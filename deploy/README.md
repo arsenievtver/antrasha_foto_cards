@@ -103,8 +103,9 @@ bash deploy/scripts/tls-enable.sh
 
 This script:
 - requests certificates via `certbot` (webroot challenge),
-- switches nginx config to TLS template,
-- recreates nginx with `443` enabled.
+- copies the TLS template [`deploy/nginx/default.tls.conf.template`](nginx/default.tls.conf.template) over `deploy/nginx/templates/default.conf.template` and recreates nginx.
+
+**Important:** the official `nginx` Docker image turns **every** file matching `*.template` under `deploy/nginx/templates/` into a separate `.conf`. Do not place the TLS template there until certificates exist — it would make nginx load broken `443` blocks and crash-loop. The TLS file lives **next to** `templates/`, not inside it.
 
 Check:
 

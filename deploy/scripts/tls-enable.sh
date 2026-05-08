@@ -37,7 +37,8 @@ compose run --rm certbot certonly \
   --agree-tos --no-eff-email --non-interactive
 
 echo "[step] switching nginx template to TLS"
-cp "$DEPLOY_DIR/nginx/templates/default.tls.conf.template" "$DEPLOY_DIR/nginx/templates/default.conf.template"
+# NB: только один файл *.template в deploy/nginx/templates/ — иначе образ nginx генерит несколько *.conf и падает на лишнем SSL без сертификатов
+cp "$DEPLOY_DIR/nginx/default.tls.conf.template" "$DEPLOY_DIR/nginx/templates/default.conf.template"
 
 echo "[step] recreating nginx"
 compose up -d --force-recreate nginx
