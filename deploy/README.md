@@ -49,16 +49,51 @@ docker compose -f deploy/docker-compose.prod.yml --project-directory deploy ps
 
 ## 5) Updates (one command)
 
+На сервере из каталога репозитория (например `/opt/antrasha_tinder`):
+
 ```bash
 bash deploy/scripts/update.sh
 ```
 
-This script does:
+Или то же самое через обёртку (удобно запомнить одно имя):
+
+```bash
+bash deploy/scripts/server-pull-deploy.sh
+```
+
+Оба варианта делают:
 - `git pull --ff-only`
-- image rebuild
-- container restart
-- Alembic migrations
-- health check
+- сборка образов `backend` / `frontend` / `admin`
+- подъём Postgres, миграции Alembic **до** перезапуска API
+- `docker compose up -d` всего стека
+- проверка `/health`
+
+### После изменений кода локально (рабочий цикл)
+
+1. Локально: закоммить и **запушить** в `main` (или ту ветку, с которой клонируешь прод).
+2. На сервере по SSH:
+
+```bash
+cd /opt/antrasha_tinder
+bash deploy/scripts/server-pull-deploy.sh
+```
+
+3. Если в коммите менялся каталог тегов [`backend/app/tag_catalog_seed.py`](../backend/app/tag_catalog_seed.py), один раз после деплоя добавь сид:
+
+```bash
+bash deploy/scripts/server-pull-deploy.sh --with-tags
+```
+
+Это то же самое, что `TAG_CATALOG_SEED=1 bash deploy/scripts/update.sh`.
+
+**Про сид тегов:** идемпотентно — новые теги добавятся, пары группа+имя не дублируются. Повторный seed **обновляет поля групп** (title, min/max, сортировки) для совпадающих `slug` из файла; правки **метаданных групп** только в админке на сервере могут быть перезаписаны при следующем сиде. Сами уже существующие теги с тем же именем сид не пересоздаёт.
+
+Ручной сид без полного деплоя:
+
+```bash
+docker compose -f deploy/docker-compose.prod.yml --project-directory deploy exec -T backend \
+  python -m app.tag_catalog_seed
+```
 
 ## 6) Backups and restore
 

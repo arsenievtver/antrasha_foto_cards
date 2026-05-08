@@ -36,6 +36,11 @@ compose run --rm --no-deps backend alembic upgrade head
 echo "[step] restarting services"
 compose up -d --remove-orphans
 
+if [[ "${TAG_CATALOG_SEED:-0}" == "1" ]]; then
+  echo "[step] tag catalog seed (TAG_CATALOG_SEED=1)"
+  compose exec -T backend python -m app.tag_catalog_seed
+fi
+
 echo "[step] smoke check /health (nginx :80 или backend :8000)"
 for _ in 1 2 3 4 5 6 7 8 9 10; do
   if curl -fsS "http://127.0.0.1/health" >/dev/null 2>&1; then
