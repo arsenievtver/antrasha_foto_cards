@@ -1,0 +1,36 @@
+# Применяется к build-context backend/ (deploy/docker-compose.prod.yml: context: ../backend).
+
+# VCS / IDE / OS
+.git
+.idea
+.vscode
+.DS_Store
+
+# Python
+__pycache__
+**/__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info
+.pytest_cache
+.mypy_cache
+.ruff_cache
+
+# Виртуальные окружения
+.venv
+venv
+env
+
+# Логи и runtime artefacts
+logs
+*.log
+var
+
+# Секреты
+.env
+.env.local
+*.pem
+*.key
+key.json

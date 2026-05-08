@@ -3,3 +3,5 @@ env/.env.backend.prod
 env/.env.postgres.prod
 backups/
 nginx/certs/
+nginx/letsencrypt/
+nginx/acme/

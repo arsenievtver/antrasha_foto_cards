@@ -1,0 +1,61 @@
+# Применяется к build-context корня репозитория (Dockerfile.frontend, admin/Dockerfile).
+# Бэкенд использует свой backend/.dockerignore (его context = backend/).
+
+# VCS / IDE / OS
+.git
+.gitignore
+.idea
+.vscode
+.DS_Store
+
+# Build artifacts (статика собирается ВНУТРИ образа, не нужно тащить наружу)
+dist
+admin/dist
+backend/dist
+*.tsbuildinfo
+
+# Зависимости (npm ci ставит свежие в образе)
+node_modules
+**/node_modules
+
+# Логи
+logs
+*.log
+npm-debug.log*
+
+# Секреты — не должны попадать в образы
+.env
+.env.local
+.env.*.local
+backend/.env
+deploy/env/.env.prod
+deploy/env/.env.backend.prod
+deploy/env/.env.postgres.prod
+key.json
+*.pem
+*.key
+
+# Артефакты certbot/Let's Encrypt — создаются под root, недоступны для чтения и не нужны в образе
+deploy/nginx/letsencrypt
+deploy/nginx/acme
+deploy/nginx/certs
+deploy/backups
+
+# Скрипты деплоя/dev — не нужны во фронтенд/админ образах
+deploy/scripts
+
+# Backend artefacts — на случай совместного запуска frontend в этом контексте
+backend/var
+backend/logs
+backend/__pycache__
+**/__pycache__
+*.pyc
+*.pyo
+
+# Editor / OS junk
+*.swp
+*.swo
+Thumbs.db
+
+# Локальные файлы Cursor/IDE
+terminals
