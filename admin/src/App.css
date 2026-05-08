@@ -1,0 +1,772 @@
+:root {
+  --bg: #0f1115;
+  --surface: #181b21;
+  --border: #2a2f3a;
+  --text: #e8eaef;
+  --muted: #8b929e;
+  --accent: #6c9eff;
+  --danger: #f07178;
+  --ok: #7fd99a;
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--bg);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+.table-link {
+  font-weight: 600;
+}
+
+.detail-meta th {
+  text-align: left;
+  padding: 0.35rem 1.25rem 0.35rem 0;
+  color: var(--muted);
+  font-weight: 500;
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+.detail-meta td {
+  padding: 0.35rem 0;
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+  border: none;
+  border-radius: 8px;
+  padding: 0.55rem 1rem;
+  background: var(--accent);
+  color: #0a0c10;
+  font-weight: 600;
+}
+
+button.secondary {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+button.danger {
+  background: var(--danger);
+  color: #0a0c10;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+input,
+select {
+  font: inherit;
+  padding: 0.5rem 0.65rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  width: 100%;
+}
+
+.layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+.sidebar {
+  width: 220px;
+  padding: 1.25rem;
+  border-right: 1px solid var(--border);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.sidebar h1 {
+  font-size: 1rem;
+  margin: 0 0 1rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.sidebar a {
+  display: block;
+  padding: 0.45rem 0.6rem;
+  border-radius: 6px;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.sidebar a:hover,
+.sidebar a.active {
+  background: #222731;
+}
+
+.sidebar .meta {
+  margin-top: auto;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+main.content {
+  flex: 1;
+  padding: 1.5rem 2rem;
+  overflow: auto;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.25rem;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.stat {
+  padding: 1rem;
+  border-radius: 10px;
+  background: #141821;
+  border: 1px solid var(--border);
+}
+
+.stat .v {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.stat .k {
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.login-wrap {
+  max-width: 420px;
+  margin: 4rem auto;
+  padding: 0 1rem;
+}
+
+.tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.tabs button {
+  flex: 1;
+  background: var(--surface);
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+
+.tabs button.active {
+  color: var(--text);
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.form-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.error {
+  color: var(--danger);
+  font-size: 0.9rem;
+}
+
+.photo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.photo-cell {
+  position: relative;
+  aspect-ratio: 3/4;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 2px solid transparent;
+  background: #141821;
+}
+
+.photo-cell.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.photo-cell .pick {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 2;
+  width: 1.15rem;
+  height: 1.15rem;
+  cursor: pointer;
+  accent-color: var(--accent);
+}
+
+.photo-thumb {
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  margin: 0;
+  border: none;
+  cursor: pointer;
+  display: block;
+  background: transparent;
+}
+
+.photo-thumb:hover .photo-cell-inner {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.photo-cell-inner {
+  width: 100%;
+  height: 100%;
+}
+
+.photo-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  z-index: 50;
+}
+
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  max-width: 720px;
+  width: 100%;
+  max-height: 90vh;
+  overflow: auto;
+  padding: 1.25rem;
+}
+
+.tag-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+
+.tag-checks label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  padding: 0.35rem 0.5rem;
+  background: #141821;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 0.5rem 0.65rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: flex-end;
+  margin-bottom: 1rem;
+}
+
+.toolbar label {
+  font-size: 0.75rem;
+  color: var(--muted);
+  display: block;
+}
+
+.flex-gap {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+/* Узкая ширина — удобнее с телефона */
+@media (max-width: 720px) {
+  .layout {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    width: 100%;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    padding: 0.65rem 0.85rem;
+  }
+
+  .sidebar h1 {
+    width: 100%;
+    margin-bottom: 0.35rem;
+  }
+
+  .sidebar a {
+    padding: 0.35rem 0.5rem;
+    font-size: 0.82rem;
+  }
+
+  .sidebar .meta {
+    width: 100%;
+    margin-top: 0.35rem;
+  }
+
+  main.content {
+    padding: 1rem;
+  }
+}
+
+/* Страница разметки */
+.tagging-page {
+  max-width: 720px;
+}
+
+.tagging-title {
+  margin-top: 0;
+}
+
+.tagging-lead {
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.tagging-actions {
+  margin: 1rem 0;
+}
+
+.tagging-actions button {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
+}
+
+.tagging-meta {
+  margin-bottom: 0.75rem;
+}
+
+.tagging-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 0.5rem;
+}
+
+.tagging-thumb {
+  position: relative;
+  aspect-ratio: 3/4;
+  border-radius: 10px;
+  overflow: hidden;
+  padding: 0;
+  border: 2px solid var(--border);
+  background: #141821;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.tagging-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.tagging-thumb-busy {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.tagging-editor-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.88);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: none;
+}
+
+.tagging-editor {
+  width: 100%;
+  max-height: min(92dvh, 100%);
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  background: var(--surface);
+  border-radius: 16px 16px 0 0;
+  /* «Чёлка» / статус-бар: превью не заходит под вырез */
+  padding: max(0.65rem, env(safe-area-inset-top, 0px)) 0.85rem
+    calc(0.75rem + env(safe-area-inset-bottom, 0px));
+  border: 1px solid var(--border);
+  border-bottom: none;
+}
+
+/* Превью книжное (портрет), на всю ширину панели — удобно для мобилки и вертикальных фото */
+.tagging-editor-img-wrap {
+  border-radius: 12px;
+  overflow: hidden;
+  background: #0a0c10;
+  width: 100%;
+  flex-shrink: 0;
+  aspect-ratio: 3 / 4;
+  max-height: min(62dvh, 560px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tagging-editor-img {
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.tagging-timer {
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin: 0.5rem 0;
+}
+
+.tag-type-tabs {
+  display: flex;
+  gap: 0.35rem;
+  overflow-x: auto;
+  padding: 0.5rem 0;
+  margin: 0 -0.25rem;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+
+.tag-type-tab {
+  flex: 0 0 auto;
+  padding: 0.45rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: #141821;
+  color: var(--muted);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.tag-type-tab.active {
+  color: var(--text);
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.tag-pill-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-bottom: 0.75rem;
+  min-height: 2.5rem;
+}
+
+.tag-pill {
+  padding: 0.5rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: #141821;
+  color: var(--text);
+  font-size: 0.9rem;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.tag-pill.on {
+  background: rgba(108, 158, 255, 0.25);
+  border-color: var(--accent);
+  color: #cfe0ff;
+}
+
+.tag-pill.tag-pill--blocked {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+.tagging-editor-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.tagging-editor-actions button {
+  flex: 1;
+  padding: 0.65rem;
+  font-size: 1rem;
+}
+
+.tagging-editor-wide {
+  max-width: 520px;
+}
+
+/* Вкладки секций: строка с горизонтальным скроллом; у каждой вкладки min-width,
+   чтобы справа всегда «торчала» следующая — видно, что есть ещё разделы */
+.tagging-section-tabs {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.4rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.5rem 2px 0.45rem;
+  margin: 0 -6px 0.35rem;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+}
+
+.tagging-section-tabs .tag-type-tab {
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+  /* % от строки вкладок (панель редактора): двум не хватает всей ширины — третья торчит */
+  min-width: max(8.25rem, 43%);
+  max-width: 100%;
+  white-space: nowrap;
+}
+
+.tagging-group-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0.5rem;
+  margin: 0.5rem 0 0.75rem;
+}
+
+.tagging-group-card {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.35rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #0d0f14;
+  cursor: pointer;
+  text-align: left;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.tagging-group-card--ok {
+  border-color: rgba(76, 175, 80, 0.55);
+}
+
+.tagging-group-card--over {
+  border-color: rgba(255, 183, 77, 0.65);
+}
+
+.tagging-group-card--over .tagging-group-check {
+  color: #aed581;
+}
+
+.tagging-group-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.tagging-group-card-title {
+  font-weight: 600;
+  font-size: 0.88rem;
+  color: #f2f4f8;
+}
+
+.tagging-group-check {
+  flex-shrink: 0;
+  color: #66bb6a;
+  font-weight: 700;
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+.tagging-group-card-meta {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.tagging-group-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(0, 0, 0, 0.82);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(0.75rem, env(safe-area-inset-top)) 1rem 1rem;
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: none;
+}
+
+.tagging-group-modal {
+  background: var(--surface);
+  border-radius: 14px;
+  padding: 1rem;
+  max-width: 440px;
+  width: 100%;
+  max-height: min(82dvh, calc(100% - 2rem));
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  border: 1px solid var(--border);
+}
+
+.tagging-group-modal-title {
+  margin: 0 0 0.35rem;
+  font-size: 1.05rem;
+}
+
+.tagging-group-modal-close {
+  width: 100%;
+  margin-top: 0.75rem;
+}
+
+.tagging-signals-label {
+  margin: 0 0 0.35rem;
+  font-size: 0.82rem;
+}
+
+.tagging-signals {
+  display: flex;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.85rem;
+}
+
+.tagging-signal {
+  flex: 1;
+  min-width: 7rem;
+  padding: 0.5rem 0.45rem;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #141821;
+  color: var(--text);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.tagging-signal.on {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.tagging-add-custom {
+  display: flex;
+  gap: 0.45rem;
+  align-items: center;
+  margin-top: 0.65rem;
+}
+
+.tagging-add-custom input {
+  flex: 1;
+  padding: 0.45rem 0.55rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #0f1218;
+  color: var(--text);
+}
+
+@media (min-width: 540px) {
+  .tagging-editor-backdrop {
+    align-items: center;
+    padding: 1rem;
+    padding-top: max(1rem, env(safe-area-inset-top));
+  }
+
+  .tagging-editor {
+    border-radius: 16px;
+    border-bottom: 1px solid var(--border);
+    max-height: min(88dvh, 100%);
+  }
+
+  .tagging-editor-wide {
+    max-width: 520px;
+  }
+
+  .tagging-editor-img-wrap {
+    max-height: min(66dvh, 620px);
+  }
+}

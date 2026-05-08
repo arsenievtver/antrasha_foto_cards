@@ -1,0 +1,5 @@
+env/.env.prod
+env/.env.backend.prod
+env/.env.postgres.prod
+backups/
+nginx/certs/

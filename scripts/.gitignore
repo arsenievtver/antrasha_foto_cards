@@ -1,0 +1,6 @@
+.backend.pid
+.frontend.pid
+.admin.pid
+logs-backend.txt
+logs-frontend.txt
+logs-admin.txt

@@ -1,0 +1,14 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: antrasha
+      POSTGRES_PASSWORD: antrasha
+      POSTGRES_DB: antrasha
+    ports:
+      - "5433:5432"
+    volumes:
+      - antrasha_pg:/var/lib/postgresql/data
+
+volumes:
+  antrasha_pg:

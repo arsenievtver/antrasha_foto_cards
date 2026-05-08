@@ -1,0 +1,110 @@
+.user-menu-trigger {
+	position: absolute;
+	top: calc(12px + env(safe-area-inset-top, 0px));
+	right: calc(12px + env(safe-area-inset-right, 0px));
+	/* Выше оверлея подсказки свайпа на странице ленты (гость может открыть вход) */
+	z-index: 170;
+	padding: 0;
+	border: none;
+	background: transparent;
+	cursor: pointer;
+}
+
+.user-menu-avatar {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 36px;
+	height: 36px;
+	border-radius: 50%;
+	background: rgba(255, 255, 255, 0.12);
+	border: 1px solid rgba(255, 255, 255, 0.35);
+	color: #fff;
+	font-size: 14px;
+	font-weight: 600;
+	text-transform: uppercase;
+}
+
+.user-menu-backdrop {
+	position: fixed;
+	inset: 0;
+	z-index: 200;
+	background: rgba(0, 0, 0, 0.55);
+	display: flex;
+	align-items: flex-start;
+	justify-content: center;
+	padding: calc(72px + env(safe-area-inset-top, 0px)) 16px 16px;
+	box-sizing: border-box;
+}
+
+.user-menu-modal {
+	position: relative;
+	width: 100%;
+	max-width: 340px;
+	padding: 20px;
+	border-radius: 12px;
+	background: #1e1e1d;
+	border: 1px solid rgba(255, 255, 255, 0.15);
+	color: #f9f9f9;
+	box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
+}
+
+.user-menu-close {
+	position: absolute;
+	top: 8px;
+	right: 12px;
+	border: none;
+	background: none;
+	color: rgba(255, 255, 255, 0.55);
+	font-size: 28px;
+	line-height: 1;
+	cursor: pointer;
+	padding: 4px;
+}
+
+.user-menu-title {
+	margin: 0 0 8px;
+	font-size: 1.15rem;
+	font-weight: 600;
+	padding-right: 28px;
+}
+
+.user-menu-meta {
+	margin: 0 0 16px;
+	font-size: 0.9rem;
+	color: rgba(255, 255, 255, 0.65);
+}
+
+.user-menu-form {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.user-menu-label {
+	font-size: 0.75rem;
+	color: rgba(255, 255, 255, 0.55);
+	margin-top: 4px;
+}
+
+.user-menu-input {
+	width: 100%;
+	box-sizing: border-box;
+	padding: 10px 12px;
+	border-radius: 8px;
+	border: 1px solid rgba(255, 255, 255, 0.25);
+	background: rgba(0, 0, 0, 0.25);
+	color: #fff;
+	font-size: 16px;
+}
+
+.user-menu-error {
+	margin: 4px 0 0;
+	font-size: 0.85rem;
+	color: #ff8a80;
+}
+
+.user-menu-action {
+	width: 100%;
+	margin-top: 12px;
+}
