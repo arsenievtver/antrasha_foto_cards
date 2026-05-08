@@ -1,6 +1,8 @@
 import asyncio
 import logging
 
+from sqlalchemy.exc import ProgrammingError
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -66,7 +68,13 @@ async def lifespan(_app: FastAPI):
     )
     db_boot = SessionLocal()
     try:
-        reset_stale_processing_jobs(db_boot, older_than_minutes=90)
+        try:
+            reset_stale_processing_jobs(db_boot, older_than_minutes=90)
+        except ProgrammingError:
+            db_boot.rollback()
+            log.warning(
+                "lifespan: reset_stale_processing_jobs пропущен — БД без миграций или нет таблицы ai_ingest_jobs; выполните alembic upgrade head",
+            )
     finally:
         db_boot.close()
 

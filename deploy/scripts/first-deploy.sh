@@ -8,21 +8,45 @@ ensure_compose
 
 mkdir -p "$DEPLOY_DIR/env" "$DEPLOY_DIR/nginx/certs"
 
-cp -n "$DEPLOY_DIR/env/.env.prod.example" "$DEPLOY_DIR/env/.env.prod" || true
-cp -n "$DEPLOY_DIR/env/.env.backend.prod.example" "$DEPLOY_DIR/env/.env.backend.prod" || true
-cp -n "$DEPLOY_DIR/env/.env.postgres.prod.example" "$DEPLOY_DIR/env/.env.postgres.prod" || true
+# Не перетирать уже созданные .env при повторном запуске (портативно без cp -n warnings)
+for _pair in \
+  ".env.prod.example|.env.prod" \
+  ".env.backend.prod.example|.env.backend.prod" \
+  ".env.postgres.prod.example|.env.postgres.prod"; do
+  _src="$DEPLOY_DIR/env/${_pair%%|*}"
+  _dst="$DEPLOY_DIR/env/${_pair##*|}"
+  if [[ ! -f "$_dst" ]]; then cp "$_src" "$_dst"; fi
+done
 
 ensure_env_files
 
-echo "[step] building and starting containers"
-compose up -d --build
+echo "[step] build images"
+compose build backend frontend admin
 
-echo "[step] waiting for backend health"
+echo "[step] start postgres only"
+compose up -d postgres
+
+echo "[step] wait for postgres readiness"
+set -a
+# shellcheck disable=SC1091
+source "$DEPLOY_DIR/env/.env.postgres.prod"
+set +a
+for _i in $(seq 1 60); do
+  if compose exec -T postgres pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB" >/dev/null 2>&1; then
+    break
+  fi
+  sleep 2
+done
+
+echo "[step] apply migrations (до старта API — иначе lifespan падает на пустой БД)"
+compose run --rm --no-deps backend alembic upgrade head
+
+echo "[step] starting all containers"
+compose up -d --remove-orphans
+
+echo "[step] backend health pause"
 sleep 6
 compose ps
 
-echo "[step] applying database migrations"
-compose exec -T backend alembic upgrade head
-
 echo "[ok] first deploy done"
-echo "Next: test health endpoint -> curl -I http://127.0.0.1/health"
+echo "Next: curl -fsS http://127.0.0.1:8000/health  затем после nginx → curl -fsS http://127.0.0.1/health"
