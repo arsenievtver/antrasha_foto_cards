@@ -4,8 +4,8 @@
 
 1. Create Ubuntu 22.04 VM in Yandex Cloud.
 2. Point DNS records:
-   - `app.example.ru` -> VM public IP
-   - `admin.example.ru` -> VM public IP
+   - `new.antrasha.ru` -> VM public IP
+   - `admin.antrasha.ru` -> VM public IP
 3. SSH to VM and install base dependencies:
 
 ```bash
