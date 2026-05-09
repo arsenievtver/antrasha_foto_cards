@@ -14,7 +14,10 @@ from app.config import Settings, settings
 from app.database import SessionLocal
 from app.models import AiIngestJob
 from app.services.fashn_client import run_product_to_model_png
-from app.services.image_prepare import build_fashn_product_image_data_url
+from app.services.image_prepare import (
+    build_fashn_product_image_data_url,
+    png_bytes_to_webp,
+)
 from app.services.yc_photo_sync import ensure_photo_row_for_yc_key
 from app.services.yc_storage import put_image_object
 
@@ -79,7 +82,7 @@ def _build_result_key(prefix: str) -> str:
     p = prefix.strip()
     if p and not p.endswith("/"):
         p += "/"
-    return f"{p}ai/{uuid.uuid4()}.png"
+    return f"{p}ai/{uuid.uuid4()}.webp"
 
 
 def acquire_next_pending_job_id() -> uuid.UUID | None:
@@ -137,9 +140,16 @@ def run_single_ingest_job(cfg: Settings, job_id: uuid.UUID) -> None:
             return
 
         try:
+            webp_bytes = png_bytes_to_webp(png_bytes, quality=85)
+        except Exception as e:
+            log.exception("webp encode job_id=%s", job_id)
+            _fail_job(db, job, f"Кодирование WebP: {e}")
+            return
+
+        try:
             bucket, prefix = _bucket_and_prefix_for_gender(cfg, job.gender)
             key = _build_result_key(prefix)
-            put_image_object(bucket, key, png_bytes, content_type="image/png")
+            put_image_object(bucket, key, webp_bytes, content_type="image/webp")
             ensure_photo_row_for_yc_key(
                 db,
                 settings=cfg,

@@ -369,64 +369,66 @@ export default function Swipe() {
 					</div>
 				</div>
 			)}
-			<AnimatePresence>
-				{stack.map((photo, i) => {
-					const isTop = i === 0;
-					const isLeaving = isTop && isExiting;
+			<div className="swipe-stack-wrap">
+				<AnimatePresence>
+					{stack.map((photo, i) => {
+						const isTop = i === 0;
+						const isLeaving = isTop && isExiting;
 
-					return (
-						<motion.div
-							key={photo.id}
-							className="swipe-card"
-							drag={isTop && !isExiting ? "x" : false}
-							dragConstraints={{ left: 0, right: 0 }}
-							dragElastic={0.8}
-							dragMomentum={true}
-							onDrag={isTop ? handleDrag : undefined}
-							onDragEnd={isTop ? handleDragEnd : undefined}
-							/* Только верхняя карта появляется с fade; нижние сразу opacity:1 — иначе стопка выглядела как «пустые дыры» */
-							initial={
-								i === 0
-									? { scale: 0.96, y: 0, opacity: 0 }
-									: { scale: 1, y: i * -10, opacity: 1 }
-							}
-							animate={
-								isLeaving
-									? {
-											x: overlay === "like" ? 1000 : -1000,
-											opacity: 0,
-										}
-									: { scale: 1, y: i * -10, opacity: 1 }
-							}
-							exit={{ opacity: 0 }}
-							style={{ zIndex: 10 - i }}
-							transition={{ duration: i === 0 ? 0.35 : 0.2 }}
-						>
-							<CardImage
+						return (
+							<motion.div
 								key={photo.id}
-								url={photo.url}
-								photoId={photo.id}
-								fetchPriority={isTop ? "high" : "low"}
-							/>
-							{isTop && overlay && (
-								<div className={`overlay ${overlay}`}>
-									{overlay === "like" ? "Нравится" : "Пропуск"}
-								</div>
-							)}
-							{isTop && showInfo && photoInfo ? (
-								<div className="swipe-photo-info" role="status" aria-live="polite">
-									<p>
-										Бренд: <strong>{photoInfo.brand}</strong>
-									</p>
-									<p>
-										Тип изделия: <strong>{photoInfo.productType}</strong>
-									</p>
-								</div>
-							) : null}
-						</motion.div>
-					);
-				})}
-			</AnimatePresence>
+								className="swipe-card"
+								drag={isTop && !isExiting ? "x" : false}
+								dragConstraints={{ left: 0, right: 0 }}
+								dragElastic={0.8}
+								dragMomentum={true}
+								onDrag={isTop ? handleDrag : undefined}
+								onDragEnd={isTop ? handleDragEnd : undefined}
+								/* Только верхняя карта появляется с fade; нижние сразу opacity:1 — иначе стопка выглядела как «пустые дыры» */
+								initial={
+									i === 0
+										? { scale: 0.96, y: 0, opacity: 0 }
+										: { scale: 1, y: i * -10, opacity: 1 }
+								}
+								animate={
+									isLeaving
+										? {
+												x: overlay === "like" ? 1000 : -1000,
+												opacity: 0,
+											}
+										: { scale: 1, y: i * -10, opacity: 1 }
+								}
+								exit={{ opacity: 0 }}
+								style={{ zIndex: 10 - i }}
+								transition={{ duration: i === 0 ? 0.35 : 0.2 }}
+							>
+								<CardImage
+									key={photo.id}
+									url={photo.url}
+									photoId={photo.id}
+									fetchPriority={isTop ? "high" : "low"}
+								/>
+								{isTop && overlay && (
+									<div className={`overlay ${overlay}`}>
+										{overlay === "like" ? "Нравится" : "Пропуск"}
+									</div>
+								)}
+								{isTop && showInfo && photoInfo ? (
+									<div className="swipe-photo-info" role="status" aria-live="polite">
+										<p>
+											Бренд: <strong>{photoInfo.brand}</strong>
+										</p>
+										<p>
+											Тип изделия: <strong>{photoInfo.productType}</strong>
+										</p>
+									</div>
+								) : null}
+							</motion.div>
+						);
+					})}
+				</AnimatePresence>
+			</div>
 
 			{index < photos.length && (
 				<div className="swipe-buttons">

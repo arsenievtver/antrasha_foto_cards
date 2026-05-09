@@ -1,26 +1,41 @@
+/*
+ * Safe-area только в .app-shell (App.css): здесь не дублируем env(safe-area-inset-*),
+ * иначе в standalone (PWA) сверху двойной отступ и карточки уезжают вниз под кнопки.
+ */
 .swipe-container {
     background: #2B2B2A;
     display: flex;
-    justify-content: center;
-    align-items: flex-start;
-    padding-top: calc(5dvh + env(safe-area-inset-top, 0px));
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: stretch;
+    padding-top: max(8px, min(5dvh, 28px));
     flex: 1;
     min-height: 0;
     height: 100%;
     position: relative;
     overflow: hidden;
+    box-sizing: border-box;
+}
+
+.swipe-stack-wrap {
+    flex: 1;
+    min-height: 0;
+    position: relative;
+    width: 100%;
 }
 
 .swipe-card {
     width: 90vw;
     max-width: 400px;
-    height: 80dvh;
+    height: 100%;
     max-height: 700px;
     background: #2B2B2A;
     border-radius: 20px;
     overflow: hidden;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
     position: absolute;
+    left: 50%;
+    top: 0;
     transform: translateX(-50%);
     display: flex;
     justify-content: center;
@@ -121,17 +136,18 @@
     background: #2b2b2a;
 }
 
-/* Контейнер кнопок */
+/* В потоке колонки: высота карточек не пересекается с кнопками (в т.ч. в PWA). */
 .swipe-buttons {
     display: grid;
     grid-template-columns: 1fr auto 1fr;
     align-items: center;
     width: min(320px, 82vw);
-    position: fixed;              /* фиксируем на экране */
-    bottom: 30px;                 /* отступ от низа */
-    left: 50%;                    /* центрируем по горизонтали */
-    transform: translateX(-50%);
-    z-index: 100;                 /* поверх карточек */
+    flex-shrink: 0;
+    align-self: center;
+    margin-top: 10px;
+    margin-bottom: 12px;
+    z-index: 100;
+    position: relative;
 }
 
 /* Кнопки */

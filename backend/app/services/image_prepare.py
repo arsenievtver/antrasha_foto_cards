@@ -61,3 +61,18 @@ def build_fashn_product_image_data_url(path: Path) -> str:
     raw = buf.getvalue()
     b64 = base64.b64encode(raw).decode("ascii")
     return f"data:image/jpeg;base64,{b64}"
+
+
+def png_bytes_to_webp(png_bytes: bytes, *, quality: int = 85) -> bytes:
+    """PNG от Fashn → WebP для загрузки в Object Storage (качество 0–100)."""
+    img = Image.open(io.BytesIO(png_bytes))
+    img.load()
+    if img.mode == "P":
+        img = img.convert("RGBA")
+    elif img.mode == "LA":
+        img = img.convert("RGBA")
+    elif img.mode not in ("RGB", "RGBA"):
+        img = img.convert("RGB")
+    out = io.BytesIO()
+    img.save(out, format="WEBP", quality=quality)
+    return out.getvalue()
