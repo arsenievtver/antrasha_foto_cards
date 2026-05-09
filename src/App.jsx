@@ -14,10 +14,11 @@ import "./App.css";
 function AppShell() {
 	const { pathname } = useLocation();
 	const scrollMain = pathname === "/thank-you";
+	const showUserMenu = pathname === "/" || pathname === "/thank-you";
 
 	return (
 		<div className="app-shell">
-			<UserMenu />
+			{showUserMenu ? <UserMenu /> : null}
 			<div className={`app-main${scrollMain ? " app-main--scroll" : ""}`}>
 				<Routes>
 					<Route path="/" element={<Home />} />

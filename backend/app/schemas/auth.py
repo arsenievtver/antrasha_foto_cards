@@ -32,3 +32,15 @@ class MeOut(BaseModel):
 class AdminSuperuserLoginRequest(BaseModel):
     username: str
     password: str
+
+
+class FittingRequestCreateRequest(BaseModel):
+    likes: int = Field(ge=0, default=0)
+    total: int = Field(ge=0, default=0)
+    photo_ids: list[uuid.UUID] = Field(default_factory=list, max_length=200)
+    note: str | None = Field(default=None, max_length=1000)
+
+
+class FittingRequestCreateResponse(BaseModel):
+    request_id: uuid.UUID
+    status: str

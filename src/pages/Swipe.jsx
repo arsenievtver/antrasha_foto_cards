@@ -139,7 +139,9 @@ export default function Swipe() {
 	const [index, setIndex] = useState(0);
 	const [isExiting, setIsExiting] = useState(false);
 	const [likes, setLikes] = useState(0);
+	const [likedPhotoIds, setLikedPhotoIds] = useState([]);
 	const [overlay, setOverlay] = useState(null);
+	const [showInfo, setShowInfo] = useState(false);
 
 	const swipeHandledRef = useRef(false);
 	const cardShownAtRef = useRef(Date.now());
@@ -153,7 +155,9 @@ export default function Swipe() {
 		setPhotos([]);
 		setIndex(0);
 		setLikes(0);
+		setLikedPhotoIds([]);
 		setOverlay(null);
+		setShowInfo(false);
 		setIsExiting(false);
 		swipeHandledRef.current = false;
 
@@ -182,6 +186,20 @@ export default function Swipe() {
 	}, [index]);
 
 	const currentPhoto = photos[index];
+	const photoInfo = useMemo(() => {
+		if (!currentPhoto) return null;
+		const tags = Array.isArray(currentPhoto.tags) ? currentPhoto.tags : [];
+		const brandTag =
+			tags.find((t) => t.type === "brand" && t.name) ||
+			tags.find((t) => t.type === "label" && t.name);
+		const productTypeTag =
+			tags.find((t) => t.type === "product_type" && t.name) ||
+			tags.find((t) => t.type === "garment_type" && t.name);
+		return {
+			brand: brandTag?.name || "не указан",
+			productType: productTypeTag?.name || "не указан",
+		};
+	}, [currentPhoto]);
 
 	const sendSwipe = useCallback(
 		async (direction) => {
@@ -209,17 +227,27 @@ export default function Swipe() {
 
 		const newLikes = direction === "right" ? likes + 1 : likes;
 		if (direction === "right") setLikes(newLikes);
+		const nextLikedPhotoIds =
+			direction === "right"
+				? [...likedPhotoIds, currentPhoto.id]
+				: likedPhotoIds;
+		if (direction === "right") setLikedPhotoIds(nextLikedPhotoIds);
 
 		const nextIndex = index + 1;
 		if (nextIndex >= photos.length) {
 			navigate("/thank-you", {
-				state: { likes: newLikes, total: photos.length },
+				state: {
+					likes: newLikes,
+					total: photos.length,
+					likedPhotoIds: nextLikedPhotoIds,
+				},
 			});
 			return;
 		}
 
 		setIndex(nextIndex);
 		setOverlay(null);
+		setShowInfo(false);
 		setIsExiting(false);
 
 		setTimeout(() => {
@@ -385,6 +413,16 @@ export default function Swipe() {
 									{overlay === "like" ? "Нравится" : "Пропуск"}
 								</div>
 							)}
+							{isTop && showInfo && photoInfo ? (
+								<div className="swipe-photo-info" role="status" aria-live="polite">
+									<p>
+										Бренд: <strong>{photoInfo.brand}</strong>
+									</p>
+									<p>
+										Тип изделия: <strong>{photoInfo.productType}</strong>
+									</p>
+								</div>
+							) : null}
 						</motion.div>
 					);
 				})}
@@ -395,14 +433,22 @@ export default function Swipe() {
 					<button
 						type="button"
 						onClick={() => handleButtonSwipe("left")}
-						className="swipe-btn nope"
+						className="swipe-btn swipe-btn--left nope"
 					>
 						👎
 					</button>
 					<button
 						type="button"
+						className="swipe-btn-info"
+						onClick={() => setShowInfo((v) => !v)}
+						aria-label="Показать описание фото"
+					>
+						!
+					</button>
+					<button
+						type="button"
 						onClick={() => handleButtonSwipe("right")}
-						className="swipe-btn like"
+						className="swipe-btn swipe-btn--right like"
 					>
 						👍
 					</button>

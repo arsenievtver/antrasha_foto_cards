@@ -14,6 +14,7 @@ from app.deps import AdminPrincipal, get_admin_principal, require_superuser
 from app.models import (
     PHOTO_SOURCE_YC_OBJECT_STORAGE,
     Brand,
+    FittingRequest,
     Interaction,
     Photo,
     PhotoTag,
@@ -37,6 +38,8 @@ from app.schemas.admin import (
     AdminPhotoTagOut,
     AdminPhotoTagsPutBody,
     AdminBrandCreateRequest,
+    AdminFittingRequestListResponse,
+    AdminFittingRequestOut,
     AdminBrandListResponse,
     AdminBrandOut,
     AdminStatsOut,
@@ -44,6 +47,7 @@ from app.schemas.admin import (
     AdminTagCreateRequest,
     AdminTagListResponse,
     AdminTagOut,
+    AdminTagUpdateRequest,
     AdminUserCreateRequest,
     AdminUserDetailOut,
     AdminUserListResponse,
@@ -810,6 +814,47 @@ def delete_tag(
     db.commit()
 
 
+@router.patch("/tags/{tag_id}", response_model=AdminTagOut)
+def update_tag(
+    tag_id: uuid.UUID,
+    body: AdminTagUpdateRequest,
+    db: Session = Depends(get_db),
+    _principal: AdminPrincipal = Depends(get_admin_principal),
+) -> AdminTagOut:
+    t = db.get(Tag, tag_id)
+    if not t:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tag not found")
+    new_name = body.name.strip()
+    if not new_name:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Название тега не может быть пустым",
+        )
+    clash = db.scalar(
+        select(Tag.id).where(
+            Tag.group_id == t.group_id,
+            Tag.name == new_name,
+            Tag.id != t.id,
+        ),
+    )
+    if clash:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Тег с таким именем уже есть в этой группе",
+        )
+    t.name = new_name
+    db.commit()
+    db.refresh(t)
+    gsl = t.group.slug if t.group else None
+    return AdminTagOut(
+        id=t.id,
+        name=t.name,
+        type=t.type,
+        group_id=t.group_id,
+        group_slug=gsl,
+    )
+
+
 @router.get("/users", response_model=AdminUserListResponse)
 def list_users(
     db: Session = Depends(get_db),
@@ -1185,6 +1230,45 @@ def create_brand(
         ) from None
     db.refresh(b)
     return AdminBrandOut(id=b.id, name=b.name, created_at=b.created_at)
+
+
+@router.get("/fitting-requests", response_model=AdminFittingRequestListResponse)
+def list_fitting_requests(
+    db: Session = Depends(get_db),
+    _su: AdminPrincipal = Depends(require_superuser),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
+) -> AdminFittingRequestListResponse:
+    _ = _su
+    total = db.scalar(select(func.count()).select_from(FittingRequest)) or 0
+    rows = db.scalars(
+        select(FittingRequest)
+        .order_by(FittingRequest.created_at.desc())
+        .offset(skip)
+        .limit(limit)
+        .options(selectinload(FittingRequest.liked_photos)),
+    ).all()
+    return AdminFittingRequestListResponse(
+        items=[
+            AdminFittingRequestOut(
+                id=row.id,
+                user_id=row.user_id,
+                display_name=row.display_name,
+                phone=row.phone,
+                likes=row.likes,
+                total=row.total,
+                match_rate=float(row.match_rate or 0),
+                note=row.note,
+                status=row.status,
+                created_at=row.created_at,
+                liked_photos=[x.photo_url for x in row.liked_photos],
+            )
+            for row in rows
+        ],
+        total=total,
+        skip=skip,
+        limit=limit,
+    )
 
 
 router.include_router(_ximilar_experimental_router)

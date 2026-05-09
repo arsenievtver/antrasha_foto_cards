@@ -8,6 +8,7 @@ import Tagging from "./pages/Tagging.jsx";
 import Users from "./pages/Users.jsx";
 import UserDetail from "./pages/UserDetail.jsx";
 import AiIngest from "./pages/AiIngest.jsx";
+import FittingRequests from "./pages/FittingRequests.jsx";
 import { getRole, getToken } from "./api.js";
 
 function RequireAuth({ children }) {
@@ -83,6 +84,14 @@ export default function App() {
             element={
               <RoleRoute roles={["superuser"]}>
                 <UserDetail />
+              </RoleRoute>
+            }
+          />
+          <Route
+            path="/fitting-requests"
+            element={
+              <RoleRoute roles={["superuser"]}>
+                <FittingRequests />
               </RoleRoute>
             }
           />

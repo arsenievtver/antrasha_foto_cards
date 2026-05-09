@@ -165,6 +165,17 @@ export async function deleteTag(tagId) {
   }
 }
 
+export async function updateTag(tagId, name) {
+  const res = await fetch(apiUrl(`/admin/tags/${tagId}`), {
+    method: "PATCH",
+    headers: headersJson(),
+    body: JSON.stringify({ name }),
+  });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
 export async function bulkDeletePhotos(photoIds) {
   const res = await fetch(apiUrl("/admin/photos/bulk-delete"), {
     method: "POST",
@@ -364,6 +375,17 @@ export async function createBrand(name) {
   });
   const data = await parseResponseJson(res);
   if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
+export async function fetchFittingRequests({ skip = 0, limit = 50 } = {}) {
+  const q = new URLSearchParams({ skip: String(skip), limit: String(limit) });
+  const res = await fetch(`${apiUrl("/admin/fitting-requests")}?${q}`, { headers: headersJson() });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  if (!Array.isArray(data.items)) {
+    throw new Error("Неверный ответ API (список заявок на примерку).");
+  }
   return data;
 }
 

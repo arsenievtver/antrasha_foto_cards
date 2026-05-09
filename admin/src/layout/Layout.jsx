@@ -36,6 +36,11 @@ export default function Layout() {
             Пользователи
           </NavLink>
         )}
+        {isSuperuser && (
+          <NavLink to="/fitting-requests" className={({ isActive }) => (isActive ? "active" : "")}>
+            Заявки на примерку
+          </NavLink>
+        )}
         {(isSuperuser || isWorker) && (
           <NavLink to="/ai-ingest" className={({ isActive }) => (isActive ? "active" : "")}>
             ИИ: телефон → каталог

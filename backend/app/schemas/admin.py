@@ -47,6 +47,27 @@ class AdminBrandCreateRequest(BaseModel):
     name: str = Field(min_length=1, max_length=200)
 
 
+class AdminFittingRequestOut(BaseModel):
+    id: uuid.UUID
+    user_id: uuid.UUID | None = None
+    display_name: str | None = None
+    phone: str
+    likes: int
+    total: int
+    match_rate: float
+    note: str | None = None
+    status: str
+    created_at: datetime
+    liked_photos: list[str] = Field(default_factory=list)
+
+
+class AdminFittingRequestListResponse(BaseModel):
+    items: list[AdminFittingRequestOut]
+    total: int
+    skip: int
+    limit: int
+
+
 class AdminPhotoOut(BaseModel):
     id: uuid.UUID
     url: str
@@ -97,6 +118,10 @@ class AdminTagCreateRequest(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     type: str = Field(min_length=1, max_length=50)
     group_id: uuid.UUID | None = None
+
+
+class AdminTagUpdateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
 
 
 class PhotoTagAssign(BaseModel):

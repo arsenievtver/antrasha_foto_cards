@@ -160,6 +160,31 @@ export async function registerUser({ displayName, phone, pin }) {
 	}
 }
 
+export async function createFittingRequest({ likes, total, note, photoIds } = {}) {
+	const t = getAuthToken();
+	if (!t) throw new Error("Нужно войти в профиль");
+	const res = await fetch(apiUrl("/auth/fitting-request"), {
+		method: "POST",
+		headers: {
+			Authorization: `Bearer ${t}`,
+			"Content-Type": "application/json",
+		},
+		body: JSON.stringify({
+			likes: Number(likes) || 0,
+			total: Number(total) || 0,
+			photo_ids: Array.isArray(photoIds) ? photoIds : [],
+			note: note ?? null,
+		}),
+	});
+	const data = await res.json().catch(() => ({}));
+	if (!res.ok) {
+		throw new Error(
+			parseErrorPayload(data, `Не удалось отправить заявку (${res.status})`),
+		);
+	}
+	return data;
+}
+
 export async function postInteraction({ photoId, action, viewTimeMs }) {
 	await ensureSessionId();
 	const headers = {

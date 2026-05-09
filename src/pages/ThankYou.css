@@ -36,6 +36,10 @@
 	color: rgba(255, 255, 255, 0.45);
 }
 
+.thank-kicker span {
+	display: block;
+}
+
 .thank-stats {
 	margin: 0;
 	text-align: center;
@@ -75,6 +79,33 @@
 
 .thank-success {
 	color: rgba(180, 255, 200, 0.95);
+}
+
+.thank-fitting {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 10px;
+	border: 1px solid rgba(255, 255, 255, 0.2);
+	border-radius: 10px;
+	background: rgba(255, 255, 255, 0.04);
+}
+
+.thank-fitting-title {
+	margin: 0;
+	text-align: center;
+	font-size: 0.92rem;
+	font-weight: 600;
+	line-height: 1.4;
+	color: rgba(255, 255, 255, 0.95);
+}
+
+.thank-fitting-text {
+	margin: 0;
+	text-align: center;
+	font-size: 0.86rem;
+	line-height: 1.45;
+	color: rgba(255, 255, 255, 0.78);
 }
 
 .thank-form {

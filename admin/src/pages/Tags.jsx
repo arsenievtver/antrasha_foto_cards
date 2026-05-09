@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { createTag, deleteTag, fetchTags } from "../api.js";
+import { createTag, deleteTag, fetchTags, updateTag } from "../api.js";
 
 export default function Tags() {
   const [items, setItems] = useState([]);
@@ -7,6 +7,8 @@ export default function Tags() {
   const [type, setType] = useState("style");
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(true);
+  const [editingId, setEditingId] = useState("");
+  const [editingName, setEditingName] = useState("");
 
   async function reload() {
     const data = await fetchTags();
@@ -46,6 +48,28 @@ export default function Tags() {
     setErr("");
     try {
       await deleteTag(id);
+      if (editingId === id) {
+        setEditingId("");
+        setEditingName("");
+      }
+      await reload();
+    } catch (e) {
+      setErr(e.message);
+    }
+  }
+
+  async function onSaveEdit() {
+    if (!editingId) return;
+    const nextName = editingName.trim();
+    if (!nextName) {
+      setErr("Название тега не может быть пустым");
+      return;
+    }
+    setErr("");
+    try {
+      await updateTag(editingId, nextName);
+      setEditingId("");
+      setEditingName("");
       await reload();
     } catch (e) {
       setErr(e.message);
@@ -86,12 +110,53 @@ export default function Tags() {
           <tbody>
             {items.map((t) => (
               <tr key={t.id}>
-                <td>{t.name}</td>
+                <td>
+                  {editingId === t.id ? (
+                    <input
+                      value={editingName}
+                      onChange={(e) => setEditingName(e.target.value)}
+                      maxLength={100}
+                      autoFocus
+                    />
+                  ) : (
+                    t.name
+                  )}
+                </td>
                 <td>{t.type}</td>
                 <td>
-                  <button type="button" className="danger" onClick={() => onDelete(t.id)}>
-                    Удалить
-                  </button>
+                  <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                    {editingId === t.id ? (
+                      <>
+                        <button type="button" onClick={onSaveEdit}>
+                          Сохранить
+                        </button>
+                        <button
+                          type="button"
+                          className="secondary"
+                          onClick={() => {
+                            setEditingId("");
+                            setEditingName("");
+                          }}
+                        >
+                          Отмена
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        type="button"
+                        className="secondary"
+                        onClick={() => {
+                          setEditingId(t.id);
+                          setEditingName(t.name);
+                        }}
+                      >
+                        Переименовать
+                      </button>
+                    )}
+                    <button type="button" className="danger" onClick={() => onDelete(t.id)}>
+                      Удалить
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}

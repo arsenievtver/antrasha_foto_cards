@@ -9,9 +9,19 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.database import get_db
 from app.deps import require_user
-from app.models import User, UserRole, UserSession
+from app.models import (
+    FittingRequest,
+    FittingRequestLikedPhoto,
+    Interaction,
+    Photo,
+    User,
+    UserRole,
+    UserSession,
+)
 from app.schemas.auth import (
     AdminSuperuserLoginRequest,
+    FittingRequestCreateRequest,
+    FittingRequestCreateResponse,
     LoginRequest,
     MeOut,
     RegisterRequest,
@@ -111,3 +121,58 @@ def login_superuser(body: AdminSuperuserLoginRequest) -> TokenResponse:
         )
     token = create_access_token(role="superuser")
     return TokenResponse(access_token=token, user_id=None, role="superuser")
+
+
+@router.post("/fitting-request", response_model=FittingRequestCreateResponse)
+def create_fitting_request(
+    body: FittingRequestCreateRequest,
+    db: Session = Depends(get_db),
+    current: User = Depends(require_user),
+) -> FittingRequestCreateResponse:
+    total = max(0, int(body.total or 0))
+    likes = max(0, min(int(body.likes or 0), total if total > 0 else int(body.likes or 0)))
+    match_rate = (likes / total) if total > 0 else 0.0
+    note = body.note.strip() if body.note else None
+    requested_photo_ids = []
+    seen = set()
+    for pid in body.photo_ids:
+        if pid in seen:
+            continue
+        seen.add(pid)
+        requested_photo_ids.append(pid)
+    fr = FittingRequest(
+        user_id=current.id,
+        display_name=current.display_name,
+        phone=current.phone,
+        likes=likes,
+        total=total,
+        match_rate=match_rate,
+        note=note,
+        status="new",
+    )
+    db.add(fr)
+    db.flush()
+    if requested_photo_ids:
+        liked_rows = db.scalars(
+            select(Interaction.photo_id).where(
+                Interaction.user_id == current.id,
+                Interaction.action == "like",
+                Interaction.photo_id.in_(requested_photo_ids),
+            ),
+        ).all()
+        liked_ids = set(liked_rows)
+        if liked_ids:
+            photos = db.execute(
+                select(Photo.id, Photo.url).where(Photo.id.in_(liked_ids)),
+            ).all()
+            for pid, purl in photos:
+                db.add(
+                    FittingRequestLikedPhoto(
+                        request_id=fr.id,
+                        photo_id=pid,
+                        photo_url=purl,
+                    ),
+                )
+    db.commit()
+    db.refresh(fr)
+    return FittingRequestCreateResponse(request_id=fr.id, status=fr.status)
