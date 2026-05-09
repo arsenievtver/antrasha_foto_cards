@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -77,6 +77,8 @@ class Photo(Base):
     price_segment: Mapped[str | None] = mapped_column(String(50), nullable=True)
     # Внешний идентификатор для связи с «МойСклад» / товарным учётом (товар, модификация и т.д.).
     moy_sklad_id: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
+    # Инкремент при каждом сохранении тегов — optimistic locking в админке.
+    tags_version: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     brand_row = relationship("Brand", back_populates="photos")
     photo_tags = relationship("PhotoTag", back_populates="photo", cascade="all, delete-orphan")

@@ -72,6 +72,13 @@ function detail(data, fallback) {
   return fallback;
 }
 
+/** Ошибка HTTP с кодом — для обработки 409 (конфликт версии) и т.д. */
+export function httpError(message, status) {
+  const e = new Error(message);
+  e.status = status;
+  return e;
+}
+
 function headersJson() {
   const h = { "Content-Type": "application/json" };
   const t = getToken();
@@ -123,6 +130,13 @@ export async function fetchPhotos({ skip = 0, limit = 48, gender, activeOnly, ta
   if (!Array.isArray(data.items)) {
     throw new Error("Неверный ответ API (нет списка фото). Проверьте VITE_BACKEND_ORIGIN и что бэкенд доступен.");
   }
+  return data;
+}
+
+export async function fetchAdminPhoto(photoId) {
+  const res = await fetch(apiUrl(`/admin/photos/${photoId}`), { headers: headersJson() });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw httpError(detail(data, res.statusText), res.status);
   return data;
 }
 
@@ -218,13 +232,19 @@ export async function putPhotoTags(photoId, tagsOrBody) {
   if (!Array.isArray(tagsOrBody) && Object.prototype.hasOwnProperty.call(tagsOrBody, "moy_sklad_id")) {
     body.moy_sklad_id = tagsOrBody.moy_sklad_id;
   }
+  if (
+    !Array.isArray(tagsOrBody) &&
+    Object.prototype.hasOwnProperty.call(tagsOrBody, "expected_tags_version")
+  ) {
+    body.expected_tags_version = tagsOrBody.expected_tags_version;
+  }
   const res = await fetch(apiUrl(`/admin/photos/${photoId}/tags`), {
     method: "PUT",
     headers: headersJson(),
     body: JSON.stringify(body),
   });
   const data = await parseResponseJson(res);
-  if (!res.ok) throw new Error(detail(data, res.statusText));
+  if (!res.ok) throw httpError(detail(data, res.statusText), res.status);
   return data;
 }
 

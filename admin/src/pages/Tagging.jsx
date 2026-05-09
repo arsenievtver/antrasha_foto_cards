@@ -4,6 +4,7 @@ import {
   claimTaggingPhoto,
   createBrand,
   createTagInGroup,
+  fetchAdminPhoto,
   fetchBrands,
   fetchTagCatalog,
   fetchTaggingQueue,
@@ -306,13 +307,27 @@ export default function Tagging() {
         apply_brand: true,
         brand_id: editorBrandId || null,
         moy_sklad_id: editorMoySkladId.trim() || null,
+        expected_tags_version: editorPhoto.tags_version ?? 0,
       });
       setEditorPhoto(null);
       setSelected({});
       setGroupModal(null);
       setSkip(0);
     } catch (e) {
-      setErr(e.message ?? String(e));
+      if (e.status === 409) {
+        try {
+          const fresh = await fetchAdminPhoto(photoId);
+          setEditorPhoto(fresh);
+          initFromPhoto(fresh);
+          setErr(
+            "На сервере уже другая версия разметки — форма обновлена. Проверьте теги и сохраните снова.",
+          );
+        } catch {
+          setErr(e.message ?? String(e));
+        }
+      } else {
+        setErr(e.message ?? String(e));
+      }
     } finally {
       setBusy(false);
     }
@@ -451,6 +466,22 @@ export default function Tagging() {
             <div className="tagging-editor-img-wrap">
               <img src={editorPhoto.url} alt="" className="tagging-editor-img" />
             </div>
+            {editorPhoto?.claim_expires_at && !editorPhoto?.claim_is_mine ? (
+              <p
+                style={{
+                  margin: "0 0 0.75rem",
+                  padding: "0.5rem 0.65rem",
+                  borderRadius: 8,
+                  borderLeft: "3px solid #b8860b",
+                  background: "rgba(184, 134, 11, 0.12)",
+                  fontSize: "0.88rem",
+                  lineHeight: 1.45,
+                }}
+              >
+                Фото сейчас у другого сотрудника (активная бронь). Можно продолжать; при конфликте
+                версии форма обновится с сервера.
+              </p>
+            ) : null}
             <div
               style={{
                 marginBottom: "0.65rem",

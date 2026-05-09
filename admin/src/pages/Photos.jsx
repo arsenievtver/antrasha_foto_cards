@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   bulkDeletePhotos,
   createBrand,
+  fetchAdminPhoto,
   fetchBrands,
   fetchPhotos,
   syncPhotosFromObjectStorage,
@@ -38,6 +39,8 @@ export default function Photos() {
   const [quickBrandBusy, setQuickBrandBusy] = useState(false);
   const [modalMoySkladId, setModalMoySkladId] = useState("");
   const [tagChecked, setTagChecked] = useState({});
+  /** Версия тегов на момент открытия модалки — optimistic locking при сохранении. */
+  const [modalTagsVersion, setModalTagsVersion] = useState(0);
   const [saving, setSaving] = useState(false);
   const [selected, setSelected] = useState({});
   const [deleting, setDeleting] = useState(false);
@@ -147,6 +150,7 @@ export default function Photos() {
     setModalMoySkladId(p.moy_sklad_id != null && p.moy_sklad_id !== "" ? String(p.moy_sklad_id) : "");
     setQuickBrandName("");
     setModalPhoto(p);
+    setModalTagsVersion(p.tags_version ?? 0);
     setAiMessage("");
     setAiDebug(null);
     setAiCopied(false);
@@ -268,11 +272,36 @@ export default function Photos() {
         apply_brand: true,
         brand_id: modalBrandId || null,
         moy_sklad_id: modalMoySkladId.trim() || null,
+        expected_tags_version: modalTagsVersion,
       });
       setItems((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
       setModalPhoto(null);
     } catch (e) {
-      setModalErr(e.message || String(e));
+      if (e.status === 409) {
+        try {
+          const fresh = await fetchAdminPhoto(modalPhoto.id);
+          const m = {};
+          for (const pt of fresh.tags || []) {
+            m[pt.tag_id] = true;
+          }
+          setTagChecked(m);
+          setModalPhoto(fresh);
+          setModalTagsVersion(fresh.tags_version ?? 0);
+          setModalBrandId(fresh.brand_id || "");
+          setModalMoySkladId(
+            fresh.moy_sklad_id != null && fresh.moy_sklad_id !== ""
+              ? String(fresh.moy_sklad_id)
+              : "",
+          );
+          setModalErr(
+            "На сервере уже другая версия разметки — форма обновлена актуальными данными. Проверьте теги и сохраните снова.",
+          );
+        } catch {
+          setModalErr(e.message || String(e));
+        }
+      } else {
+        setModalErr(e.message || String(e));
+      }
     } finally {
       setSaving(false);
     }
@@ -510,6 +539,23 @@ export default function Photos() {
             onClick={(e) => e.stopPropagation()}
           >
             <h3 style={{ marginTop: 0 }}>Теги для фото</h3>
+            {modalPhoto?.claim_expires_at && !modalPhoto?.claim_is_mine ? (
+              <p
+                style={{
+                  margin: "0 0 0.75rem",
+                  padding: "0.5rem 0.65rem",
+                  borderRadius: 8,
+                  borderLeft: "3px solid #b8860b",
+                  background: "rgba(184, 134, 11, 0.12)",
+                  fontSize: "0.88rem",
+                  lineHeight: 1.45,
+                }}
+              >
+                Фото сейчас у другого сотрудника (активная бронь). Вы можете править; при
+                одновременном сохранении сработает проверка версии — откроется актуальная разметка с
+                сервера.
+              </p>
+            ) : null}
             <div className="flex-gap" style={{ marginBottom: "0.65rem", flexWrap: "wrap" }}>
               <button
                 type="button"

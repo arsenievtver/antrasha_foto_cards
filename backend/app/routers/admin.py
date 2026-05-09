@@ -125,6 +125,7 @@ def _photo_out(p: Photo, *, viewer_user_id: uuid.UUID | None = None) -> AdminPho
         brand=p.brand,
         price_segment=p.price_segment,
         moy_sklad_id=p.moy_sklad_id,
+        tags_version=p.tags_version,
         claim_expires_at=claim_expires_at,
         claim_is_mine=claim_is_mine,
     )
@@ -230,29 +231,6 @@ def _viewer_id(principal: AdminPrincipal) -> uuid.UUID | None:
     return principal.user.id if principal.user else None
 
 
-def _assert_worker_claim_for_tagging_queue_save(
-    photo: Photo,
-    principal: AdminPrincipal,
-    *,
-    was_in_tagging_queue: bool,
-) -> None:
-    if principal.role != "worker" or not principal.user:
-        return
-    if not was_in_tagging_queue:
-        return
-    now = datetime.now(timezone.utc)
-    if photo.tagging_claimed_by_id != principal.user.id:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Забронируйте фото на странице «Разметка» или нажмите «Взять»",
-        )
-    if photo.tagging_claimed_until is None or photo.tagging_claimed_until < now:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Бронь истекла — возьмите фото из очереди снова",
-        )
-
-
 @router.get("/stats", response_model=AdminStatsOut)
 def admin_stats(
     db: Session = Depends(get_db),
@@ -306,7 +284,7 @@ def admin_stats(
 @router.get("/photos", response_model=AdminPhotoListResponse)
 def list_photos(
     db: Session = Depends(get_db),
-    _principal: AdminPrincipal = Depends(get_admin_principal),
+    principal: AdminPrincipal = Depends(get_admin_principal),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
     gender: str | None = Query(None, description="male | female"),
@@ -314,6 +292,8 @@ def list_photos(
     tagging_done_only: bool = Query(False, description="только завершённая разметка"),
     brand_id: uuid.UUID | None = Query(None, description="фильтр по бренду"),
 ) -> AdminPhotoListResponse:
+    _expire_stale_tagging_claims(db)
+    db.flush()
     cond = [Photo.source_type == PHOTO_SOURCE_YC_OBJECT_STORAGE]
     if gender:
         cond.append(func.lower(Photo.gender) == gender.strip().lower())
@@ -337,12 +317,32 @@ def list_photos(
         .options(_tag_catalog_selectinloads())
     )
     rows = db.scalars(q).unique().all()
+    vid = _viewer_id(principal)
     return AdminPhotoListResponse(
-        items=[_photo_out(p) for p in rows],
+        items=[_photo_out(p, viewer_user_id=vid) for p in rows],
         total=total,
         skip=skip,
         limit=limit,
     )
+
+
+@router.get("/photos/{photo_id}", response_model=AdminPhotoOut)
+def get_admin_photo(
+    photo_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    principal: AdminPrincipal = Depends(get_admin_principal),
+) -> AdminPhotoOut:
+    """Одно фото — для обновления карточки после конфликта версии и т.п."""
+    _expire_stale_tagging_claims(db)
+    db.flush()
+    photo = db.execute(
+        select(Photo)
+        .where(Photo.id == photo_id, Photo.source_type == PHOTO_SOURCE_YC_OBJECT_STORAGE)
+        .options(_tag_catalog_selectinloads()),
+    ).scalar_one_or_none()
+    if not photo:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Photo not found")
+    return _photo_out(photo, viewer_user_id=_viewer_id(principal))
 
 
 @router.post("/photos/sync-object-storage")
@@ -591,20 +591,22 @@ def put_photo_tags(
     db: Session = Depends(get_db),
     principal: AdminPrincipal = Depends(get_admin_principal),
 ) -> AdminPhotoOut:
+    _expire_stale_tagging_claims(db)
+    db.flush()
     photo = db.execute(
         select(Photo)
         .where(Photo.id == photo_id)
-        .options(_tag_catalog_selectinloads()),
+        .options(_tag_catalog_selectinloads())
+        .with_for_update(),
     ).scalar_one_or_none()
     if not photo or photo.source_type != PHOTO_SOURCE_YC_OBJECT_STORAGE:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Photo not found")
 
-    was_in_tagging_queue = not photo.tagging_review_done
-    _assert_worker_claim_for_tagging_queue_save(
-        photo,
-        principal,
-        was_in_tagging_queue=was_in_tagging_queue,
-    )
+    if body.expected_tags_version is not None and photo.tags_version != body.expected_tags_version:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Фото уже изменено (теги или разметка). Обновите данные и попробуйте сохранить снова.",
+        )
 
     tag_ids = [a.tag_id for a in body.tags]
     if len(tag_ids) != len(set(tag_ids)):
@@ -667,6 +669,7 @@ def put_photo_tags(
         if photo.tagging_claimed_by_id == principal.user.id:
             photo.tagging_claimed_by_id = None
             photo.tagging_claimed_until = None
+    photo.tags_version = photo.tags_version + 1
     db.commit()
     photo = db.execute(
         select(Photo)

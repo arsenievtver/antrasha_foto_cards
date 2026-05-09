@@ -84,6 +84,8 @@ class AdminPhotoOut(BaseModel):
     brand: str | None = None
     price_segment: str | None = None
     moy_sklad_id: str | None = None
+    # Инкремент при сохранении тегов (optimistic locking).
+    tags_version: int = 0
     # Очередь разметки: активная бронь другим сотрудником / своя
     claim_expires_at: datetime | None = None
     claim_is_mine: bool = False
@@ -138,6 +140,8 @@ class AdminPhotoTagsPutBody(BaseModel):
     apply_brand: bool = False
     brand_id: uuid.UUID | None = None
     moy_sklad_id: str | None = Field(default=None, max_length=128)
+    # Если передано — должно совпадать с Photo.tags_version, иначе 409 (данные устарели).
+    expected_tags_version: int | None = None
 
 
 class AdminCatalogTagOut(BaseModel):
