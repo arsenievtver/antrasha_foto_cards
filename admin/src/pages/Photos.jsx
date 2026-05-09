@@ -32,6 +32,7 @@ export default function Photos() {
   const [loading, setLoading] = useState(true);
   const [tagCatalog, setTagCatalog] = useState(null);
   const [modalPhoto, setModalPhoto] = useState(null);
+  const [modalErr, setModalErr] = useState("");
   const [modalBrandId, setModalBrandId] = useState("");
   const [quickBrandName, setQuickBrandName] = useState("");
   const [quickBrandBusy, setQuickBrandBusy] = useState(false);
@@ -152,6 +153,7 @@ export default function Photos() {
     setXimilarObjects([]);
     setXimilarMergedTagIds([]);
     setSelectedXimilarIndex(0);
+    setModalErr("");
   }
 
   async function onQuickAddBrandModal(e) {
@@ -159,14 +161,14 @@ export default function Photos() {
     const name = quickBrandName.trim();
     if (!name || quickBrandBusy) return;
     setQuickBrandBusy(true);
-    setErr("");
+    setModalErr("");
     try {
       const created = await createBrand(name);
       setBrands((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name, "ru")));
       setModalBrandId(created.id);
       setQuickBrandName("");
     } catch (ex) {
-      setErr(ex.message || String(ex));
+      setModalErr(ex.message || String(ex));
     } finally {
       setQuickBrandBusy(false);
     }
@@ -175,7 +177,7 @@ export default function Photos() {
   async function runXimilarSuggest() {
     if (!modalPhoto || aiBusy) return;
     setAiBusy(true);
-    setErr("");
+    setModalErr("");
     setAiMessage("");
     setAiDebug(null);
     setAiCopied(false);
@@ -204,7 +206,7 @@ export default function Photos() {
       if (data.ximilar && typeof data.ximilar === "object")
         setAiDebug(data.ximilar);
     } catch (e) {
-      setErr(e.message || String(e));
+      setModalErr(e.message || String(e));
     } finally {
       setAiBusy(false);
     }
@@ -249,14 +251,14 @@ export default function Photos() {
       setAiCopied(true);
       window.setTimeout(() => setAiCopied(false), 2000);
     } catch (e) {
-      setErr(e.message || String(e));
+      setModalErr(e.message || String(e));
     }
   }
 
   async function saveModal() {
     if (!modalPhoto) return;
     setSaving(true);
-    setErr("");
+    setModalErr("");
     try {
       const tags = Object.entries(tagChecked)
         .filter(([, v]) => v)
@@ -270,7 +272,7 @@ export default function Photos() {
       setItems((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
       setModalPhoto(null);
     } catch (e) {
-      setErr(e.message);
+      setModalErr(e.message || String(e));
     } finally {
       setSaving(false);
     }
@@ -420,7 +422,7 @@ export default function Photos() {
             : `Удалить выбранные (${selectedCount})`}
         </button>
       </div>
-      {err && <p className="error">{err}</p>}
+      {!modalPhoto && err && <p className="error">{err}</p>}
       {loading ? (
         <p style={{ color: "var(--muted)" }}>Загрузка…</p>
       ) : (
@@ -797,6 +799,7 @@ export default function Photos() {
               )}
             </div>
             <div className="flex-gap">
+              {modalErr ? <p className="error">{modalErr}</p> : null}
               <button type="button" disabled={saving} onClick={saveModal}>
                 {saving ? "Сохранение…" : "Сохранить"}
               </button>

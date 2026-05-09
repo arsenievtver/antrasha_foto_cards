@@ -5,8 +5,11 @@ export default function Layout() {
   const nav = useNavigate();
   const role = getRole();
   const hasToken = !!getToken();
+  const isSuperuser = role === "superuser";
+  const isWorker = role === "worker";
+  const hasAdminAccess = isSuperuser || isWorker;
 
-  if (!hasToken) {
+  if (!hasToken || !hasAdminAccess) {
     return <Navigate to="/login" replace />;
   }
 
@@ -14,9 +17,11 @@ export default function Layout() {
     <div className="layout">
       <aside className="sidebar">
         <h1>Админка</h1>
-        <NavLink end to="/" className={({ isActive }) => (isActive ? "active" : "")}>
-          Статистика
-        </NavLink>
+        {isSuperuser && (
+          <NavLink end to="/" className={({ isActive }) => (isActive ? "active" : "")}>
+            Статистика
+          </NavLink>
+        )}
         <NavLink to="/photos" className={({ isActive }) => (isActive ? "active" : "")}>
           Фото и теги
         </NavLink>
@@ -26,12 +31,12 @@ export default function Layout() {
         <NavLink to="/tagging" className={({ isActive }) => (isActive ? "active" : "")}>
           Разметка тегов
         </NavLink>
-        {role === "superuser" && (
+        {isSuperuser && (
           <NavLink to="/users" className={({ isActive }) => (isActive ? "active" : "")}>
             Пользователи
           </NavLink>
         )}
-        {role === "superuser" && (
+        {(isSuperuser || isWorker) && (
           <NavLink to="/ai-ingest" className={({ isActive }) => (isActive ? "active" : "")}>
             ИИ: телефон → каталог
           </NavLink>
