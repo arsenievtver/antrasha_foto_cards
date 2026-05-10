@@ -100,7 +100,13 @@ def submit_job(settings: Settings, *, product_image_data_url: str, prompt: str) 
     jid = data.get("id")
     if not jid:
         return None, "Ответ Fashn без id"
-    return str(jid), None
+    fj = str(jid)
+    log.info(
+        "fashn submit OK remote_id=%s… (полный id длиной %s)",
+        fj[:10],
+        len(fj),
+    )
+    return fj, None
 
 
 def poll_status(settings: Settings, job_id: str) -> tuple[list[str], str | None]:
@@ -109,6 +115,7 @@ def poll_status(settings: Settings, job_id: str) -> tuple[list[str], str | None]
         return [], "FASHN_API_KEY не задан"
     headers = {"Authorization": f"Bearer {api_key.strip()}"}
     started = time.monotonic()
+    next_status_log_at = 0.0
     while True:
         if time.monotonic() - started > TIMEOUT_SEC:
             return [], "Timeout ожидания Fashn"
@@ -125,6 +132,16 @@ def poll_status(settings: Settings, job_id: str) -> tuple[list[str], str | None]
             return [], r.text[:2000]
         data = r.json()
         status = data.get("status")
+        now = time.monotonic()
+        if now >= next_status_log_at:
+            log.info(
+                "fashn poll remote_id=%s… api_status=%s elapsed=%.0fs / %.0fs max",
+                str(job_id)[:12],
+                status,
+                now - started,
+                TIMEOUT_SEC,
+            )
+            next_status_log_at = now + 45.0
         if status == "completed":
             out = data.get("output") or []
             if isinstance(out, list):
@@ -154,6 +171,12 @@ def run_product_to_model_png(settings: Settings, *, gender: str, product_image_d
     prompt = load_prompt_for_gender(gender)
     last_err = "Неизвестная ошибка"
     for attempt in range(MAX_RETRIES):
+        log.info(
+            "fashn product-to-model попытка %s/%s gender=%s",
+            attempt + 1,
+            MAX_RETRIES,
+            gender,
+        )
         jid, err = submit_job(settings, product_image_data_url=product_image_data_url, prompt=prompt)
         if err:
             last_err = err

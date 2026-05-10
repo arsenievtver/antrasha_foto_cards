@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import time
 
 from sqlalchemy.exc import ProgrammingError
 
@@ -14,6 +15,9 @@ from app.services.ai_ingest_worker import reset_stale_processing_jobs, try_proce
 from app.services.yc_photo_sync import run_sync_job_commit
 
 log = logging.getLogger("app.main")
+
+# Чтобы не забивать лог при concurrency>1: одно предупреждение на все слоты воркера.
+_last_ai_ingest_skip_warn_monotonic: float = 0.0
 
 
 async def _yc_auto_sync_loop() -> None:
@@ -41,9 +45,20 @@ async def _ai_ingest_worker_slots() -> None:
 
 
 async def _ai_ingest_worker_slot() -> None:
+    global _last_ai_ingest_skip_warn_monotonic
     while True:
         await asyncio.sleep(0.28)
         if not settings.fashn_configured or not settings.yc_s3_configured:
+            now = time.monotonic()
+            if now - _last_ai_ingest_skip_warn_monotonic >= 90:
+                _last_ai_ingest_skip_warn_monotonic = now
+                log.warning(
+                    "ai_ingest: воркер не обрабатывает очередь — нужны FASHN_API_KEY и пара "
+                    "YC_S3_ACCESS_KEY_ID / YC_S3_SECRET_ACCESS_KEY. Сейчас fashn_configured=%s "
+                    "yc_s3_configured=%s",
+                    settings.fashn_configured,
+                    settings.yc_s3_configured,
+                )
             await asyncio.sleep(2.5)
             continue
         try:

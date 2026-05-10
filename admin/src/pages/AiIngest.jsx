@@ -218,6 +218,16 @@ export default function AiIngest() {
           {(limits.max_file_bytes / (1024 * 1024)).toFixed(0)} МиБ на файл, очередь не более{" "}
           {limits.max_pending_jobs} задач в статусе «В очереди», параллельно воркеров:{" "}
           {limits.worker_concurrency}.
+          <div style={{ marginTop: "0.5rem" }}>
+            Пайплайн Fashn→S3 (воркер активен):{" "}
+            <strong style={{ color: limits.pipeline_ready ? "var(--accent)" : "var(--danger)" }}>
+              {limits.pipeline_ready ? "да" : "нет"}
+            </strong>
+            {limits.pipeline_ready ? "" : " — пока нет, задачи не уйдут с очереди"}
+            {" · "}
+            Fashn ключ …{limits.fashn_key_last4 ?? "????"}, YC access key …
+            {limits.yc_access_key_id_last4 ?? "????"}
+          </div>
         </div>
       )}
 

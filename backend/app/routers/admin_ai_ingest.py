@@ -39,6 +39,12 @@ def _limits() -> AiIngestLimitsOut:
     if key and str(key).strip():
         s = str(key).strip()
         tail = s[-4:] if len(s) >= 4 else "****"
+    aid = settings.yc_s3_access_key_id
+    yc_tail: str | None = None
+    if aid and str(aid).strip():
+        a = str(aid).strip()
+        yc_tail = a[-4:] if len(a) >= 4 else "****"
+    pipeline = settings.fashn_configured and settings.yc_s3_configured
     return AiIngestLimitsOut(
         max_files_per_upload=settings.ai_ingest_max_files_per_upload,
         max_file_bytes=settings.ai_ingest_max_file_bytes,
@@ -46,10 +52,12 @@ def _limits() -> AiIngestLimitsOut:
         worker_concurrency=settings.ai_ingest_worker_concurrency,
         fashn_configured=settings.fashn_configured,
         yc_s3_configured=settings.yc_s3_configured,
+        pipeline_ready=pipeline,
         fashn_calls_from="server_only",
         env_dotenv_candidates=[str(p) for p in DOTENV_CANDIDATE_PATHS],
         env_dotenv_loaded=[str(p) for p in DOTENV_LOADED_PATHS],
         fashn_key_last4=tail,
+        yc_access_key_id_last4=yc_tail,
     )
 
 

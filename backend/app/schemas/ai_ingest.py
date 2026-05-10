@@ -14,10 +14,14 @@ class AiIngestLimitsOut(BaseModel):
     # Ниже — не секреты, чтобы сверить окружение сервера со скриптом у себя на машине.
     fashn_configured: bool = False
     yc_s3_configured: bool = False
+    # Оба True → фоновый воркер реально вызывает Fashn и грузит результат в бакет.
+    pipeline_ready: bool = False
     fashn_calls_from: str = "server_only"
     env_dotenv_candidates: list[str] = []
     env_dotenv_loaded: list[str] = []
     fashn_key_last4: str | None = None
+    # Последние 4 символа access key id — сверка, что в процесс попали ваши ключи из env.
+    yc_access_key_id_last4: str | None = None
 
 
 class AiIngestJobOut(BaseModel):

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import time
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -119,6 +120,13 @@ def run_single_ingest_job(cfg: Settings, job_id: uuid.UUID) -> None:
         if job.status != "processing":
             return
         path = Path(job.temp_path)
+        log.info(
+            "ai_ingest job_id=%s gender=%s temp_path=%s exists=%s",
+            job_id,
+            job.gender,
+            path,
+            path.is_file(),
+        )
         if not path.is_file():
             _fail_job(db, job, "Временный файл не найден")
             return
@@ -130,14 +138,33 @@ def run_single_ingest_job(cfg: Settings, job_id: uuid.UUID) -> None:
             _fail_job(db, job, f"Подготовка изображения: {e}")
             return
 
+        log.info(
+            "ai_ingest job_id=%s → Fashn product-to-model (data_url ~%s символов)",
+            job_id,
+            len(data_url),
+        )
+        t0 = time.monotonic()
         png_bytes, err = run_product_to_model_png(
             cfg,
             gender=job.gender,
             product_image_data_url=data_url,
         )
+        dt = time.monotonic() - t0
         if err or not png_bytes:
+            log.warning(
+                "ai_ingest job_id=%s Fashn за %.1fs: ошибка: %s",
+                job_id,
+                dt,
+                (err or "")[:500],
+            )
             _fail_job(db, job, err or "Fashn не вернул изображение")
             return
+        log.info(
+            "ai_ingest job_id=%s Fashn OK за %.1fs, png=%s байт",
+            job_id,
+            dt,
+            len(png_bytes),
+        )
 
         try:
             webp_bytes = png_bytes_to_webp(png_bytes, quality=85)
@@ -149,6 +176,13 @@ def run_single_ingest_job(cfg: Settings, job_id: uuid.UUID) -> None:
         try:
             bucket, prefix = _bucket_and_prefix_for_gender(cfg, job.gender)
             key = _build_result_key(prefix)
+            log.info(
+                "ai_ingest job_id=%s → S3 put bucket=%s key=%s webp=%s байт",
+                job_id,
+                bucket,
+                key,
+                len(webp_bytes),
+            )
             put_image_object(bucket, key, webp_bytes, content_type="image/webp")
             ensure_photo_row_for_yc_key(
                 db,
@@ -159,6 +193,7 @@ def run_single_ingest_job(cfg: Settings, job_id: uuid.UUID) -> None:
                 brand_id=job.brand_id,
             )
             _success_job(db, job, bucket=bucket, key=key)
+            log.info("ai_ingest job_id=%s завершён (completed)", job_id)
         except Exception as e:
             log.exception("s3 or db job_id=%s", job_id)
             db.rollback()
@@ -189,6 +224,7 @@ def try_process_one_ingest_job(cfg: Settings | None = None) -> None:
     jid = acquire_next_pending_job_id()
     if jid is None:
         return
+    log.info("ai_ingest взял задачу в работу job_id=%s", jid)
     run_single_ingest_job(cfg, jid)
 
 
