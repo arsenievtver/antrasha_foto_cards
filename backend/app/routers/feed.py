@@ -58,6 +58,7 @@ def get_feed(
                 url=p.url,
                 gender=p.gender,
                 source_type=p.source_type,
+                brand=p.brand,
                 tags=tags,
             )
         )

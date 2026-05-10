@@ -189,6 +189,10 @@ export default function Swipe() {
 	const photoInfo = useMemo(() => {
 		if (!currentPhoto) return null;
 		const tags = Array.isArray(currentPhoto.tags) ? currentPhoto.tags : [];
+		const brandFromPhoto =
+			typeof currentPhoto.brand === "string" && currentPhoto.brand.trim()
+				? currentPhoto.brand.trim()
+				: null;
 		const brandTag =
 			tags.find((t) => t.type === "brand" && t.name) ||
 			tags.find((t) => t.type === "label" && t.name);
@@ -196,7 +200,7 @@ export default function Swipe() {
 			tags.find((t) => t.type === "product_type" && t.name) ||
 			tags.find((t) => t.type === "garment_type" && t.name);
 		return {
-			brand: brandTag?.name || "не указан",
+			brand: brandFromPhoto || brandTag?.name || "не указан",
 			productType: productTypeTag?.name || "не указан",
 		};
 	}, [currentPhoto]);
@@ -416,12 +420,8 @@ export default function Swipe() {
 								)}
 								{isTop && showInfo && photoInfo ? (
 									<div className="swipe-photo-info" role="status" aria-live="polite">
-										<p>
-											Бренд: <strong>{photoInfo.brand}</strong>
-										</p>
-										<p>
-											Тип изделия: <strong>{photoInfo.productType}</strong>
-										</p>
+										<p>Бренд: {photoInfo.brand}</p>
+										<p>Тип изделия: {photoInfo.productType}</p>
 									</div>
 								) : null}
 							</motion.div>

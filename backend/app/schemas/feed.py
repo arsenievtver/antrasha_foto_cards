@@ -16,6 +16,8 @@ class FeedPhoto(BaseModel):
     url: str
     gender: str
     source_type: str
+    # Денормализация из brands.name; не путать с тегами каталога (photo_tags).
+    brand: str | None = None
     tags: list[TagOut]
 
 
