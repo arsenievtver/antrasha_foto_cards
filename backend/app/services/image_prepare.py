@@ -8,6 +8,11 @@ from pathlib import Path
 
 from PIL import Image
 
+# Большой JSON с base64 на POST /v1/run часто рвёт TLS (UNEXPECTED_EOF_WHILE_READING).
+_JPEG_REENCODE_IF_LARGER_THAN_BYTES = 2_500_000
+_JPEG_MAX_LONG_EDGE_PX = 2048
+_JPEG_REENCODE_QUALITY = 88
+
 _HEIF_REGISTERED = False
 
 
@@ -24,6 +29,35 @@ def _register_heif_once() -> None:
     _HEIF_REGISTERED = True
 
 
+def _reencode_jpeg_smaller_for_transport(raw: bytes) -> bytes:
+    """Уменьшает разрешение/вес JPEG для стабильного HTTPS POST на api.fashn.ai."""
+    img = Image.open(io.BytesIO(raw))
+    img.load()
+    w, h = img.size
+    m = max(w, h)
+    if m > _JPEG_MAX_LONG_EDGE_PX:
+        scale = _JPEG_MAX_LONG_EDGE_PX / m
+        new_w = max(1, int(w * scale))
+        new_h = max(1, int(h * scale))
+        img = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
+    if img.mode == "LA":
+        img = img.convert("RGBA")
+    if img.mode in ("RGBA",) or (img.mode == "P" and "transparency" in getattr(img, "info", {})):
+        rgba = img.convert("RGBA")
+        bg = Image.new("RGB", rgba.size, (255, 255, 255))
+        bg.paste(rgba, mask=rgba.split()[-1])
+        img = bg
+    elif img.mode == "P":
+        img = img.convert("RGB")
+    elif img.mode == "L":
+        img = img.convert("RGB")
+    elif img.mode != "RGB":
+        img = img.convert("RGB")
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", quality=_JPEG_REENCODE_QUALITY, optimize=True)
+    return buf.getvalue()
+
+
 def build_fashn_product_image_data_url(path: Path) -> str:
     """
     `product_image` для Fashn: `data:image/jpeg;base64,...`
@@ -35,6 +69,8 @@ def build_fashn_product_image_data_url(path: Path) -> str:
     ext = path.suffix.lower()
     if ext in (".jpg", ".jpeg"):
         raw = path.read_bytes()
+        if len(raw) > _JPEG_REENCODE_IF_LARGER_THAN_BYTES:
+            raw = _reencode_jpeg_smaller_for_transport(raw)
         b64 = base64.b64encode(raw).decode("ascii")
         return f"data:image/jpeg;base64,{b64}"
 

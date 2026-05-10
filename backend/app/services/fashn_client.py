@@ -7,10 +7,35 @@ import time
 from pathlib import Path
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from app.config import Settings
 
 log = logging.getLogger("app.fashn")
+
+# Одна сессия на процесс: connection pooling + urllib3 retries на обрывах TLS/сети.
+_FASHN_SESSION: requests.Session | None = None
+
+
+def _get_fashn_session() -> requests.Session:
+    global _FASHN_SESSION
+    if _FASHN_SESSION is None:
+        retry = Retry(
+            total=5,
+            connect=5,
+            read=5,
+            backoff_factor=0.6,
+            status_forcelist=(429, 502, 503, 504),
+            allowed_methods=frozenset(["GET", "POST"]),
+            raise_on_status=False,
+        )
+        adapter = HTTPAdapter(max_retries=retry, pool_connections=4, pool_maxsize=8)
+        s = requests.Session()
+        s.mount("https://", adapter)
+        s.mount("http://", adapter)
+        _FASHN_SESSION = s
+    return _FASHN_SESSION
 
 RUN_URL = "https://api.fashn.ai/v1/run"
 STATUS_URL = "https://api.fashn.ai/v1/status/{}"
@@ -84,16 +109,43 @@ def submit_job(settings: Settings, *, product_image_data_url: str, prompt: str) 
             "seed": SEED,
         },
     }
-    try:
-        r = requests.post(
-            RUN_URL,
-            headers=headers,
-            json=payload,
-            timeout=_timeout(settings, settings.fashn_http_read_timeout_submit),
-            proxies=_proxies(settings),
-        )
-    except requests.RequestException as e:
-        return None, str(e)
+    session = _get_fashn_session()
+    timeout = _timeout(settings, settings.fashn_http_read_timeout_submit)
+    proxies = _proxies(settings)
+    # Отдельный цикл на SSLError/ConnectionError: часть обрывов TLS urllib3 не классифицирует как retry.
+    wire_attempts = 4
+    r: requests.Response | None = None
+    last_tx_err: str | None = None
+    for wire in range(wire_attempts):
+        try:
+            r = session.post(
+                RUN_URL,
+                headers=headers,
+                json=payload,
+                timeout=timeout,
+                proxies=proxies,
+            )
+            break
+        except (
+            requests.exceptions.SSLError,
+            requests.exceptions.ConnectionError,
+            requests.exceptions.Timeout,
+            requests.exceptions.ChunkedEncodingError,
+        ) as e:
+            last_tx_err = str(e)
+            log.warning(
+                "fashn POST /v1/run wire try %s/%s: %s",
+                wire + 1,
+                wire_attempts,
+                e,
+            )
+            if wire == wire_attempts - 1:
+                return None, last_tx_err
+            time.sleep(0.5 * (2**wire))
+        except requests.RequestException as e:
+            return None, str(e)
+    if r is None:
+        return None, last_tx_err or "не удалось отправить запрос в Fashn"
     if r.status_code != 200:
         return None, r.text[:2000]
     data = r.json()
@@ -120,7 +172,7 @@ def poll_status(settings: Settings, job_id: str) -> tuple[list[str], str | None]
         if time.monotonic() - started > TIMEOUT_SEC:
             return [], "Timeout ожидания Fashn"
         try:
-            r = requests.get(
+            r = _get_fashn_session().get(
                 STATUS_URL.format(job_id),
                 headers=headers,
                 timeout=_timeout(settings, settings.fashn_http_read_timeout_poll),
@@ -154,7 +206,7 @@ def poll_status(settings: Settings, job_id: str) -> tuple[list[str], str | None]
 
 def download_png_bytes(url: str, *, settings: Settings) -> tuple[bytes | None, str | None]:
     try:
-        r = requests.get(
+        r = _get_fashn_session().get(
             url,
             timeout=_timeout(settings, settings.fashn_http_read_timeout_download),
             proxies=_proxies(settings),
