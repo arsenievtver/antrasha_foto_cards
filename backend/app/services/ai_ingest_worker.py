@@ -9,7 +9,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from sqlalchemy import func, select, update
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, noload
 
 from app.config import Settings, settings
 from app.database import SessionLocal
@@ -89,13 +89,17 @@ def _build_result_key(prefix: str) -> str:
 def acquire_next_pending_job_id() -> uuid.UUID | None:
     db = SessionLocal()
     try:
-        job = db.execute(
+        # Без noload: у AiIngestJob brand — lazy="joined", в SELECT попадает JOIN к brands.
+        # Тогда execute().scalar_one_or_none() не подходит для строки ORM+JOIN (см. SA 2 «ORM Rows»);
+        # в итоге воркер мог не получать ни одной задачи при живой очереди.
+        job = db.scalars(
             select(AiIngestJob)
+            .options(noload(AiIngestJob.brand))
             .where(AiIngestJob.status == "pending")
             .order_by(AiIngestJob.created_at.asc())
             .limit(1)
             .with_for_update(skip_locked=True),
-        ).scalar_one_or_none()
+        ).first()
         if job is None:
             return None
         jid = job.id
