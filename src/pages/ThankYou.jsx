@@ -69,6 +69,7 @@ export default function ThankYou() {
 	const isHighMatch = total > 0 && likeRate >= 0.5;
 	const hasAnyLikes = likes > 0;
 	const pct = Math.round(likeRate * 100);
+	const allLiked = total > 0 && likes === total;
 
 	async function onFittingRequest() {
 		setErr("");
@@ -286,7 +287,7 @@ export default function ThankYou() {
 				className="thank-button thank-secondary"
 				onClick={() => navigate("/")}
 			>
-				К новым образам
+				{allLiked ? "Посмотреть еще раз все" : "К новым образам"}
 			</button>
 		</div>
 	);
