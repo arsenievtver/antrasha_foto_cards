@@ -118,6 +118,24 @@ export async function fetchStats() {
   return data;
 }
 
+export async function fetchFeedSettings() {
+  const res = await fetch(apiUrl("/admin/feed-settings"), { headers: headersJson() });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
+export async function patchFeedSettings(body) {
+  const res = await fetch(apiUrl("/admin/feed-settings"), {
+    method: "PATCH",
+    headers: headersJson(),
+    body: JSON.stringify(body),
+  });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
 export async function fetchPhotos({ skip = 0, limit = 48, gender, activeOnly, taggingDoneOnly, brandId } = {}) {
   const q = new URLSearchParams({ skip: String(skip), limit: String(limit) });
   if (gender) q.set("gender", gender);

@@ -4,7 +4,10 @@ import {
   createBrand,
   fetchAdminPhoto,
   fetchBrands,
+  fetchFeedSettings,
   fetchPhotos,
+  getRole,
+  patchFeedSettings,
   syncPhotosFromObjectStorage,
   fetchTagCatalog,
   putPhotoTags,
@@ -45,6 +48,8 @@ export default function Photos() {
   const [selected, setSelected] = useState({});
   const [deleting, setDeleting] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [feedSettings, setFeedSettings] = useState(null);
+  const [feedSettingsLoading, setFeedSettingsLoading] = useState(true);
   const [aiBusy, setAiBusy] = useState(false);
   const [aiMessage, setAiMessage] = useState("");
   const [aiDebug, setAiDebug] = useState(null);
@@ -83,6 +88,14 @@ export default function Photos() {
       } catch (e) {
         /* бренды не должны блокировать каталог тегов */
         if (!c) setErr((prev) => prev || e.message);
+      }
+      try {
+        const fs = await fetchFeedSettings();
+        if (!c) setFeedSettings(fs);
+      } catch {
+        if (!c) setFeedSettings({ require_tagging_review_for_feed: false });
+      } finally {
+        if (!c) setFeedSettingsLoading(false);
       }
     })();
     return () => {
@@ -365,11 +378,63 @@ export default function Photos() {
     }
   }
 
+  async function onFeedPolicyChange(checked) {
+    if (getRole() !== "superuser") return;
+    setErr("");
+    try {
+      const data = await patchFeedSettings({ require_tagging_review_for_feed: checked });
+      setFeedSettings(data);
+    } catch (e) {
+      setErr(e.message || String(e));
+    }
+  }
+
   const canMore = skip + items.length < total;
 
   return (
     <div>
       <h2 style={{ marginTop: 0 }}>Фото и теги</h2>
+      <div
+        style={{
+          marginBottom: "0.75rem",
+          padding: "0.65rem 0.85rem",
+          borderRadius: 8,
+          border: "1px solid var(--border)",
+          background: "var(--surface)",
+          fontSize: "0.9rem",
+          color: "var(--muted)",
+          maxWidth: "44rem",
+          lineHeight: 1.45,
+        }}
+      >
+        <label
+          style={{
+            display: "flex",
+            alignItems: "flex-start",
+            gap: "0.5rem",
+            cursor: getRole() === "superuser" && !feedSettingsLoading ? "pointer" : "default",
+          }}
+        >
+          <input
+            type="checkbox"
+            style={{ marginTop: "0.2rem" }}
+            checked={feedSettings?.require_tagging_review_for_feed ?? false}
+            disabled={feedSettingsLoading || getRole() !== "superuser"}
+            onChange={(e) => onFeedPolicyChange(e.target.checked)}
+          />
+          <span>
+            <strong style={{ color: "var(--text)" }}>В ленту только после разметки.</strong> Если
+            выключено — после «Обновить» (синк с бакетом) активные фото попадают в свайпы и без тегов.
+            Режим приоритетно для срочных показов; включите обратно, когда нужна только полностью
+            размеченная выдача.
+            {getRole() !== "superuser" && (
+              <span style={{ display: "block", marginTop: "0.25rem" }}>
+                Переключает только суперпользователь.
+              </span>
+            )}
+          </span>
+        </label>
+      </div>
       <div className="toolbar">
         <div>
           <label>Пол</label>

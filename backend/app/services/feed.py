@@ -24,6 +24,7 @@ from app.models import (
     UserTagPairWeight,
     UserTagWeight,
 )
+from app.services.feed_policy import feed_require_tagging_review_for_feed
 
 log = logging.getLogger("app.feed")
 
@@ -149,17 +150,16 @@ def fetch_feed_photos(
         collection_gender_norm=g_norm,
     )
 
-    q = (
-        select(Photo)
-        .where(
-            Photo.is_active.is_(True),
-            Photo.tagging_review_done.is_(True),
-            func.lower(Photo.gender) == g_norm,
-            Photo.source_type == PHOTO_SOURCE_YC_OBJECT_STORAGE,
-        )
-        .options(
-            selectinload(Photo.photo_tags).selectinload(PhotoTag.tag).selectinload(Tag.group),
-        )
+    cond = [
+        Photo.is_active.is_(True),
+        func.lower(Photo.gender) == g_norm,
+        Photo.source_type == PHOTO_SOURCE_YC_OBJECT_STORAGE,
+    ]
+    if feed_require_tagging_review_for_feed(db):
+        cond.append(Photo.tagging_review_done.is_(True))
+
+    q = select(Photo).where(*cond).options(
+        selectinload(Photo.photo_tags).selectinload(PhotoTag.tag).selectinload(Tag.group),
     )
     all_for_gender = list(db.execute(q).scalars().unique().all())
     total_active = len(all_for_gender)

@@ -193,6 +193,16 @@ class AdminStatsOut(BaseModel):
     photos_female: int
 
 
+class FeedSettingsOut(BaseModel):
+    """Политика /feed: требовать ли завершённую разметку перед показом карточки."""
+
+    require_tagging_review_for_feed: bool
+
+
+class FeedSettingsPatch(BaseModel):
+    require_tagging_review_for_feed: bool
+
+
 class AdminUserOut(BaseModel):
     id: uuid.UUID
     phone: str

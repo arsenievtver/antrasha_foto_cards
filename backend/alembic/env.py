@@ -8,6 +8,7 @@ from app.database import Base
 from app.models import (  # noqa: F401 - register metadata
     AiIngestJob,
     Brand,
+    FeedSettings,
     Interaction,
     Photo,
     PhotoTag,

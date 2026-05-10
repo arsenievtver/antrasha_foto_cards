@@ -14,6 +14,7 @@ from app.deps import AdminPrincipal, get_admin_principal, require_superuser
 from app.models import (
     PHOTO_SOURCE_YC_OBJECT_STORAGE,
     Brand,
+    FeedSettings,
     FittingRequest,
     Interaction,
     Photo,
@@ -38,6 +39,8 @@ from app.schemas.admin import (
     AdminPhotoTagOut,
     AdminPhotoTagsPutBody,
     AdminBrandCreateRequest,
+    FeedSettingsOut,
+    FeedSettingsPatch,
     AdminFittingRequestListResponse,
     AdminFittingRequestOut,
     AdminBrandListResponse,
@@ -279,6 +282,38 @@ def admin_stats(
         photos_male=photos_male,
         photos_female=photos_female,
     )
+
+
+@router.get("/feed-settings", response_model=FeedSettingsOut)
+def get_feed_settings(
+    db: Session = Depends(get_db),
+    _principal: AdminPrincipal = Depends(get_admin_principal),
+) -> FeedSettingsOut:
+    row = db.get(FeedSettings, 1)
+    if row is None:
+        return FeedSettingsOut(require_tagging_review_for_feed=False)
+    return FeedSettingsOut(require_tagging_review_for_feed=row.require_tagging_review_for_feed)
+
+
+@router.patch("/feed-settings", response_model=FeedSettingsOut)
+def patch_feed_settings(
+    body: FeedSettingsPatch,
+    db: Session = Depends(get_db),
+    _su: AdminPrincipal = Depends(require_superuser),
+) -> FeedSettingsOut:
+    _ = _su
+    row = db.get(FeedSettings, 1)
+    if row is None:
+        row = FeedSettings(
+            id=1,
+            require_tagging_review_for_feed=body.require_tagging_review_for_feed,
+        )
+        db.add(row)
+    else:
+        row.require_tagging_review_for_feed = body.require_tagging_review_for_feed
+    db.commit()
+    db.refresh(row)
+    return FeedSettingsOut(require_tagging_review_for_feed=row.require_tagging_review_for_feed)
 
 
 @router.get("/photos", response_model=AdminPhotoListResponse)

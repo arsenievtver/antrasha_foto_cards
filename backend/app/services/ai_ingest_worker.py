@@ -171,7 +171,7 @@ def run_single_ingest_job(cfg: Settings, job_id: uuid.UUID) -> None:
         )
 
         try:
-            webp_bytes = png_bytes_to_webp(png_bytes, quality=85)
+            webp_bytes = png_bytes_to_webp(png_bytes, quality=100)
         except Exception as e:
             log.exception("webp encode job_id=%s", job_id)
             _fail_job(db, job, f"Кодирование WebP: {e}")
