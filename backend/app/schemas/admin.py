@@ -89,6 +89,10 @@ class AdminPhotoOut(BaseModel):
     # Очередь разметки: активная бронь другим сотрудником / своя
     claim_expires_at: datetime | None = None
     claim_is_mine: bool = False
+    # Счётчики реакций (уникальные «идентичности», см. модель Photo).
+    # rating = likes_count - dislikes_count.
+    likes_count: int = 0
+    dislikes_count: int = 0
 
 
 class AdminPhotoListResponse(BaseModel):

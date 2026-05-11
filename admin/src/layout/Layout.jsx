@@ -25,6 +25,9 @@ export default function Layout() {
         <NavLink to="/photos" className={({ isActive }) => (isActive ? "active" : "")}>
           Фото и теги
         </NavLink>
+        <NavLink to="/photo-ratings" className={({ isActive }) => (isActive ? "active" : "")}>
+          Рейтинг фото
+        </NavLink>
         <NavLink to="/tags" className={({ isActive }) => (isActive ? "active" : "")}>
           Справочник тегов
         </NavLink>

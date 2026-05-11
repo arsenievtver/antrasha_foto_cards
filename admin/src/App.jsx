@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import Layout from "./layout/Layout.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import Login from "./pages/Login.jsx";
+import PhotoRatings from "./pages/PhotoRatings.jsx";
 import Photos from "./pages/Photos.jsx";
 import Tags from "./pages/Tags.jsx";
 import Tagging from "./pages/Tagging.jsx";
@@ -52,6 +53,14 @@ export default function App() {
             element={
               <RoleRoute roles={["superuser", "worker"]}>
                 <Photos />
+              </RoleRoute>
+            }
+          />
+          <Route
+            path="/photo-ratings"
+            element={
+              <RoleRoute roles={["superuser", "worker"]}>
+                <PhotoRatings />
               </RoleRoute>
             }
           />

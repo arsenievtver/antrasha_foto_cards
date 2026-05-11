@@ -13,6 +13,7 @@ import {
   putPhotoTags,
   suggestXimilarTags,
 } from "../api.js";
+import { useHoverPreview } from "../utils/usePhotoHover.jsx";
 
 /** Подписи секций каталога — как на странице «Разметка тегов». */
 const SECTION_LABELS = {
@@ -58,6 +59,7 @@ export default function Photos() {
   const [ximilarObjects, setXimilarObjects] = useState([]);
   const [ximilarMergedTagIds, setXimilarMergedTagIds] = useState([]);
   const [selectedXimilarIndex, setSelectedXimilarIndex] = useState(0);
+  const photoHover = useHoverPreview();
 
   const loadList = useCallback(async () => {
     setErr("");
@@ -334,8 +336,11 @@ export default function Photos() {
     }
     setDeleting(true);
     setErr("");
+    // Бэкенд делает один S3 delete_objects на бакет, но nginx proxy_read_timeout
+    // даёт ограниченный бюджет — батчим консервативно, чтобы каждый запрос
+    // укладывался в считанные секунды даже на медленной сети до Yandex Cloud.
+    const batchSize = 50;
     try {
-      const batchSize = 100;
       const allResults = [];
       for (let i = 0; i < ids.length; i += batchSize) {
         const chunk = ids.slice(i, i + batchSize);
@@ -355,10 +360,25 @@ export default function Photos() {
           failed.map((f) => `${f.id}: ${f.detail || "ошибка"}`).join("\n"),
         );
       }
-      await loadList();
     } catch (e) {
-      setErr(e.message);
+      // Самый частый кейс — таймаут nginx (HTML 504 → parseResponseJson бросает):
+      // на сервере удаление, вероятно, уже идёт/прошло. Чистим выделение оптимистично
+      // и обязательно перезагружаем список ниже (в finally), чтобы UI пришёл в порядок.
+      setSelected((s) => {
+        const n = { ...s };
+        for (const id of ids) delete n[id];
+        return n;
+      });
+      setErr(
+        `Не удалось дождаться ответа сервера: ${e.message || e}. ` +
+          "Часть фото могла быть уже удалена — список обновлён.",
+      );
     } finally {
+      try {
+        await loadList();
+      } catch (e2) {
+        setErr((prev) => prev || e2.message || String(e2));
+      }
       setDeleting(false);
     }
   }
@@ -531,6 +551,7 @@ export default function Photos() {
                 key={p.id}
                 className={`photo-cell ${selected[p.id] ? "selected" : ""}`}
                 style={{ position: "relative" }}
+                {...photoHover.hoverProps(p.url)}
               >
                 <span
                   style={{
@@ -921,6 +942,7 @@ export default function Photos() {
           </div>
         </div>
       )}
+      {photoHover.overlay}
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { fetchFittingRequests } from "../api.js";
+import { useHoverPreview } from "../utils/usePhotoHover.jsx";
 
 function fmtPct(rate) {
   const n = Number(rate) || 0;
@@ -11,6 +12,7 @@ export default function FittingRequests() {
   const [total, setTotal] = useState(0);
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(true);
+  const photoHover = useHoverPreview();
 
   useEffect(() => {
     let cancelled = false;
@@ -73,6 +75,7 @@ export default function FittingRequests() {
                           target="_blank"
                           rel="noreferrer"
                           title="Открыть фото"
+                          {...photoHover.hoverProps(url)}
                         >
                           <img
                             src={url}
@@ -99,6 +102,7 @@ export default function FittingRequests() {
           </tbody>
         </table>
       </div>
+      {photoHover.overlay}
     </div>
   );
 }

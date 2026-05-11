@@ -79,6 +79,11 @@ class Photo(Base):
     moy_sklad_id: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
     # Инкремент при каждом сохранении тегов — optimistic locking в админке.
     tags_version: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # Денормализация: уникальные «идентичности» (user_id или session_id),
+    # которые последним действием поставили лайк/дизлайк. Источник истины — interactions:
+    # повторные свайпы одной идентичности не считаются, «переключение» меняет сторону.
+    likes_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    dislikes_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     brand_row = relationship("Brand", back_populates="photos")
     photo_tags = relationship("PhotoTag", back_populates="photo", cascade="all, delete-orphan")

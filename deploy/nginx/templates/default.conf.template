@@ -36,6 +36,10 @@ server {
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
+    # Админские операции (sync, bulk-delete) могут идти к Object Storage; дефолтные 60 с малы.
+    proxy_connect_timeout 30s;
+    proxy_send_timeout    300s;
+    proxy_read_timeout    300s;
   }
 
   location /internal/ {
@@ -74,6 +78,10 @@ server {
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
+    # Админские операции (sync, bulk-delete) могут идти к Object Storage; дефолтные 60 с малы.
+    proxy_connect_timeout 30s;
+    proxy_send_timeout    300s;
+    proxy_read_timeout    300s;
   }
 
   location /internal/ {

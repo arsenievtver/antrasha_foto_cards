@@ -79,6 +79,82 @@ def delete_photo_file_from_object_storage(cfg: Settings, url: str) -> str | None
         return str(e)
 
 
+# S3 Multi-Object Delete лимит — 1000 ключей за запрос.
+_S3_DELETE_OBJECTS_MAX_KEYS = 1000
+
+
+def bulk_delete_photo_files_from_object_storage(
+    cfg: Settings,
+    urls: list[str],
+) -> dict[str, str | None]:
+    """
+    Пакетное удаление файлов фото из управляемых бакетов.
+
+    Один S3-клиент на весь вызов; один `delete_objects` (Multi-Object Delete)
+    на бакет (до 1000 ключей за запрос). Это критично для админского bulk-delete
+    — иначе при 50+ фото операция превышает nginx `proxy_read_timeout` (60 с),
+    и фронт получает 504, хотя бэкенд продолжает удалять.
+
+    Возвращает: для каждого входного URL — `None` (успех, либо удаление из
+    стораджа не требуется), либо текст ошибки S3.
+    """
+    out: dict[str, str | None] = {u: None for u in urls}
+    if not cfg.yc_s3_configured or not urls:
+        return out
+
+    allowed = {cfg.yc_bucket_men, cfg.yc_bucket_women}
+    # bucket -> key -> [исходные URL, которые ссылаются на этот key]
+    keys_by_bucket: dict[str, dict[str, list[str]]] = {}
+    for u in urls:
+        parsed = parse_storage_public_url(u)
+        if not parsed:
+            continue
+        bucket, key = parsed
+        if bucket not in allowed:
+            continue
+        keys_by_bucket.setdefault(bucket, {}).setdefault(key, []).append(u)
+
+    if not keys_by_bucket:
+        return out
+
+    try:
+        client = get_s3_client()
+    except RuntimeError as e:
+        msg = str(e)
+        for keys_map in keys_by_bucket.values():
+            for url_list in keys_map.values():
+                for u in url_list:
+                    out[u] = msg
+        return out
+
+    for bucket, keys_map in keys_by_bucket.items():
+        keys = list(keys_map.keys())
+        for i in range(0, len(keys), _S3_DELETE_OBJECTS_MAX_KEYS):
+            chunk = keys[i : i + _S3_DELETE_OBJECTS_MAX_KEYS]
+            try:
+                resp = client.delete_objects(
+                    Bucket=bucket,
+                    Delete={
+                        "Objects": [{"Key": k} for k in chunk],
+                        # Quiet=True — в ответе будут только ошибки, успешные ключи опускаются.
+                        "Quiet": True,
+                    },
+                )
+            except ClientError as e:
+                # Целиком чанк не дошёл — пометим все его URL как «ошибка».
+                err_msg = str(e)
+                for k in chunk:
+                    for u in keys_map.get(k, []):
+                        out[u] = err_msg
+                continue
+            for err in resp.get("Errors", []) or []:
+                err_key = err.get("Key", "")
+                msg = err.get("Message") or err.get("Code") or "S3 error"
+                for u in keys_map.get(err_key, []):
+                    out[u] = msg
+    return out
+
+
 def is_image_key(key: str) -> bool:
     if not key or key.endswith("/"):
         return False

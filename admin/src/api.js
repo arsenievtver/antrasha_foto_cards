@@ -136,12 +136,21 @@ export async function patchFeedSettings(body) {
   return data;
 }
 
-export async function fetchPhotos({ skip = 0, limit = 48, gender, activeOnly, taggingDoneOnly, brandId } = {}) {
+export async function fetchPhotos({
+  skip = 0,
+  limit = 48,
+  gender,
+  activeOnly,
+  taggingDoneOnly,
+  brandId,
+  sort,
+} = {}) {
   const q = new URLSearchParams({ skip: String(skip), limit: String(limit) });
   if (gender) q.set("gender", gender);
   if (activeOnly) q.set("active_only", "true");
   if (taggingDoneOnly) q.set("tagging_done_only", "true");
   if (brandId) q.set("brand_id", brandId);
+  if (sort && sort !== "recent") q.set("sort", sort);
   const res = await fetch(`${apiUrl("/admin/photos")}?${q}`, { headers: headersJson() });
   const data = await parseResponseJson(res);
   if (!res.ok) throw new Error(detail(data, res.statusText));

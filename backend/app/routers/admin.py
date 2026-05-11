@@ -65,7 +65,7 @@ from app.security import hash_pin
 from app.experimental.ximilar.router import router as _ximilar_experimental_router
 from app.services.tagging_validation import validate_catalog_tag_selection
 from app.services.yc_photo_sync import run_sync_job_commit
-from app.services.yc_storage import delete_photo_file_from_object_storage
+from app.services.yc_storage import bulk_delete_photo_files_from_object_storage
 
 TAGGING_CLAIM_TTL = timedelta(minutes=5)
 
@@ -131,6 +131,8 @@ def _photo_out(p: Photo, *, viewer_user_id: uuid.UUID | None = None) -> AdminPho
         tags_version=p.tags_version,
         claim_expires_at=claim_expires_at,
         claim_is_mine=claim_is_mine,
+        likes_count=p.likes_count,
+        dislikes_count=p.dislikes_count,
     )
 
 
@@ -316,6 +318,29 @@ def patch_feed_settings(
     return FeedSettingsOut(require_tagging_review_for_feed=row.require_tagging_review_for_feed)
 
 
+# Поддерживаемые сортировки в /admin/photos. Значения сохраняйте синхронно с фронтом (admin/src/pages/Photos.jsx).
+ADMIN_PHOTOS_SORTS = {
+    "recent",          # по умолчанию: новые сверху
+    "top_likes",       # больше лайков
+    "top_dislikes",    # больше дизлайков
+    "top_rating",      # выше рейтинг (likes - dislikes)
+    "bottom_rating",   # ниже рейтинг (антирейтинг)
+}
+
+
+def _photos_order_by(sort: str):
+    rating = (Photo.likes_count - Photo.dislikes_count).label("rating")
+    if sort == "top_likes":
+        return [Photo.likes_count.desc(), Photo.created_at.desc()]
+    if sort == "top_dislikes":
+        return [Photo.dislikes_count.desc(), Photo.created_at.desc()]
+    if sort == "top_rating":
+        return [rating.desc(), Photo.created_at.desc()]
+    if sort == "bottom_rating":
+        return [rating.asc(), Photo.created_at.desc()]
+    return [Photo.created_at.desc()]
+
+
 @router.get("/photos", response_model=AdminPhotoListResponse)
 def list_photos(
     db: Session = Depends(get_db),
@@ -326,9 +351,15 @@ def list_photos(
     active_only: bool = Query(False),
     tagging_done_only: bool = Query(False, description="только завершённая разметка"),
     brand_id: uuid.UUID | None = Query(None, description="фильтр по бренду"),
+    sort: str = Query(
+        "recent",
+        description="recent | top_likes | top_dislikes | top_rating | bottom_rating",
+    ),
 ) -> AdminPhotoListResponse:
     _expire_stale_tagging_claims(db)
     db.flush()
+    if sort not in ADMIN_PHOTOS_SORTS:
+        sort = "recent"
     cond = [Photo.source_type == PHOTO_SOURCE_YC_OBJECT_STORAGE]
     if gender:
         cond.append(func.lower(Photo.gender) == gender.strip().lower())
@@ -346,7 +377,7 @@ def list_photos(
     if cond:
         q = q.where(*cond)
     q = (
-        q.order_by(Photo.created_at.desc())
+        q.order_by(*_photos_order_by(sort))
         .offset(skip)
         .limit(limit)
         .options(_tag_catalog_selectinloads())
@@ -591,20 +622,39 @@ def bulk_delete_photos(
     db: Session = Depends(get_db),
     _principal: AdminPrincipal = Depends(get_admin_principal),
 ) -> AdminPhotosBulkDeleteResponse:
+    """
+    Пакетное удаление фото: один S3 `delete_objects` на бакет + удаления в БД.
+
+    Старая реализация делала отдельный `boto3.session` + `delete_object` на каждое
+    фото и отдельный `db.commit()` — на 50+ фото это выходило за 60 c nginx
+    `proxy_read_timeout`, фронт получал 504, хотя бэкенд продолжал удалять.
+    """
+    # Сохраняем порядок и убираем дубликаты (на случай повторов в теле запроса).
+    photo_ids: list[uuid.UUID] = list(dict.fromkeys(body.photo_ids))
+
+    photos_by_id: dict[uuid.UUID, Photo] = {
+        p.id: p
+        for p in db.scalars(select(Photo).where(Photo.id.in_(photo_ids))).all()
+    }
+
+    # url → ошибка S3 (или None при успехе / неприменимо). Один S3-клиент на весь батч.
+    urls = [photos_by_id[pid].url for pid in photo_ids if pid in photos_by_id]
+    storage_errors_by_url = bulk_delete_photo_files_from_object_storage(settings, urls)
+
     results: list[AdminPhotoBulkDeleteItem] = []
-    for pid in body.photo_ids:
-        photo = db.get(Photo, pid)
+    for pid in photo_ids:
+        photo = photos_by_id.get(pid)
         if not photo:
             results.append(AdminPhotoBulkDeleteItem(id=pid, ok=False, detail="not_found"))
             continue
-        storage_err = delete_photo_file_from_object_storage(settings, photo.url)
-        if storage_err:
-            log.warning("bulk_delete photo_id=%s storage failed: %s", pid, storage_err)
+        s_err = storage_errors_by_url.get(photo.url)
+        if s_err:
+            log.warning("bulk_delete photo_id=%s storage failed: %s", pid, s_err)
             results.append(
                 AdminPhotoBulkDeleteItem(
                     id=pid,
                     ok=False,
-                    detail=f"object_storage: {storage_err}",
+                    detail=f"object_storage: {s_err}",
                 ),
             )
             continue
