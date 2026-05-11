@@ -65,6 +65,7 @@ bash deploy/scripts/server-pull-deploy.sh
 - `git pull --ff-only`
 - сборка образов `backend` / `frontend` / `admin`
 - подъём Postgres, миграции Alembic **до** перезапуска API
+- материализацию активного nginx-шаблона из источника (TLS — если есть Let's Encrypt сертификат для `APP_DOMAIN`, иначе HTTP) с `force-recreate nginx`
 - `docker compose up -d` всего стека
 - проверка `/health`
 
@@ -140,7 +141,11 @@ This script:
 - requests certificates via `certbot` (webroot challenge),
 - copies the TLS template [`deploy/nginx/default.tls.conf.template`](nginx/default.tls.conf.template) over `deploy/nginx/templates/default.conf.template` and recreates nginx.
 
+После первого включения TLS никаких ручных шагов не нужно: дальнейший `update.sh` сам обнаружит выпущенный сертификат и каждый деплой будет перекладывать актуальный TLS-источник в `templates/default.conf.template`.
+
 **Important:** the official `nginx` Docker image turns **every** file matching `*.template` under `deploy/nginx/templates/` into a separate `.conf`. Do not place the TLS template there until certificates exist — it would make nginx load broken `443` blocks and crash-loop. The TLS file lives **next to** `templates/`, not inside it.
+
+> Активный шаблон `deploy/nginx/templates/default.conf.template` **не отслеживается git'ом** (см. `.gitignore`) — это сгенерированный артефакт. Источники истины — `deploy/nginx/default.http.conf.template` и `deploy/nginx/default.tls.conf.template`. При правках nginx-конфига меняй именно их.
 
 Check:
 

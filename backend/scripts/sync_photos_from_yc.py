@@ -54,6 +54,14 @@ def main() -> None:
         action="store_true",
         help="Не отключать записи в БД для этого пола, если их URL нет в бакете",
     )
+    parser.add_argument(
+        "--purge-orphans",
+        action="store_true",
+        help=(
+            "Удалять из БД фотки, отсутствующие в бакете, полностью (каскадно "
+            "зачищаются photo_tags/interactions). По умолчанию только is_active=False."
+        ),
+    )
     args = parser.parse_args()
 
     if not settings.yc_s3_configured:
@@ -63,19 +71,32 @@ def main() -> None:
         )
         sys.exit(1)
 
+    if args.keep_orphans and args.purge_orphans:
+        print(
+            "Ошибка: --keep-orphans и --purge-orphans взаимоисключающие.",
+            file=sys.stderr,
+        )
+        sys.exit(2)
+
     require_postgres()
 
     clean = not args.keep_orphans
     try:
-        out = run_sync_job_commit(settings, deactivate_not_in_bucket=clean)
+        out = run_sync_job_commit(
+            settings,
+            deactivate_not_in_bucket=clean,
+            purge_not_in_bucket=args.purge_orphans,
+        )
     except Exception:
         raise
     m, f = out["male"], out["female"]
     print(
-        f"OK: male — объектов в бакете {m['keys_in_bucket']}, добавлено строк {m['rows_added']}, "
-        f"деактивировано лишних {m['rows_deactivated']}; "
+        f"OK: male — объектов в бакете {m['keys_in_bucket']}, добавлено {m['rows_added']}, "
+        f"деактивировано {m['rows_deactivated']}, удалено {m.get('rows_purged', 0)}"
+        f"{' (safety_skip)' if m.get('safety_skip') else ''}; "
         f"female — в бакете {f['keys_in_bucket']}, добавлено {f['rows_added']}, "
-        f"деактивировано {f['rows_deactivated']}."
+        f"деактивировано {f['rows_deactivated']}, удалено {f.get('rows_purged', 0)}"
+        f"{' (safety_skip)' if f.get('safety_skip') else ''}."
     )
 
 

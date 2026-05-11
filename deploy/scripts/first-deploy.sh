@@ -41,6 +41,13 @@ done
 echo "[step] apply migrations (до старта API — иначе lifespan падает на пустой БД)"
 compose run --rm --no-deps backend alembic upgrade head
 
+# Bootstrap активного nginx-шаблона (HTTP-режим). После выпуска сертификатов
+# через tls-enable.sh скрипт сам перетрёт шаблон на TLS-вариант. Файл не
+# отслеживается git'ом (см. .gitignore), поэтому генерим явно перед `compose up`.
+echo "[step] bootstrap nginx template (HTTP mode; TLS enables via tls-enable.sh later)"
+cp "$DEPLOY_DIR/nginx/default.http.conf.template" \
+   "$DEPLOY_DIR/nginx/templates/default.conf.template"
+
 echo "[step] starting all containers"
 compose up -d --remove-orphans
 

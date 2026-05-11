@@ -1,4 +1,4 @@
-"""Суперпользователь: загрузка сырья → очередь → Fashn → Object Storage."""
+"""Админка (суперпользователь и сотрудник): загрузка сырья → очередь → Fashn → Object Storage."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.config import DOTENV_CANDIDATE_PATHS, DOTENV_LOADED_PATHS, settings
 from app.database import SessionLocal, get_db
-from app.deps import require_superuser, AdminPrincipal
+from app.deps import AdminPrincipal, get_admin_principal
 from app.models import AiIngestJob, Brand
 from app.schemas.ai_ingest import (
     AiIngestDiagnosticsOut,
@@ -101,18 +101,18 @@ def _count_status(db: Session, st: str) -> int:
 
 @router.get("/limits", response_model=AiIngestLimitsOut)
 def get_limits(
-    _su: AdminPrincipal = Depends(require_superuser),
+    _p: AdminPrincipal = Depends(get_admin_principal),
 ) -> AiIngestLimitsOut:
-    _ = _su
+    _ = _p
     return _limits()
 
 
 @router.get("/diagnostics", response_model=AiIngestDiagnosticsOut)
 def ingest_network_diagnostics(
-    _su: AdminPrincipal = Depends(require_superuser),
+    _p: AdminPrincipal = Depends(get_admin_principal),
 ) -> AiIngestDiagnosticsOut:
     """TCP до api.fashn.ai:443 с машины, где крутится бэкенд (Docker/VPS — не ваш ноутбук)."""
-    _ = _su
+    _ = _p
     import socket
 
     ok = False
@@ -128,9 +128,9 @@ def ingest_network_diagnostics(
 @router.get("/stats", response_model=AiIngestQueueStatsOut)
 def queue_stats(
     db: Session = Depends(get_db),
-    _su: AdminPrincipal = Depends(require_superuser),
+    _p: AdminPrincipal = Depends(get_admin_principal),
 ) -> AiIngestQueueStatsOut:
-    _ = _su
+    _ = _p
     return AiIngestQueueStatsOut(
         pending=_count_status(db, "pending"),
         processing=_count_status(db, "processing"),
@@ -141,11 +141,11 @@ def queue_stats(
 @router.get("/jobs", response_model=AiIngestJobListResponse)
 def list_jobs(
     db: Session = Depends(get_db),
-    _su: AdminPrincipal = Depends(require_superuser),
+    _p: AdminPrincipal = Depends(get_admin_principal),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
 ) -> AiIngestJobListResponse:
-    _ = _su
+    _ = _p
     total = db.scalar(select(func.count()).select_from(AiIngestJob)) or 0
     rows = db.scalars(
         select(AiIngestJob)
@@ -184,17 +184,17 @@ async def _save_upload_limited(upload: UploadFile, dest: Path, max_bytes: int) -
 
 @router.post("/upload", response_model=AiIngestUploadResponse)
 async def upload_batch(
-    _su: AdminPrincipal = Depends(require_superuser),
+    _p: AdminPrincipal = Depends(get_admin_principal),
     gender: str = Form(..., description="male | female"),
     brand_id: uuid.UUID = Form(..., description="ID бренда, см. GET /admin/brands"),
     files: list[UploadFile] = File(...),
 ) -> AiIngestUploadResponse:
     """
-    Не используем Depends(get_db) здесь: у superuser уже есть сессия из get_admin_principal,
+    Не используем Depends(get_db) здесь: Bearer уже проверен в get_admin_principal,
     второй get_db отнимает второе соединение на всё время приёма multipart (типичный «зависший» upload).
     БД трогаем короткими SessionLocal().
     """
-    _ = _su
+    _ = _p
     g = gender.strip().lower()
     if g not in ("male", "female"):
         raise HTTPException(status_code=400, detail="gender: укажите male или female")
@@ -315,9 +315,9 @@ async def upload_batch(
 def retry_job(
     job_id: uuid.UUID,
     db: Session = Depends(get_db),
-    _su: AdminPrincipal = Depends(require_superuser),
+    _p: AdminPrincipal = Depends(get_admin_principal),
 ) -> AiIngestJobOut:
-    _ = _su
+    _ = _p
     j = db.get(AiIngestJob, job_id)
     if not j:
         raise HTTPException(status_code=404, detail="Задача не найдена")
@@ -344,9 +344,9 @@ def retry_job(
 def delete_job(
     job_id: uuid.UUID,
     db: Session = Depends(get_db),
-    _su: AdminPrincipal = Depends(require_superuser),
+    _p: AdminPrincipal = Depends(get_admin_principal),
 ) -> None:
-    _ = _su
+    _ = _p
     j = db.get(AiIngestJob, job_id)
     if not j:
         raise HTTPException(status_code=404, detail="Задача не найдена")

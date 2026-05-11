@@ -28,3 +28,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Активный nginx-шаблон — это сгенерированный артефакт (HTTP- или TLS-источник).
+# Кладёт его update.sh / tls-enable.sh. Не отслеживается, чтобы git pull
+# не конфликтовал с локальным состоянием на сервере (TLS-overlay).
+deploy/nginx/templates/default.conf.template

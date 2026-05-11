@@ -49,6 +49,9 @@ export default function Photos() {
   const [selected, setSelected] = useState({});
   const [deleting, setDeleting] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  // Сводка по последнему синку с бакетом (показывается коротким уведомлением
+  // под тулбаром, чтобы админ видел: добавилось/удалилось/пропуск по safety).
+  const [syncSummary, setSyncSummary] = useState(null);
   const [feedSettings, setFeedSettings] = useState(null);
   const [feedSettingsLoading, setFeedSettingsLoading] = useState(true);
   const [aiBusy, setAiBusy] = useState(false);
@@ -387,10 +390,24 @@ export default function Photos() {
     if (syncing) return;
     setSyncing(true);
     setErr("");
+    setSyncSummary(null);
     try {
-      await syncPhotosFromObjectStorage();
+      // purge=true: фотки, отсутствующие в бакете, удаляются из БД полностью
+      // (а не просто деактивируются), чтобы битые карточки не оставались
+      // в списке после ручного удаления объекта из Object Storage.
+      const stats = await syncPhotosFromObjectStorage({ purge: true });
       setSkip(0);
       await loadList();
+      const m = stats?.male || {};
+      const f = stats?.female || {};
+      setSyncSummary({
+        added: (m.rows_added || 0) + (f.rows_added || 0),
+        purged: (m.rows_purged || 0) + (f.rows_purged || 0),
+        deactivated: (m.rows_deactivated || 0) + (f.rows_deactivated || 0),
+        safetySkip: Boolean(m.safety_skip || f.safety_skip),
+        male: m,
+        female: f,
+      });
     } catch (e) {
       setErr(e.message || String(e));
     } finally {
@@ -537,6 +554,32 @@ export default function Photos() {
         </button>
       </div>
       {!modalPhoto && err && <p className="error">{err}</p>}
+      {!modalPhoto && syncSummary && (
+        <p
+          style={{
+            color: syncSummary.safetySkip ? "#cc3a3a" : "var(--muted)",
+            fontSize: "0.9rem",
+            margin: "0.25rem 0 0",
+          }}
+        >
+          {syncSummary.safetySkip ? (
+            <>
+              Sync с бакетом: один из бакетов вернул 0 ключей при наличии записей
+              в БД — БД не меняли (предохранитель). Проверь ключи/префиксы YC и
+              нажми «Обновить» ещё раз.
+            </>
+          ) : (
+            <>
+              Sync с бакетом: добавлено {syncSummary.added}
+              {", удалено осиротевших "}{syncSummary.purged}
+              {syncSummary.deactivated > 0
+                ? `, деактивировано ${syncSummary.deactivated}`
+                : ""}
+              .
+            </>
+          )}
+        </p>
+      )}
       {loading ? (
         <p style={{ color: "var(--muted)" }}>Загрузка…</p>
       ) : (

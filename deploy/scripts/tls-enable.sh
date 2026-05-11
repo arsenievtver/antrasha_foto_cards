@@ -37,7 +37,13 @@ compose run --rm certbot certonly \
   --agree-tos --no-eff-email --non-interactive
 
 echo "[step] switching nginx template to TLS"
-# NB: только один файл *.template в deploy/nginx/templates/ — иначе образ nginx генерит несколько *.conf и падает на лишнем SSL без сертификатов
+# NB: только один файл *.template в deploy/nginx/templates/ — иначе образ nginx
+# генерит несколько *.conf и падает на лишнем SSL без сертификатов.
+# Сам активный шаблон НЕ отслеживается git'ом (см. .gitignore): это
+# сгенерированный артефакт. Дальше update.sh при каждом деплое сам подбирает
+# нужный источник (TLS, если /letsencrypt/live/${APP_DOMAIN}/fullchain.pem
+# существует, иначе HTTP) и пересоздаёт nginx — отдельных команд после
+# tls-enable.sh запускать не нужно.
 cp "$DEPLOY_DIR/nginx/default.tls.conf.template" "$DEPLOY_DIR/nginx/templates/default.conf.template"
 
 echo "[step] recreating nginx"

@@ -413,6 +413,14 @@ def get_admin_photo(
 
 @router.post("/photos/sync-object-storage")
 def sync_photos_from_object_storage(
+    purge: bool = Query(
+        False,
+        description=(
+            "Если True — фотки, которых уже нет в бакете, удаляются из БД полностью "
+            "(каскадно зачищаются связанные теги/интеракции). По умолчанию False: "
+            "такие фотки только деактивируются (is_active=False)."
+        ),
+    ),
     _principal: AdminPrincipal = Depends(get_admin_principal),
 ) -> dict:
     _ = _principal
@@ -421,7 +429,11 @@ def sync_photos_from_object_storage(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Yandex S3 ключи не настроены",
         )
-    return run_sync_job_commit(settings, deactivate_not_in_bucket=True)
+    return run_sync_job_commit(
+        settings,
+        deactivate_not_in_bucket=True,
+        purge_not_in_bucket=purge,
+    )
 
 
 @router.get("/tagging-queue", response_model=AdminPhotoListResponse)

@@ -1,0 +1,4 @@
+# Папка нужна как bind-volume для nginx-контейнера (см. docker-compose.prod.yml).
+# Сам default.conf.template — сгенерированный артефакт, его кладёт сюда update.sh
+# (либо tls-enable.sh при первом включении TLS). Файл не отслеживается git'ом,
+# см. .gitignore.

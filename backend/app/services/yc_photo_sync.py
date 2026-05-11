@@ -11,7 +11,7 @@ import uuid
 from dataclasses import dataclass
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.config import Settings
@@ -28,6 +28,12 @@ class BucketSyncStats:
     keys_in_bucket: int
     rows_added: int
     rows_deactivated: int
+    # Полностью удалены из БД (каскадно зачищаются photo_tags/interactions,
+    # fitting_requests.photo_id ← NULL). Используется только при purge=True.
+    rows_purged: int = 0
+    # True, если бакет вернул 0 ключей при наличии существующих строк в БД для
+    # этого пола: вероятный сбой/неверный prefix — БД оставляем как есть.
+    safety_skip: bool = False
 
 
 def sync_bucket_to_db(
@@ -38,6 +44,7 @@ def sync_bucket_to_db(
     gender: str,
     prefix: str,
     deactivate_not_in_bucket: bool,
+    purge_not_in_bucket: bool = False,
 ) -> BucketSyncStats:
     client = get_s3_client()
     keys = list_image_keys(client, bucket, prefix)
@@ -67,16 +74,53 @@ def sync_bucket_to_db(
         )
         added += 1
 
+    # Защита от случайного «обнуления»: если бакет вдруг вернул 0 ключей, но
+    # в БД есть записи для этого пола — почти наверняка это временный сбой
+    # (неверный prefix, RO-ошибка ключа, частичная недоступность). Не трогаем БД.
+    safety_skip = False
+    if (deactivate_not_in_bucket or purge_not_in_bucket) and len(keys) == 0:
+        existing_count = db.scalar(
+            select(func.count())
+            .select_from(Photo)
+            .where(
+                Photo.gender == gender,
+                Photo.source_type == PHOTO_SOURCE_YC_OBJECT_STORAGE,
+            ),
+        ) or 0
+        if existing_count > 0:
+            safety_skip = True
+            log.warning(
+                "yc_photo_sync SAFETY-SKIP gender=%s bucket=%s prefix=%r "
+                "(bucket вернул 0 ключей, в БД %s записей) — БД не меняем",
+                gender, bucket, prefix, existing_count,
+            )
+
     deactivated = 0
-    if deactivate_not_in_bucket:
-        q = select(Photo).where(
-            Photo.gender == gender,
-            Photo.source_type == PHOTO_SOURCE_YC_OBJECT_STORAGE,
-        )
-        for p in db.execute(q).scalars().all():
-            if p.url not in existing_urls and p.is_active:
-                p.is_active = False
-                deactivated += 1
+    purged = 0
+    if not safety_skip:
+        if purge_not_in_bucket:
+            # Удаляем «осиротевшие» в БД (URL, которых нет в бакете) одним SQL:
+            # ON DELETE CASCADE на photo_tags/interactions и SET NULL на
+            # fitting_requests.photo_id — на уровне схемы.
+            orphan_q = select(Photo.id).where(
+                Photo.gender == gender,
+                Photo.source_type == PHOTO_SOURCE_YC_OBJECT_STORAGE,
+            )
+            if existing_urls:
+                orphan_q = orphan_q.where(Photo.url.notin_(existing_urls))
+            orphan_ids = list(db.execute(orphan_q).scalars().all())
+            if orphan_ids:
+                db.execute(delete(Photo).where(Photo.id.in_(orphan_ids)))
+                purged = len(orphan_ids)
+        elif deactivate_not_in_bucket:
+            q = select(Photo).where(
+                Photo.gender == gender,
+                Photo.source_type == PHOTO_SOURCE_YC_OBJECT_STORAGE,
+            )
+            for p in db.execute(q).scalars().all():
+                if p.url not in existing_urls and p.is_active:
+                    p.is_active = False
+                    deactivated += 1
 
     return BucketSyncStats(
         gender=gender,
@@ -84,6 +128,8 @@ def sync_bucket_to_db(
         keys_in_bucket=len(keys),
         rows_added=added,
         rows_deactivated=deactivated,
+        rows_purged=purged,
+        safety_skip=safety_skip,
     )
 
 
@@ -139,6 +185,7 @@ def sync_all_buckets_from_yc(
     *,
     settings: Settings,
     deactivate_not_in_bucket: bool = True,
+    purge_not_in_bucket: bool = False,
 ) -> tuple[BucketSyncStats, BucketSyncStats]:
     if not settings.yc_s3_configured:
         raise RuntimeError("Yandex Object Storage: не заданы YC_S3_ACCESS_KEY_ID / YC_S3_SECRET_ACCESS_KEY")
@@ -150,6 +197,7 @@ def sync_all_buckets_from_yc(
         gender="male",
         prefix=settings.yc_s3_prefix_men,
         deactivate_not_in_bucket=deactivate_not_in_bucket,
+        purge_not_in_bucket=purge_not_in_bucket,
     )
     f = sync_bucket_to_db(
         db,
@@ -158,6 +206,7 @@ def sync_all_buckets_from_yc(
         gender="female",
         prefix=settings.yc_s3_prefix_women,
         deactivate_not_in_bucket=deactivate_not_in_bucket,
+        purge_not_in_bucket=purge_not_in_bucket,
     )
     return m, f
 
@@ -169,33 +218,44 @@ def stats_as_dict(m: BucketSyncStats, f: BucketSyncStats) -> dict[str, Any]:
             "keys_in_bucket": m.keys_in_bucket,
             "rows_added": m.rows_added,
             "rows_deactivated": m.rows_deactivated,
+            "rows_purged": m.rows_purged,
+            "safety_skip": m.safety_skip,
         },
         "female": {
             "bucket": f.bucket,
             "keys_in_bucket": f.keys_in_bucket,
             "rows_added": f.rows_added,
             "rows_deactivated": f.rows_deactivated,
+            "rows_purged": f.rows_purged,
+            "safety_skip": f.safety_skip,
         },
     }
 
 
-def run_sync_job_commit(settings: Settings, *, deactivate_not_in_bucket: bool = True) -> dict[str, Any]:
-    """Одна транзакция на полный цикл (для CLI и фона)."""
+def run_sync_job_commit(
+    settings: Settings,
+    *,
+    deactivate_not_in_bucket: bool = True,
+    purge_not_in_bucket: bool = False,
+) -> dict[str, Any]:
+    """Одна транзакция на полный цикл (для CLI, фона и админ-эндпоинта)."""
     from app.database import SessionLocal
 
     db = SessionLocal()
     try:
-        m, f = sync_all_buckets_from_yc(db, settings=settings, deactivate_not_in_bucket=deactivate_not_in_bucket)
+        m, f = sync_all_buckets_from_yc(
+            db,
+            settings=settings,
+            deactivate_not_in_bucket=deactivate_not_in_bucket,
+            purge_not_in_bucket=purge_not_in_bucket,
+        )
         db.commit()
         out = stats_as_dict(m, f)
         log.info(
-            "yc_photo_sync OK male keys=%s +%s ~%s | female keys=%s +%s ~%s",
-            m.keys_in_bucket,
-            m.rows_added,
-            m.rows_deactivated,
-            f.keys_in_bucket,
-            f.rows_added,
-            f.rows_deactivated,
+            "yc_photo_sync OK male keys=%s +%s ~%s -%s skip=%s | "
+            "female keys=%s +%s ~%s -%s skip=%s",
+            m.keys_in_bucket, m.rows_added, m.rows_deactivated, m.rows_purged, m.safety_skip,
+            f.keys_in_bucket, f.rows_added, f.rows_deactivated, f.rows_purged, f.safety_skip,
         )
         return out
     except Exception:

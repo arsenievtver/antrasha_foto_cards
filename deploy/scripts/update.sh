@@ -33,8 +33,32 @@ done
 echo "[step] apply migrations before rolling backend"
 compose run --rm --no-deps backend alembic upgrade head
 
+# Активный nginx-шаблон не отслеживается git'ом (см. .gitignore) — он генерится
+# здесь из двух источников: default.tls.conf.template (если уже выпущен
+# Let's Encrypt сертификат для APP_DOMAIN) или default.http.conf.template
+# (иначе). Это устраняет постоянный «локальный diff» на сервере после
+# tls-enable.sh, из-за которого git pull рушился.
+echo "[step] resolve active nginx template (TLS if cert exists, else HTTP)"
+set -a
+# shellcheck disable=SC1091
+source "$DEPLOY_DIR/env/.env.prod"
+set +a
+ACTIVE_TEMPLATE="$DEPLOY_DIR/nginx/templates/default.conf.template"
+TLS_CERT="$DEPLOY_DIR/nginx/letsencrypt/live/${APP_DOMAIN:-_unset_}/fullchain.pem"
+if [[ -n "${APP_DOMAIN:-}" && -f "$TLS_CERT" ]]; then
+  echo "  using TLS template (cert: $TLS_CERT)"
+  cp "$DEPLOY_DIR/nginx/default.tls.conf.template" "$ACTIVE_TEMPLATE"
+else
+  echo "  using HTTP template (no TLS cert for ${APP_DOMAIN:-<unset>})"
+  cp "$DEPLOY_DIR/nginx/default.http.conf.template" "$ACTIVE_TEMPLATE"
+fi
+
 echo "[step] restarting services"
 compose up -d --remove-orphans
+# bind-mount файла не триггерит recreate, а envsubst шаблонов nginx-образа
+# выполняется только в entrypoint'е при старте контейнера. Поэтому здесь
+# принудительно пересоздаём nginx, чтобы он подхватил обновлённый шаблон.
+compose up -d --force-recreate nginx
 
 if [[ "${TAG_CATALOG_SEED:-0}" == "1" ]]; then
   echo "[step] tag catalog seed (TAG_CATALOG_SEED=1)"

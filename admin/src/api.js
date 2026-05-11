@@ -167,8 +167,10 @@ export async function fetchAdminPhoto(photoId) {
   return data;
 }
 
-export async function syncPhotosFromObjectStorage() {
-  const res = await fetch(apiUrl("/admin/photos/sync-object-storage"), {
+export async function syncPhotosFromObjectStorage(opts = {}) {
+  const purge = !!opts.purge;
+  const qs = purge ? "?purge=true" : "";
+  const res = await fetch(apiUrl(`/admin/photos/sync-object-storage${qs}`), {
     method: "POST",
     headers: headersJson(),
   });
