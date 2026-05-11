@@ -11,7 +11,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
  * пробежка курсора по сетке не успевает его открыть. На `mousedown` (например,
  * клик по карточке открывает модалку) — мгновенно скрывается.
  */
-const HOVER_DELAY_MS = 660;
+const HOVER_DELAY_MS = 1980;
 
 export function useHoverPreview() {
   const [url, setUrl] = useState(null);

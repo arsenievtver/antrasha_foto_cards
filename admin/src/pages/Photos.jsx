@@ -431,35 +431,9 @@ export default function Photos() {
   return (
     <div>
       <h2 style={{ marginTop: 0 }}>Фото и теги</h2>
-      <div
-        style={{
-          marginBottom: "0.75rem",
-          padding: "0.65rem 0.85rem",
-          borderRadius: 8,
-          border: "1px solid var(--border)",
-          background: "var(--surface)",
-          fontSize: "0.9rem",
-          color: "var(--muted)",
-          maxWidth: "44rem",
-          lineHeight: 1.45,
-        }}
-      >
-        <label
-          style={{
-            display: "flex",
-            alignItems: "flex-start",
-            gap: "0.5rem",
-            cursor: getRole() === "superuser" && !feedSettingsLoading ? "pointer" : "default",
-          }}
-        >
-          <input
-            type="checkbox"
-            style={{ marginTop: "0.2rem" }}
-            checked={feedSettings?.require_tagging_review_for_feed ?? false}
-            disabled={feedSettingsLoading || getRole() !== "superuser"}
-            onChange={(e) => onFeedPolicyChange(e.target.checked)}
-          />
-          <span>
+      <div className="feed-policy-card">
+        <div className="feed-policy-row">
+          <div className="feed-policy-text">
             <strong style={{ color: "var(--text)" }}>В ленту только после разметки.</strong> Если
             выключено — после «Обновить» (синк с бакетом) активные фото попадают в свайпы и без тегов.
             Режим приоритетно для срочных показов; включите обратно, когда нужна только полностью
@@ -469,8 +443,22 @@ export default function Photos() {
                 Переключает только суперпользователь.
               </span>
             )}
-          </span>
-        </label>
+          </div>
+          <button
+            type="button"
+            className="switch-toggle"
+            role="switch"
+            aria-checked={feedSettings?.require_tagging_review_for_feed ?? false}
+            aria-label="В ленту только после разметки"
+            disabled={feedSettingsLoading || getRole() !== "superuser"}
+            onClick={() => {
+              const v = feedSettings?.require_tagging_review_for_feed ?? false;
+              onFeedPolicyChange(!v);
+            }}
+          >
+            <span className="switch-thumb" aria-hidden />
+          </button>
+        </div>
       </div>
       <div className="toolbar">
         <div>

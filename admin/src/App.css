@@ -262,6 +262,21 @@ main.content {
   display: block;
 }
 
+/* Заявки: лайкнутое фото удалено из бакета / URL битый */
+.liked-photo-placeholder {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 6px;
+  border: 1px dashed var(--border);
+  background: #141821;
+  color: var(--muted);
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -345,6 +360,76 @@ td {
   text-align: left;
   padding: 0.5rem 0.65rem;
   border-bottom: 1px solid var(--border);
+}
+
+/* Настройка ленты на странице «Фото и теги»: полная ширина контента + свитч */
+.feed-policy-card {
+  width: 100%;
+  margin-bottom: 0.75rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-size: 0.9rem;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.feed-policy-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  width: 100%;
+}
+
+.feed-policy-text {
+  flex: 1;
+  min-width: 0;
+}
+
+button.switch-toggle {
+  flex-shrink: 0;
+  align-self: center;
+  width: 48px;
+  height: 28px;
+  min-width: 48px;
+  padding: 0;
+  border-radius: 999px;
+  background: #3a4150;
+  border: 1px solid var(--border);
+  position: relative;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+button.switch-toggle[aria-checked="true"] {
+  background: var(--accent);
+  border-color: transparent;
+}
+
+button.switch-toggle .switch-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #f2f4f8;
+  transition: transform 0.15s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+
+button.switch-toggle[aria-checked="true"] .switch-thumb {
+  transform: translateX(22px);
+}
+
+button.switch-toggle:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+button.switch-toggle:not(:disabled):hover {
+  filter: brightness(1.08);
 }
 
 .toolbar {
