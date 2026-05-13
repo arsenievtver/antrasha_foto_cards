@@ -44,3 +44,10 @@ class FittingRequestCreateRequest(BaseModel):
 class FittingRequestCreateResponse(BaseModel):
     request_id: uuid.UUID
     status: str
+
+
+class GuestFittingRequestCreateRequest(BaseModel):
+    """Заявка на примерку без регистрации — только телефон."""
+
+    phone: str = Field(min_length=5, max_length=32)
+    note: str | None = Field(default=None, max_length=1000)

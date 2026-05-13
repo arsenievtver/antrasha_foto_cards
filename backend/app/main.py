@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import DOTENV_LOADED_PATHS, settings
 from app.logging_config import setup_logging
 from app.database import SessionLocal
-from app.routers import admin, admin_ai_ingest, auth, feed, interactions, internal_sync, sessions
+from app.routers import admin, admin_ai_ingest, auth, feed, guest, interactions, internal_sync, sessions
 from app.services.ai_ingest_worker import reset_stale_processing_jobs, try_process_one_ingest_job
 from app.services.yc_photo_sync import run_sync_job_commit
 
@@ -131,6 +131,7 @@ app.add_middleware(
 )
 
 app.include_router(sessions.router)
+app.include_router(guest.router)
 app.include_router(feed.router)
 app.include_router(interactions.router)
 app.include_router(auth.router)

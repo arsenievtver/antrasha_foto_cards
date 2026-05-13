@@ -185,6 +185,25 @@ export async function createFittingRequest({ likes, total, note, photoIds } = {}
 	return data;
 }
 
+/** Заявка на примерку без аккаунта (страница «О бренде» и т.п.) */
+export async function createGuestFittingRequest({ phone, note } = {}) {
+	const res = await fetch(apiUrl("/guest/fitting-request"), {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({
+			phone: phone ?? "",
+			note: note ?? null,
+		}),
+	});
+	const data = await res.json().catch(() => ({}));
+	if (!res.ok) {
+		throw new Error(
+			parseErrorPayload(data, `Не удалось отправить заявку (${res.status})`),
+		);
+	}
+	return data;
+}
+
 export async function postInteraction({ photoId, action, viewTimeMs }) {
 	await ensureSessionId();
 	const headers = {
