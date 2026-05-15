@@ -8,6 +8,8 @@
 	--about-accent: #c4a484;
 	--about-pad-x: 22px;
 	--about-topbar-h: 48px;
+	--about-ink: #060605;
+	--about-surface: #2b2b2a;
 
 	flex: 1;
 	min-height: 0;
@@ -15,12 +17,7 @@
 	box-sizing: border-box;
 	font-family: var(--about-font);
 	color: var(--about-text);
-	background: radial-gradient(
-			ellipse 120% 80% at 50% -20%,
-			rgba(196, 164, 132, 0.07),
-			transparent 55%
-		),
-		linear-gradient(180deg, #10100f 0%, #060605 42%, #0a0a09 100%);
+	background: var(--about-ink);
 	-webkit-font-smoothing: antialiased;
 }
 
@@ -75,10 +72,54 @@
 }
 
 .about-main {
+	width: 100%;
+	margin: 0;
+	padding: 0;
+	box-sizing: border-box;
+}
+
+/* Первый экран — на всю высоту viewport, чёрный фон */
+.about-hero-screen {
+	box-sizing: border-box;
+	min-height: 100dvh;
+	min-height: 100svh;
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	padding: clamp(16px, 4vh, 32px) var(--about-pad-x);
+	background: radial-gradient(
+			ellipse 120% 70% at 50% 0%,
+			rgba(196, 164, 132, 0.09),
+			transparent 58%
+		),
+		var(--about-ink);
+}
+
+.about-hero-screen__inner {
+	width: 100%;
 	max-width: 440px;
 	margin: 0 auto;
-	padding: 8px var(--about-pad-x) calc(32px + env(safe-area-inset-bottom, 0px));
 	box-sizing: border-box;
+}
+
+/* Остальной контент — непрерывная серая зона */
+.about-body {
+	background: var(--about-surface);
+	padding: 8px var(--about-pad-x) calc(32px + env(safe-area-inset-bottom, 0px));
+}
+
+.about-body__inner {
+	max-width: 440px;
+	margin: 0 auto;
+	box-sizing: border-box;
+}
+
+.about-block {
+	margin-bottom: 2.25rem;
+}
+
+.about-block--quote {
+	margin-bottom: 2rem;
 }
 
 .about-eyebrow {
@@ -108,14 +149,6 @@
 .about-hero__media {
 	margin: 0 0 4px;
 	width: 100%;
-}
-
-.about-block {
-	margin-bottom: 2.25rem;
-}
-
-.about-block--quote {
-	margin-bottom: 2rem;
 }
 
 .about-h2 {
@@ -265,7 +298,7 @@
 	justify-content: center;
 }
 
-.about-hero .about-media-slot {
+.about-hero-screen .about-media-slot {
 	aspect-ratio: 3 / 4;
 	max-height: min(52vh, 420px);
 	margin-left: auto;
@@ -414,4 +447,17 @@
 	letter-spacing: 0.38em;
 	text-transform: uppercase;
 	color: rgba(242, 241, 238, 0.35);
+}
+
+.about-footer__legal {
+	display: inline-block;
+	margin-top: 12px;
+	font-size: 0.72rem;
+	color: rgba(242, 241, 238, 0.45);
+	text-decoration: underline;
+	text-underline-offset: 2px;
+}
+
+.about-footer__legal:hover {
+	color: rgba(242, 241, 238, 0.75);
 }

@@ -8,6 +8,7 @@ import {
 	normalizePhoneRu,
 	pinDigits,
 } from "../utils/masks";
+import PrivacyConsent from "../components/PrivacyConsent";
 import "./ThankYou.css";
 
 export default function ThankYou() {
@@ -165,14 +166,17 @@ export default function ThankYou() {
 					Заявка принята. Скоро позвоним вам для согласования примерки.
 				</p>
 			) : (
-				<button
-					type="button"
-					className="thank-button thank-submit"
-					disabled={fittingBusy}
-					onClick={onFittingRequest}
-				>
-					{fittingBusy ? "Отправляем…" : "Заявка на примерку"}
-				</button>
+				<>
+					<PrivacyConsent />
+					<button
+						type="button"
+						className="thank-button thank-submit"
+						disabled={fittingBusy}
+						onClick={onFittingRequest}
+					>
+						{fittingBusy ? "Отправляем…" : "Заявка на примерку"}
+					</button>
+				</>
 			)}
 		</>
 	);
@@ -247,7 +251,8 @@ export default function ThankYou() {
 						</label>
 						<p className="thank-label-hint">
 							Вместо пароля: придумайте 6 цифр — по ним вы войдёте в профиль с этого
-							или другого устройства.
+							или другого устройства. Если номер уже в программе — введите тот же PIN,
+							что задавали ранее.
 						</p>
 						<input
 							className="thank-input"
@@ -260,6 +265,7 @@ export default function ThankYou() {
 							}
 							required
 						/>
+						<PrivacyConsent />
 						<button
 							type="submit"
 							className="thank-button thank-submit"

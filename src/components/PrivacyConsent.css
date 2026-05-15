@@ -1,0 +1,21 @@
+.privacy-consent {
+	margin: 8px 0 0;
+	font-size: 0.72rem;
+	line-height: 1.45;
+	color: rgba(255, 255, 255, 0.5);
+	text-align: center;
+}
+
+.privacy-consent--left {
+	text-align: left;
+}
+
+.privacy-consent__link {
+	color: rgba(255, 255, 255, 0.78);
+	text-decoration: underline;
+	text-underline-offset: 2px;
+}
+
+.privacy-consent__link:hover {
+	color: #fff;
+}

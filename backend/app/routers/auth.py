@@ -2,7 +2,7 @@ import re
 import secrets
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -28,7 +28,9 @@ from app.schemas.auth import (
     TokenResponse,
 )
 from app.security import create_access_token, hash_pin, verify_pin
+from app.services.max_notify import send_fitting_request_notification
 from app.services.weights import merge_session_into_user
+from app.utils.phone import normalize_ru_phone
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -51,18 +53,42 @@ def register(body: RegisterRequest, db: Session = Depends(get_db)) -> TokenRespo
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Session not found; create one via POST /sessions first",
         )
-    phone = body.phone.strip()
+    phone = normalize_ru_phone(body.phone)
+    if not phone:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Укажите корректный номер телефона (РФ, 10 или 11 цифр)",
+        )
+    pin = body.pin.strip()
+    display_name = body.display_name.strip()
     existing = db.execute(select(User).where(User.phone == phone)).scalar_one_or_none()
     if existing:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Phone already registered",
-        )
+        if not verify_pin(pin, existing.pin_hash):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=(
+                    "Этот номер уже зарегистрирован. "
+                    "Введите PIN, который вы задавали ранее."
+                ),
+            )
+        if existing.role == UserRole.worker.value and not re.fullmatch(r"\d{6}", pin):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Worker PIN must be exactly 6 digits",
+            )
+        if not existing.display_name and display_name:
+            existing.display_name = display_name
+        existing.last_login_at = datetime.now(timezone.utc)
+        merge_session_into_user(db, session_id=body.session_id, user=existing)
+        db.commit()
+        db.refresh(existing)
+        token = create_access_token(user_id=existing.id, role=existing.role)
+        return TokenResponse(access_token=token, user_id=existing.id, role=existing.role)
 
     user = User(
         phone=phone,
-        display_name=body.display_name.strip(),
-        pin_hash=hash_pin(body.pin),
+        display_name=display_name,
+        pin_hash=hash_pin(pin),
         role=UserRole.user.value,
     )
     db.add(user)
@@ -126,6 +152,7 @@ def login_superuser(body: AdminSuperuserLoginRequest) -> TokenResponse:
 @router.post("/fitting-request", response_model=FittingRequestCreateResponse)
 def create_fitting_request(
     body: FittingRequestCreateRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current: User = Depends(require_user),
 ) -> FittingRequestCreateResponse:
@@ -175,4 +202,24 @@ def create_fitting_request(
                 )
     db.commit()
     db.refresh(fr)
+    liked_urls = list(
+        db.scalars(
+            select(FittingRequestLikedPhoto.photo_url).where(
+                FittingRequestLikedPhoto.request_id == fr.id,
+            ),
+        ).all(),
+    )
+    background_tasks.add_task(
+        send_fitting_request_notification,
+        request_id=fr.id,
+        display_name=fr.display_name,
+        phone=fr.phone,
+        likes=fr.likes,
+        total=fr.total,
+        match_rate=fr.match_rate,
+        note=fr.note,
+        is_guest=False,
+        liked_photo_urls=liked_urls,
+        created_at=fr.created_at,
+    )
     return FittingRequestCreateResponse(request_id=fr.id, status=fr.status)

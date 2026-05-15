@@ -7,6 +7,7 @@ import {
 } from "../utils/masks";
 import { loginUser } from "../api/client";
 import { useAuth } from "../context/AuthContext";
+import PrivacyConsent from "./PrivacyConsent";
 import "./UserMenu.css";
 
 export default function UserMenu() {
@@ -140,6 +141,7 @@ export default function UserMenu() {
 									{loginErr && (
 										<p className="user-menu-error">{loginErr}</p>
 									)}
+									<PrivacyConsent className="privacy-consent--left" />
 									<button
 										type="submit"
 										className="thank-button user-menu-action"

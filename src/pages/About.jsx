@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { motion as Motion } from "framer-motion";
 import { createFittingRequest, createGuestFittingRequest } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import { formatPhoneMask, normalizePhoneRu } from "../utils/masks";
+import PrivacyConsent from "../components/PrivacyConsent";
 import "./About.css";
 import "./ThankYou.css";
 
@@ -88,67 +89,75 @@ export default function About() {
 			</header>
 
 			<main className="about-main">
-				<Motion.section className="about-hero" {...fade}>
-					<p className="about-eyebrow">ANTRASHA</p>
-					<h1 className="about-hero__title">
-						Безупречный стиль
-						<span className="about-hero__title-break">
-							персонально для Вас
-						</span>
-					</h1>
-					<div className="about-hero__media about-media-slot" data-slot="hero">
-						<img
-							src={heroImg}
-							alt="ANTRASHA — бутик"
-							className="about-media-slot__img"
-						/>
-						<span className="about-media-slot__hint">hero — 3∶4 или 16∶9</span>
+				<Motion.section className="about-hero-screen" {...fade}>
+					<div className="about-hero-screen__inner">
+						<p className="about-eyebrow">ANTRASHA</p>
+						<h1 className="about-hero__title">
+							Безупречный стиль
+							<span className="about-hero__title-break">
+								персонально для Вас
+							</span>
+						</h1>
+						<div
+							className="about-hero__media about-media-slot"
+							data-slot="hero"
+						>
+							<img
+								src={heroImg}
+								alt="ANTRASHA — бутик"
+								className="about-media-slot__img"
+							/>
+							<span className="about-media-slot__hint">hero — 3∶4 или 16∶9</span>
+						</div>
 					</div>
 				</Motion.section>
 
-				<Motion.section className="about-block" {...fadeUp}>
-					<p className="about-prose">
-						ANTRASHA — пространство одежды с более чем 20-летней историей в
-						историческом центре Твери.
-					</p>
-					<p className="about-prose">
-						Мы работаем с тщательно отобранными европейскими брендами (Германия,
-						Италия, Нидерланды, Дания), для которых качество, крой и сдержанная
-						элегантность — не тенденция, а стандарт.
-					</p>
-					<p className="about-brands" lang="en">
-						Roy Robson · Riani · Marc Aurel · Seidensticker · Aeronautica
-						Militare
-					</p>
-				</Motion.section>
+				<div className="about-body">
+					<div className="about-body__inner">
+						<Motion.section className="about-block" {...fadeUp}>
+							<p className="about-prose">
+								ANTRASHA — пространство одежды с более чем 20-летней историей в
+								историческом центре Твери.
+							</p>
+							<p className="about-prose">
+								Мы работаем с тщательно отобранными европейскими брендами
+								(Германия, Италия, Нидерланды, Дания), для которых качество,
+								крой и сдержанная элегантность — не тенденция, а стандарт.
+							</p>
+							<p className="about-brands" lang="en">
+								Roy Robson · Riani · Marc Aurel · Seidensticker · Aeronautica
+								Militare
+							</p>
+						</Motion.section>
 
-				<Motion.section className="about-block about-block--quote" {...fade}>
-					<blockquote className="about-quote">
-						<p>
-							Каждое решение здесь выверено: от подбора коллекций до
-							персональной работы с клиентом. Мы не предлагаем случайные вещи —
-							мы собираем образы, которые органично вписываются в ваш ритм жизни
-							и подчеркивают статус без избыточности.
-						</p>
-					</blockquote>
-					<p className="about-prose about-prose--tight">
-						ANTRASHA — это выбор тех, кто ценит точность, приватность и
-						уверенность в результате.
-					</p>
-				</Motion.section>
+						<Motion.section className="about-block about-block--quote" {...fade}>
+							<blockquote className="about-quote">
+								<p>
+									Каждое решение здесь выверено: от подбора коллекций до
+									персональной работы с клиентом. Мы не предлагаем случайные
+									вещи — мы собираем образы, которые органично вписываются в
+									ваш ритм жизни и подчеркивают статус без избыточности.
+								</p>
+							</blockquote>
+							<p className="about-prose about-prose--tight">
+								ANTRASHA — это выбор тех, кто ценит точность, приватность и
+								уверенность в результате.
+							</p>
+						</Motion.section>
 
-				<div className="about-rule" aria-hidden />
+						<div className="about-rule" aria-hidden />
 
-				<Motion.section className="about-block" {...fadeUp}>
-					<h2 className="about-h2">Атмосфера бутика</h2>
-					<p className="about-prose">
-						Пространство, где время замедляется. Мы создали бутик ANTRASHA, чтобы
-						Ваш шопинг был похож на отдых. Никакой спешки — только Вы, приятная
-						музыка, идеальные силуэты и стилист, который работает лично с Вами.
-					</p>
-				</Motion.section>
+						<Motion.section className="about-block" {...fadeUp}>
+							<h2 className="about-h2">Атмосфера бутика</h2>
+							<p className="about-prose">
+								Пространство, где время замедляется. Мы создали бутик ANTRASHA,
+								чтобы Ваш шопинг был похож на отдых. Никакой спешки — только Вы,
+								приятная музыка, идеальные силуэты и стилист, который работает
+								лично с Вами.
+							</p>
+						</Motion.section>
 
-				<section className="about-atmosphere-grid">
+						<section className="about-atmosphere-grid">
 					<Motion.article
 						className="about-atmo-card"
 						{...fadeUp}
@@ -221,13 +230,13 @@ export default function About() {
 							Маленькие детали, которые делают ваш визит особенным.
 						</p>
 					</Motion.article>
-				</section>
+						</section>
 
-				<div className="about-rule" aria-hidden />
+						<div className="about-rule" aria-hidden />
 
-				<Motion.section className="about-block" {...fadeUp}>
-					<h2 className="about-h2">Как проходит персональный стайлинг</h2>
-					<ol className="about-steps">
+						<Motion.section className="about-block" {...fadeUp}>
+							<h2 className="about-h2">Как проходит персональный стайлинг</h2>
+							<ol className="about-steps">
 						<li className="about-step">
 							<span className="about-step__num">01</span>
 							<div>
@@ -263,56 +272,56 @@ export default function About() {
 								</p>
 							</div>
 						</li>
-					</ol>
-				</Motion.section>
+							</ol>
+						</Motion.section>
 
-				<div className="about-rule" aria-hidden />
+						<div className="about-rule" aria-hidden />
 
-				<Motion.section className="about-block about-contacts" {...fadeUp}>
-					<h2 className="about-h2">Адрес и контакты</h2>
-					<p className="about-contact-brand">ANTRASHA</p>
-					<div className="about-contact-lines">
-						<a href="tel:+74822453557" className="about-contact-link">
-							+7 (4822) 45-35-57
-						</a>
-						<a
-							href="mailto:alexei@antrasha.ru"
-							className="about-contact-link"
-						>
-							alexei@antrasha.ru
-						</a>
-						<p className="about-prose about-prose--small about-prose--contact">
-							Тверь, б-р Радищева, 37
-						</p>
-						<p className="about-prose about-prose--small about-prose--contact">
-							пн.–пт. 10:30–19:30
-							<br />
-							сб.–вс. 11:00–18:00
-						</p>
-					</div>
-					<p className="about-social-title">Мессенджеры</p>
-					<div className="about-social-links">
-						<a
-							href="https://t.me/AntrashaBot"
-							target="_blank"
-							rel="noopener noreferrer"
-							className="about-contact-link about-contact-link--external"
-						>
-							Telegram — @AntrashaBot
-						</a>
-						<a
-							href="https://max.ru/id690300316030_biz"
-							target="_blank"
-							rel="noopener noreferrer"
-							className="about-contact-link about-contact-link--external"
-						>
-							MAX
-						</a>
-					</div>
-				</Motion.section>
+						<Motion.section className="about-block about-contacts" {...fadeUp}>
+							<h2 className="about-h2">Адрес и контакты</h2>
+						<p className="about-contact-brand">ANTRASHA</p>
+						<div className="about-contact-lines">
+							<a href="tel:+74822453557" className="about-contact-link">
+								+7 (4822) 45-35-57
+							</a>
+							<a
+								href="mailto:alexei@antrasha.ru"
+								className="about-contact-link"
+							>
+								alexei@antrasha.ru
+							</a>
+							<p className="about-prose about-prose--small about-prose--contact">
+								Тверь, б-р Радищева, 37
+							</p>
+							<p className="about-prose about-prose--small about-prose--contact">
+								пн.–пт. 10:30–19:30
+								<br />
+								сб.–вс. 11:00–18:00
+							</p>
+						</div>
+						<p className="about-social-title">Мессенджеры</p>
+						<div className="about-social-links">
+							<a
+								href="https://t.me/AntrashaBot"
+								target="_blank"
+								rel="noopener noreferrer"
+								className="about-contact-link about-contact-link--external"
+							>
+								Telegram — @AntrashaBot
+							</a>
+							<a
+								href="https://max.ru/id690300316030_biz"
+								target="_blank"
+								rel="noopener noreferrer"
+								className="about-contact-link about-contact-link--external"
+							>
+								MAX
+							</a>
+						</div>
+						</Motion.section>
 
-				<Motion.section className="about-block about-fitting-wrap" {...fadeUp}>
-					<div className="thank-fitting">
+						<Motion.section className="about-block about-fitting-wrap" {...fadeUp}>
+							<div className="thank-fitting">
 						<p className="thank-fitting-title">
 							Персональная примерка в ANTRASHA
 						</p>
@@ -347,21 +356,29 @@ export default function About() {
 								Заявка принята. Скоро позвоним для согласования примерки.
 							</p>
 						) : (
-							<button
-								type="button"
-								className="thank-button thank-submit"
-								disabled={fittingBusy}
-								onClick={onFittingRequest}
-							>
-								{fittingBusy ? "Отправляем…" : "Заявка на примерку"}
-							</button>
+							<>
+								<PrivacyConsent />
+								<button
+									type="button"
+									className="thank-button thank-submit"
+									disabled={fittingBusy}
+									onClick={onFittingRequest}
+								>
+									{fittingBusy ? "Отправляем…" : "Заявка на примерку"}
+								</button>
+							</>
 						)}
-					</div>
-				</Motion.section>
+							</div>
+						</Motion.section>
 
-				<footer className="about-footer">
-					<p className="about-footer__mark">ANTRASHA</p>
-				</footer>
+						<footer className="about-footer">
+							<p className="about-footer__mark">ANTRASHA</p>
+							<Link to="/privacy" className="about-footer__legal">
+								Политика конфиденциальности
+							</Link>
+						</footer>
+					</div>
+				</div>
 			</main>
 		</div>
 	);

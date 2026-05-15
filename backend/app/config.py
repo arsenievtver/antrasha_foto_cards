@@ -67,6 +67,16 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("API_XIMILAR", "api_ximilar"),
     )
 
+    # MAX Bot API — уведомления о новых заявках на примерку
+    max_bot_token: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("MAX_BOT_TOKEN", "max_bot_token"),
+    )
+    max_notify_user_id: int | None = Field(
+        default=None,
+        validation_alias=AliasChoices("MAX_NOTIFY_USER_ID", "max_notify_user_id"),
+    )
+
     # Fashn AI (product-to-model) — в .env: FASHN_API_KEY
     fashn_api_key: str | None = None
     # Если api.fashn.ai недоступен с IP сервера (например РФ), задайте HTTPS-прокси только для Fashn.
@@ -109,6 +119,14 @@ class Settings(BaseSettings):
         if self.ai_ingest_temp_dir and str(self.ai_ingest_temp_dir).strip():
             return Path(self.ai_ingest_temp_dir).expanduser().resolve()
         return (_BACKEND_DIR / "var" / "ai_ingest_tmp").resolve()
+
+    @property
+    def max_notify_configured(self) -> bool:
+        return bool(
+            self.max_bot_token
+            and str(self.max_bot_token).strip()
+            and self.max_notify_user_id is not None
+        )
 
     @property
     def fashn_configured(self) -> bool:
