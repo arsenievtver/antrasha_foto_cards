@@ -22,13 +22,15 @@
 }
 
 .about-topbar {
+	/* safe-area уже в .app-shell (App.css) — не дублируем */
 	position: sticky;
 	top: 0;
 	z-index: 120;
+	box-sizing: border-box;
 	display: flex;
 	align-items: center;
-	min-height: calc(var(--about-topbar-h) + env(safe-area-inset-top, 0px));
-	padding: calc(8px + env(safe-area-inset-top, 0px)) var(--about-pad-x) 10px;
+	min-height: var(--about-topbar-h);
+	padding: 8px var(--about-pad-x) 10px;
 	background: linear-gradient(
 		to bottom,
 		rgba(6, 6, 5, 0.94) 0%,
