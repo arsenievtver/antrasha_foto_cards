@@ -45,6 +45,12 @@ body {
 	padding-left: env(safe-area-inset-left, 0px);
 }
 
+/* About: контент под статус-бар, без серой полосы safe-area */
+.app-shell--immersive {
+	padding-top: 0;
+	background: #060605;
+}
+
 .app-main {
 	flex: 1;
 	min-height: 0;

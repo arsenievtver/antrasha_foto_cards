@@ -25,8 +25,10 @@ function AppShell() {
 		pathname === "/about" ||
 		pathname === "/privacy";
 
+	const immersiveTop = pathname === "/about";
+
 	return (
-		<div className="app-shell">
+		<div className={`app-shell${immersiveTop ? " app-shell--immersive" : ""}`}>
 			{showUserMenu ? <UserMenu /> : null}
 			<div className={`app-main${scrollMain ? " app-main--scroll" : ""}`}>
 				<Routes>

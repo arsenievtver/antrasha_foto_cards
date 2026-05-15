@@ -22,23 +22,20 @@
 }
 
 .about-topbar {
-	/* safe-area уже в .app-shell (App.css) — не дублируем */
-	position: sticky;
+	position: fixed;
 	top: 0;
+	left: 0;
+	right: 0;
 	z-index: 120;
 	box-sizing: border-box;
 	display: flex;
 	align-items: center;
-	min-height: var(--about-topbar-h);
-	padding: 8px var(--about-pad-x) 10px;
-	background: linear-gradient(
-		to bottom,
-		rgba(6, 6, 5, 0.94) 0%,
-		rgba(6, 6, 5, 0.72) 70%,
-		transparent 100%
-	);
-	backdrop-filter: blur(10px);
-	-webkit-backdrop-filter: blur(10px);
+	min-height: calc(var(--about-topbar-h) + env(safe-area-inset-top, 0px));
+	padding: calc(8px + env(safe-area-inset-top, 0px)) max(var(--about-pad-x), env(safe-area-inset-left, 0px))
+		10px max(var(--about-pad-x), env(safe-area-inset-right, 0px));
+	background: rgba(6, 6, 5, 0.28);
+	backdrop-filter: blur(18px) saturate(160%);
+	-webkit-backdrop-filter: blur(18px) saturate(160%);
 }
 
 .about-back {
@@ -80,15 +77,21 @@
 	box-sizing: border-box;
 }
 
-/* Первый экран — на всю высоту viewport, чёрный фон */
+/* Первый экран — на всю высоту viewport, контент по центру видимой области */
 .about-hero-screen {
 	box-sizing: border-box;
 	min-height: 100dvh;
 	min-height: 100svh;
 	display: flex;
 	flex-direction: column;
+	align-items: center;
 	justify-content: center;
-	padding: clamp(16px, 4vh, 32px) var(--about-pad-x);
+	padding: calc(
+			env(safe-area-inset-top, 0px) + var(--about-topbar-h) + clamp(12px, 3vh, 24px)
+		)
+		max(var(--about-pad-x), env(safe-area-inset-left, 0px))
+		calc(clamp(16px, 4vh, 32px) + env(safe-area-inset-bottom, 0px))
+		max(var(--about-pad-x), env(safe-area-inset-right, 0px));
 	background: radial-gradient(
 			ellipse 120% 70% at 50% 0%,
 			rgba(196, 164, 132, 0.09),
