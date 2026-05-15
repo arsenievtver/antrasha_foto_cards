@@ -107,10 +107,12 @@
 	box-sizing: border-box;
 }
 
-/* Остальной контент — непрерывная серая зона */
+/* Остальной контент — непрерывная серая зона до самого низа экрана */
 .about-body {
 	background: var(--about-surface);
-	padding: 8px var(--about-pad-x) calc(32px + env(safe-area-inset-bottom, 0px));
+	padding: 8px max(var(--about-pad-x), env(safe-area-inset-left, 0px))
+		calc(32px + env(safe-area-inset-bottom, 0px))
+		max(var(--about-pad-x), env(safe-area-inset-right, 0px));
 }
 
 .about-body__inner {

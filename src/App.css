@@ -45,10 +45,10 @@ body {
 	padding-left: env(safe-area-inset-left, 0px);
 }
 
-/* About: контент под статус-бар, без серой полосы safe-area */
+/* About: контент edge-to-edge, safe-area только внутри страницы */
 .app-shell--immersive {
-	padding-top: 0;
-	background: #060605;
+	padding: 0;
+	background: transparent;
 }
 
 .app-main {
