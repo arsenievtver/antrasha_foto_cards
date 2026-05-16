@@ -26,7 +26,7 @@ def create_access_token(
     role: str = "user",
 ) -> str:
     expire = datetime.now(UTC) + timedelta(minutes=settings.jwt_expire_minutes)
-    payload: dict = {"exp": expire, "role": role}
+    payload: dict = {"exp": expire, "role": role, "typ": "access"}
     if role == "superuser":
         payload["sub"] = "superuser"
     elif user_id is not None:
@@ -36,21 +36,54 @@ def create_access_token(
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
 
-def decode_token_payload(token: str) -> tuple[uuid.UUID | None, str] | None:
+def create_refresh_token(*, user_id: uuid.UUID, role: str = "user") -> str:
+    expire = datetime.now(UTC) + timedelta(days=settings.jwt_refresh_expire_days)
+    payload = {
+        "exp": expire,
+        "role": role,
+        "sub": str(user_id),
+        "typ": "refresh",
+    }
+    return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
+
+
+def _decode_jwt_payload(token: str) -> dict | None:
     try:
-        payload = jwt.decode(
+        return jwt.decode(
             token,
             settings.jwt_secret,
             algorithms=[settings.jwt_algorithm],
         )
-        role = str(payload.get("role") or "user")
-        sub = payload.get("sub")
-        if role == "superuser" or sub == "superuser":
-            return (None, "superuser")
-        if not sub:
-            return None
-        return (uuid.UUID(str(sub)), role)
     except (JWTError, ValueError):
+        return None
+
+
+def decode_token_payload(token: str) -> tuple[uuid.UUID | None, str] | None:
+    payload = _decode_jwt_payload(token)
+    if payload is None:
+        return None
+    if payload.get("typ") == "refresh":
+        return None
+    role = str(payload.get("role") or "user")
+    sub = payload.get("sub")
+    if role == "superuser" or sub == "superuser":
+        return (None, "superuser")
+    if not sub:
+        return None
+    return (uuid.UUID(str(sub)), role)
+
+
+def decode_refresh_token_payload(token: str) -> tuple[uuid.UUID, str] | None:
+    payload = _decode_jwt_payload(token)
+    if payload is None or payload.get("typ") != "refresh":
+        return None
+    role = str(payload.get("role") or "user")
+    sub = payload.get("sub")
+    if not sub or role == "superuser":
+        return None
+    try:
+        return (uuid.UUID(str(sub)), role)
+    except ValueError:
         return None
 
 

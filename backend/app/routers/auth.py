@@ -24,15 +24,31 @@ from app.schemas.auth import (
     FittingRequestCreateResponse,
     LoginRequest,
     MeOut,
+    RefreshRequest,
     RegisterRequest,
     TokenResponse,
 )
-from app.security import create_access_token, hash_pin, verify_pin
+from app.security import (
+    create_access_token,
+    create_refresh_token,
+    decode_refresh_token_payload,
+    hash_pin,
+    verify_pin,
+)
 from app.services.max_notify import send_fitting_request_notification
 from app.services.weights import merge_session_into_user
 from app.utils.phone import normalize_ru_phone
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+def _user_token_response(user: User) -> TokenResponse:
+    return TokenResponse(
+        access_token=create_access_token(user_id=user.id, role=user.role),
+        refresh_token=create_refresh_token(user_id=user.id, role=user.role),
+        user_id=user.id,
+        role=user.role,
+    )
 
 
 @router.get("/me", response_model=MeOut)
@@ -82,8 +98,7 @@ def register(body: RegisterRequest, db: Session = Depends(get_db)) -> TokenRespo
         merge_session_into_user(db, session_id=body.session_id, user=existing)
         db.commit()
         db.refresh(existing)
-        token = create_access_token(user_id=existing.id, role=existing.role)
-        return TokenResponse(access_token=token, user_id=existing.id, role=existing.role)
+        return _user_token_response(existing)
 
     user = User(
         phone=phone,
@@ -96,8 +111,7 @@ def register(body: RegisterRequest, db: Session = Depends(get_db)) -> TokenRespo
     merge_session_into_user(db, session_id=body.session_id, user=user)
     db.commit()
     db.refresh(user)
-    token = create_access_token(user_id=user.id, role=user.role)
-    return TokenResponse(access_token=token, user_id=user.id, role=user.role)
+    return _user_token_response(user)
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -116,8 +130,25 @@ def login(body: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
         )
     user.last_login_at = datetime.now(timezone.utc)
     db.commit()
-    token = create_access_token(user_id=user.id, role=user.role)
-    return TokenResponse(access_token=token, user_id=user.id, role=user.role)
+    return _user_token_response(user)
+
+
+@router.post("/refresh", response_model=TokenResponse)
+def refresh_tokens(body: RefreshRequest, db: Session = Depends(get_db)) -> TokenResponse:
+    parsed = decode_refresh_token_payload(body.refresh_token.strip())
+    if parsed is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired refresh token",
+        )
+    user_id, _role = parsed
+    user = db.get(User, user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found",
+        )
+    return _user_token_response(user)
 
 
 @router.post("/admin/superuser", response_model=TokenResponse)

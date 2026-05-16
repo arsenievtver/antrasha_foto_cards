@@ -6,7 +6,13 @@ import {
 	useMemo,
 	useState,
 } from "react";
-import { fetchMe, getAuthToken, setAuthToken } from "../api/client";
+import {
+	clearAuthTokens,
+	fetchMe,
+	getAuthToken,
+	refreshAccessToken,
+	setAuthToken,
+} from "../api/client";
 
 const AuthContext = createContext(null);
 
@@ -26,13 +32,25 @@ export function AuthProvider({ children }) {
 		try {
 			const me = await fetchMe();
 			if (!me && getAuthToken()) {
-				setAuthToken(null);
+				const renewed = await refreshAccessToken();
+				if (renewed) {
+					const retry = await fetchMe({ retryOn401: false });
+					if (retry) {
+						setProfile(retry);
+						setToken(getAuthToken());
+						return retry;
+					}
+				}
+				clearAuthTokens();
 				setToken(null);
 				setProfile(null);
 				return null;
 			}
 			setProfile(me);
 			return me;
+		} catch {
+			// Сеть/5xx: не сбрасываем токен — profile не трогаем.
+			return null;
 		} finally {
 			setLoading(false);
 		}
@@ -47,14 +65,24 @@ export function AuthProvider({ children }) {
 		refreshProfile();
 	}, [token, refreshProfile]);
 
+	useEffect(() => {
+		function onVisible() {
+			if (document.visibilityState === "visible" && getAuthToken()) {
+				refreshProfile();
+			}
+		}
+		document.addEventListener("visibilitychange", onVisible);
+		return () => document.removeEventListener("visibilitychange", onVisible);
+	}, [refreshProfile]);
+
 	const logout = useCallback(() => {
-		setAuthToken(null);
+		clearAuthTokens();
 		setToken(null);
 		setProfile(null);
 	}, []);
 
-	const loginWithToken = useCallback((accessToken) => {
-		setAuthToken(accessToken);
+	const loginWithToken = useCallback((accessToken, refreshToken = null) => {
+		setAuthToken(accessToken, refreshToken);
 		setToken(accessToken);
 	}, []);
 
@@ -63,7 +91,7 @@ export function AuthProvider({ children }) {
 			token,
 			profile,
 			loading,
-			isAuthenticated: !!profile,
+			isAuthenticated: !!profile || !!token,
 			logout,
 			loginWithToken,
 			refreshProfile,

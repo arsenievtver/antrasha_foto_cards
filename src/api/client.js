@@ -1,5 +1,9 @@
 const SESSION_KEY = "antrasha_session_id";
 const AUTH_KEY = "antrasha_access_token";
+const REFRESH_KEY = "antrasha_refresh_token";
+export const REMEMBER_PHONE_KEY = "antrasha_remember_phone";
+
+let refreshInFlight = null;
 
 /**
  * Прямой URL бэкенда без `/api`, например http://127.0.0.1:8000
@@ -65,9 +69,59 @@ export function getAuthToken() {
 	return localStorage.getItem(AUTH_KEY);
 }
 
-export function setAuthToken(token) {
+export function getRefreshToken() {
+	return localStorage.getItem(REFRESH_KEY);
+}
+
+export function setAuthToken(token, refreshToken = undefined) {
 	if (token) localStorage.setItem(AUTH_KEY, token);
 	else localStorage.removeItem(AUTH_KEY);
+	if (refreshToken !== undefined) {
+		if (refreshToken) localStorage.setItem(REFRESH_KEY, refreshToken);
+		else localStorage.removeItem(REFRESH_KEY);
+	}
+}
+
+export function clearAuthTokens() {
+	localStorage.removeItem(AUTH_KEY);
+	localStorage.removeItem(REFRESH_KEY);
+}
+
+export function getRememberedPhone() {
+	return localStorage.getItem(REMEMBER_PHONE_KEY) || "";
+}
+
+export function setRememberedPhone(phone) {
+	if (phone) localStorage.setItem(REMEMBER_PHONE_KEY, phone);
+	else localStorage.removeItem(REMEMBER_PHONE_KEY);
+}
+
+/** Обновляет access (и refresh при ротации) по refresh JWT. */
+export async function refreshAccessToken() {
+	const refresh = getRefreshToken();
+	if (!refresh) return false;
+	if (!refreshInFlight) {
+		refreshInFlight = (async () => {
+			try {
+				const res = await fetch(apiUrl("/auth/refresh"), {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ refresh_token: refresh }),
+				});
+				const data = await res.json().catch(() => ({}));
+				if (!res.ok) return false;
+				setAuthToken(data.access_token, data.refresh_token ?? refresh);
+				return true;
+			} finally {
+				refreshInFlight = null;
+			}
+		})();
+	}
+	return refreshInFlight;
+}
+
+function storeLoginTokens(data) {
+	setAuthToken(data.access_token, data.refresh_token ?? null);
 }
 
 export async function loadFeed(gender, { limit = 30 } = {}) {
@@ -84,13 +138,18 @@ export async function loadFeed(gender, { limit = 30 } = {}) {
 	return res.json();
 }
 
-export async function fetchMe() {
+export async function fetchMe({ retryOn401 = true } = {}) {
 	const t = getAuthToken();
 	if (!t) return null;
 	const res = await fetch(apiUrl("/auth/me"), {
 		headers: { Authorization: `Bearer ${t}` },
 	});
-	if (res.status === 401) return null;
+	if (res.status === 401) {
+		if (retryOn401 && (await refreshAccessToken())) {
+			return fetchMe({ retryOn401: false });
+		}
+		return null;
+	}
 	if (!res.ok) {
 		const text = await res.text();
 		throw new Error(text || `me ${res.status}`);
@@ -110,7 +169,7 @@ export async function loginUser({ phone, pin }) {
 			parseErrorPayload(data, `Вход не удался (${res.status})`),
 		);
 	}
-	setAuthToken(data.access_token);
+	storeLoginTokens(data);
 	return data;
 }
 

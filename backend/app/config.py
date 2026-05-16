@@ -28,7 +28,10 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://antrasha:antrasha@localhost:5433/antrasha"
     jwt_secret: str = "dev-secret-change-in-production"
     jwt_algorithm: str = "HS256"
-    jwt_expire_minutes: int = 60 * 24 * 7
+    # Access JWT (короткий срок; продление — через refresh).
+    jwt_expire_minutes: int = 60 * 24 * 30
+    # Refresh JWT для POST /auth/refresh (только role=user/worker, не superuser).
+    jwt_refresh_expire_days: int = 180
     cors_origins: str = (
         "http://localhost:5173,http://127.0.0.1:5173,"
         "http://localhost:5174,http://127.0.0.1:5174"

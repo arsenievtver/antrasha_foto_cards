@@ -55,7 +55,7 @@ export default function ThankYou() {
 				phone: norm,
 				pin: p,
 			});
-			loginWithToken(data.access_token);
+			loginWithToken(data.access_token, data.refresh_token);
 			await refreshProfile();
 			setDoneRegister(true);
 		} catch (ex) {

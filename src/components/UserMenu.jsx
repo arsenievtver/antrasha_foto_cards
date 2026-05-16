@@ -1,11 +1,15 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
 	formatPhoneMask,
 	formatPinMask,
 	normalizePhoneRu,
 	pinDigits,
 } from "../utils/masks";
-import { loginUser } from "../api/client";
+import {
+	getRememberedPhone,
+	loginUser,
+	setRememberedPhone,
+} from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import PrivacyConsent from "./PrivacyConsent";
 import "./UserMenu.css";
@@ -20,7 +24,7 @@ export default function UserMenu() {
 		refreshProfile,
 	} = useAuth();
 	const [open, setOpen] = useState(false);
-	const [phone, setPhone] = useState("");
+	const [phone, setPhone] = useState(() => getRememberedPhone());
 	const [pin, setPin] = useState("");
 	const [loginErr, setLoginErr] = useState("");
 	const [loginBusy, setLoginBusy] = useState(false);
@@ -30,11 +34,22 @@ export default function UserMenu() {
 		profile?.phone?.replace(/\D/g, "")?.slice(-1) ||
 		"?";
 
+	useEffect(() => {
+		if (open && !profile) {
+			const saved = getRememberedPhone();
+			if (saved) setPhone(saved);
+		}
+	}, [open, profile]);
+
 	function close() {
 		setOpen(false);
 		setLoginErr("");
-		setPhone("");
 		setPin("");
+		if (!profile) setPhone(getRememberedPhone());
+	}
+
+	function resetPhoneField() {
+		setPhone(getRememberedPhone());
 	}
 
 	async function onLogin(e) {
@@ -49,7 +64,8 @@ export default function UserMenu() {
 		setLoginBusy(true);
 		try {
 			const data = await loginUser({ phone: norm, pin: p });
-			loginWithToken(data.access_token);
+			setRememberedPhone(norm);
+			loginWithToken(data.access_token, data.refresh_token);
 			await refreshProfile();
 			close();
 		} catch (err) {
@@ -95,6 +111,30 @@ export default function UserMenu() {
 							<p className="user-menu-meta" style={{ marginTop: 8 }}>
 								Загрузка…
 							</p>
+						) : token && !profile ? (
+							<>
+								<h3 className="user-menu-title">Профиль</h3>
+								<p className="user-menu-meta">
+									Не удалось загрузить данные. Проверьте сеть.
+								</p>
+								<button
+									type="button"
+									className="thank-button user-menu-action"
+									onClick={() => refreshProfile()}
+								>
+									Повторить
+								</button>
+								<button
+									type="button"
+									className="thank-button user-menu-action"
+									onClick={() => {
+										logout();
+										resetPhoneField();
+									}}
+								>
+									Выйти
+								</button>
+							</>
 						) : profile ? (
 							<>
 								<h3 className="user-menu-title">

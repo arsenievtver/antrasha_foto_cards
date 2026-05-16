@@ -17,9 +17,14 @@ class LoginRequest(BaseModel):
 
 class TokenResponse(BaseModel):
     access_token: str
+    refresh_token: str | None = None
     token_type: str = "bearer"
     user_id: uuid.UUID | None = None
     role: str = "user"
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str
 
 
 class MeOut(BaseModel):
