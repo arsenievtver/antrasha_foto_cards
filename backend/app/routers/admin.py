@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import delete, func, or_, select, update
-from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from sqlalchemy.exc import IntegrityError, ProgrammingError, SQLAlchemyError
 from sqlalchemy.orm import Session, aliased, selectinload
 from starlette.responses import Response
 
@@ -71,7 +71,11 @@ from app.schemas.admin import (
 from app.security import hash_pin
 from app.experimental.ximilar.router import router as _ximilar_experimental_router
 from app.services.campaign_links import build_tracking_url, normalize_campaign_path
-from app.services.campaign_stats import count_organic_sessions, fetch_campaign_dashboard_rows
+from app.services.campaign_stats import (
+    count_organic_sessions,
+    count_sessions_with_campaign,
+    fetch_campaign_dashboard_rows,
+)
 from app.services.tagging_validation import validate_catalog_tag_selection
 from app.services.yc_photo_sync import run_sync_job_commit
 from app.services.yc_storage import bulk_delete_photo_files_from_object_storage
@@ -317,16 +321,14 @@ def admin_stats(
         or 0
     )
     sessions_total = db.scalar(select(func.count()).select_from(UserSession)) or 0
-    sessions_with_campaign = (
-        db.scalar(
-            select(func.count())
-            .select_from(UserSession)
-            .where(UserSession.campaign_id.is_not(None)),
-        )
-        or 0
-    )
+    sessions_with_campaign = count_sessions_with_campaign(db)
     attributed_total = sessions_with_campaign or 0
-    campaign_rows = fetch_campaign_dashboard_rows(db)
+    try:
+        campaign_rows = fetch_campaign_dashboard_rows(db)
+    except ProgrammingError:
+        db.rollback()
+        log.exception("admin_stats: campaign breakdown unavailable (run alembic upgrade head?)")
+        campaign_rows = []
     campaign_visits = []
     for row in campaign_rows:
         v = row["visits"]
