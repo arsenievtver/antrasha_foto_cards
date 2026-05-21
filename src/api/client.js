@@ -1,3 +1,5 @@
+import { getStoredRef } from "../utils/attribution.js";
+
 const SESSION_KEY = "antrasha_session_id";
 const AUTH_KEY = "antrasha_access_token";
 const REFRESH_KEY = "antrasha_refresh_token";
@@ -30,11 +32,21 @@ function parseErrorPayload(data, fallback) {
 	return fallback;
 }
 
+async function postSession() {
+	const ref = getStoredRef();
+	const res = await fetch(apiUrl("/sessions"), {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify(ref ? { ref } : {}),
+	});
+	return res;
+}
+
 /** Создаёт сессию один раз и кеширует ID в localStorage */
 export async function ensureSessionId() {
 	let id = localStorage.getItem(SESSION_KEY);
 	if (id) return id;
-	const res = await fetch(apiUrl("/sessions"), { method: "POST" });
+	const res = await postSession();
 	if (!res.ok) {
 		const raw = await res.text();
 		let data = {};
@@ -55,7 +67,7 @@ export async function ensureSessionId() {
 
 /** Новая анонимная сессия (если старая на сервере отсутствует — см. registerUser). */
 export async function createFreshSessionId() {
-	const res = await fetch(apiUrl("/sessions"), { method: "POST" });
+	const res = await postSession();
 	if (!res.ok) {
 		throw new Error(`Session failed: ${res.status}`);
 	}

@@ -36,6 +36,8 @@ class Settings(BaseSettings):
         "http://localhost:5173,http://127.0.0.1:5173,"
         "http://localhost:5174,http://127.0.0.1:5174"
     )
+    # Базовый URL публичного приложения для ссылок кампаний (?ref=slug)
+    public_app_url: str = "http://localhost:5173"
 
     # Суперпользователь админки: логин + пароль (JWT role=superuser).
     # Задайте username и один из вариантов пароля: хеш bcrypt (как у PIN) или plain только для локальной разработки.

@@ -186,6 +186,13 @@ class AdminWorkerTagCreateBody(BaseModel):
     name: str = Field(min_length=1, max_length=100)
 
 
+class AdminCampaignVisitStat(BaseModel):
+    campaign_id: uuid.UUID
+    name: str
+    slug: str
+    visits: int
+
+
 class AdminStatsOut(BaseModel):
     users: int
     workers: int
@@ -195,6 +202,31 @@ class AdminStatsOut(BaseModel):
     interactions: int
     photos_male: int
     photos_female: int
+    sessions_total: int
+    sessions_with_campaign: int
+    campaign_visits: list[AdminCampaignVisitStat]
+
+
+class AdminCampaignOut(BaseModel):
+    id: uuid.UUID
+    name: str
+    slug: str
+    path: str
+    is_active: bool
+    created_at: datetime
+    tracking_url: str
+    visits: int
+
+
+class AdminCampaignListResponse(BaseModel):
+    public_app_url: str
+    items: list[AdminCampaignOut]
+
+
+class AdminCampaignCreateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    slug: str | None = Field(default=None, max_length=64)
+    path: str = Field(default="/", max_length=200)
 
 
 class FeedSettingsOut(BaseModel):

@@ -22,6 +22,11 @@ export default function Layout() {
             Статистика
           </NavLink>
         )}
+        {isSuperuser && (
+          <NavLink to="/campaigns" className={({ isActive }) => (isActive ? "active" : "")}>
+            Рекламные ссылки
+          </NavLink>
+        )}
         <NavLink to="/photos" className={({ isActive }) => (isActive ? "active" : "")}>
           Фото и теги
         </NavLink>

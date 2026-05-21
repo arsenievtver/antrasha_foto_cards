@@ -118,6 +118,24 @@ export async function fetchStats() {
   return data;
 }
 
+export async function fetchCampaigns() {
+  const res = await fetch(apiUrl("/admin/campaigns"), { headers: headersJson() });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
+export async function createCampaign({ name, slug, path }) {
+  const res = await fetch(apiUrl("/admin/campaigns"), {
+    method: "POST",
+    headers: headersJson(),
+    body: JSON.stringify({ name, slug: slug || null, path: path || "/" }),
+  });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
 export async function fetchFeedSettings() {
   const res = await fetch(apiUrl("/admin/feed-settings"), { headers: headersJson() });
   const data = await parseResponseJson(res);

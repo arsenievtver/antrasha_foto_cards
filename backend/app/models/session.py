@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, func
+from sqlalchemy import DateTime, ForeignKey, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -14,6 +14,12 @@ class UserSession(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
+    campaign_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("marketing_campaigns.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -21,6 +27,7 @@ class UserSession(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
+    campaign = relationship("MarketingCampaign", back_populates="sessions")
     interactions = relationship("Interaction", back_populates="session")
     tag_weights = relationship("UserTagWeight", back_populates="session")
     tag_pair_weights = relationship("UserTagPairWeight", back_populates="session")

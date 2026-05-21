@@ -31,7 +31,11 @@ export default function Dashboard() {
     ["Муж / Жен", `${s.photos_male} / ${s.photos_female}`],
     ["Теги", s.tags],
     ["Взаимодействия", s.interactions],
+    ["Сессии (всего)", s.sessions_total ?? 0],
+    ["Заходы по ссылкам", s.sessions_with_campaign ?? 0],
   ];
+
+  const campaignVisits = s.campaign_visits ?? [];
 
   return (
     <div>
@@ -44,6 +48,32 @@ export default function Dashboard() {
           </div>
         ))}
       </div>
+
+      {campaignVisits.length > 0 ? (
+        <div className="card" style={{ marginTop: "1.5rem" }}>
+          <h3 style={{ marginTop: 0 }}>Заходы по рекламным ссылкам</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Кампания</th>
+                <th>ref</th>
+                <th>Заходы</th>
+              </tr>
+            </thead>
+            <tbody>
+              {campaignVisits.map((row) => (
+                <tr key={row.campaign_id}>
+                  <td>{row.name}</td>
+                  <td>
+                    <code>{row.slug}</code>
+                  </td>
+                  <td>{row.visits}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
     </div>
   );
 }

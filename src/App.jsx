@@ -12,6 +12,13 @@ import Swipe from "./pages/Swipe";
 import ThankYou from "./pages/ThankYou";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import "./App.css";
+import {
+	captureRefFromUrl,
+	stripRefFromUrl,
+} from "./utils/attribution.js";
+
+captureRefFromUrl();
+stripRefFromUrl();
 
 function AppShell() {
 	const { pathname } = useLocation();

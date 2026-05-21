@@ -17,15 +17,18 @@ from app.models import (
     FeedSettings,
     FittingRequest,
     Interaction,
+    MarketingCampaign,
     Photo,
     PhotoTag,
     Tag,
     TagGroup,
     User,
     UserRole,
+    UserSession,
     UserTagPairWeight,
     UserTagWeight,
 )
+from app.models.marketing_campaign import normalize_campaign_slug
 from app.schemas.admin import (
     AdminCatalogGroupOut,
     AdminCatalogSectionOut,
@@ -45,6 +48,10 @@ from app.schemas.admin import (
     AdminFittingRequestOut,
     AdminBrandListResponse,
     AdminBrandOut,
+    AdminCampaignCreateRequest,
+    AdminCampaignListResponse,
+    AdminCampaignOut,
+    AdminCampaignVisitStat,
     AdminStatsOut,
     AdminTagCatalogResponse,
     AdminTagCreateRequest,
@@ -63,6 +70,7 @@ from app.schemas.admin import (
 )
 from app.security import hash_pin
 from app.experimental.ximilar.router import router as _ximilar_experimental_router
+from app.services.campaign_links import build_tracking_url, normalize_campaign_path
 from app.services.tagging_validation import validate_catalog_tag_selection
 from app.services.yc_photo_sync import run_sync_job_commit
 from app.services.yc_storage import bulk_delete_photo_files_from_object_storage
@@ -236,6 +244,39 @@ def _viewer_id(principal: AdminPrincipal) -> uuid.UUID | None:
     return principal.user.id if principal.user else None
 
 
+def _campaign_visit_rows(db: Session) -> list[tuple[uuid.UUID, str, str, int]]:
+    return list(
+        db.execute(
+            select(
+                MarketingCampaign.id,
+                MarketingCampaign.name,
+                MarketingCampaign.slug,
+                func.count(UserSession.id),
+            )
+            .outerjoin(UserSession, UserSession.campaign_id == MarketingCampaign.id)
+            .group_by(
+                MarketingCampaign.id,
+                MarketingCampaign.name,
+                MarketingCampaign.slug,
+            )
+            .order_by(func.count(UserSession.id).desc(), MarketingCampaign.name),
+        ).all(),
+    )
+
+
+def _campaign_out(c: MarketingCampaign, *, visits: int) -> AdminCampaignOut:
+    return AdminCampaignOut(
+        id=c.id,
+        name=c.name,
+        slug=c.slug,
+        path=c.path,
+        is_active=c.is_active,
+        created_at=c.created_at,
+        tracking_url=build_tracking_url(c),
+        visits=visits,
+    )
+
+
 @router.get("/stats", response_model=AdminStatsOut)
 def admin_stats(
     db: Session = Depends(get_db),
@@ -274,6 +315,25 @@ def admin_stats(
         )
         or 0
     )
+    sessions_total = db.scalar(select(func.count()).select_from(UserSession)) or 0
+    sessions_with_campaign = (
+        db.scalar(
+            select(func.count())
+            .select_from(UserSession)
+            .where(UserSession.campaign_id.is_not(None)),
+        )
+        or 0
+    )
+    campaign_visits = [
+        AdminCampaignVisitStat(
+            campaign_id=cid,
+            name=name,
+            slug=slug,
+            visits=visits,
+        )
+        for cid, name, slug, visits in _campaign_visit_rows(db)
+        if visits > 0
+    ]
     return AdminStatsOut(
         users=users,
         workers=workers,
@@ -283,6 +343,9 @@ def admin_stats(
         interactions=interactions,
         photos_male=photos_male,
         photos_female=photos_female,
+        sessions_total=sessions_total,
+        sessions_with_campaign=sessions_with_campaign,
+        campaign_visits=campaign_visits,
     )
 
 
@@ -1369,6 +1432,56 @@ def list_fitting_requests(
         skip=skip,
         limit=limit,
     )
+
+
+@router.get("/campaigns", response_model=AdminCampaignListResponse)
+def list_campaigns(
+    db: Session = Depends(get_db),
+    _su: AdminPrincipal = Depends(require_superuser),
+) -> AdminCampaignListResponse:
+    _ = _su
+    visit_map = {
+        cid: visits for cid, _name, _slug, visits in _campaign_visit_rows(db)
+    }
+    campaigns = db.scalars(
+        select(MarketingCampaign).order_by(MarketingCampaign.created_at.desc()),
+    ).all()
+    return AdminCampaignListResponse(
+        public_app_url=settings.public_app_url.rstrip("/"),
+        items=[
+            _campaign_out(c, visits=visit_map.get(c.id, 0)) for c in campaigns
+        ],
+    )
+
+
+@router.post("/campaigns", response_model=AdminCampaignOut, status_code=status.HTTP_201_CREATED)
+def create_campaign(
+    body: AdminCampaignCreateRequest,
+    db: Session = Depends(get_db),
+    _su: AdminPrincipal = Depends(require_superuser),
+) -> AdminCampaignOut:
+    _ = _su
+    try:
+        path = normalize_campaign_path(body.path)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+    raw_slug = body.slug.strip() if body.slug else body.name
+    try:
+        slug = normalize_campaign_slug(raw_slug)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+    c = MarketingCampaign(name=body.name.strip(), slug=slug, path=path)
+    db.add(c)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Кампания с таким slug уже есть",
+        ) from None
+    db.refresh(c)
+    return _campaign_out(c, visits=0)
 
 
 router.include_router(_ximilar_experimental_router)
