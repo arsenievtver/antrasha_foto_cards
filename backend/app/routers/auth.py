@@ -94,6 +94,8 @@ def register(body: RegisterRequest, db: Session = Depends(get_db)) -> TokenRespo
             )
         if not existing.display_name and display_name:
             existing.display_name = display_name
+        if existing.signup_campaign_id is None and session.campaign_id is not None:
+            existing.signup_campaign_id = session.campaign_id
         existing.last_login_at = datetime.now(timezone.utc)
         merge_session_into_user(db, session_id=body.session_id, user=existing)
         db.commit()
@@ -105,6 +107,7 @@ def register(body: RegisterRequest, db: Session = Depends(get_db)) -> TokenRespo
         display_name=display_name,
         pin_hash=hash_pin(pin),
         role=UserRole.user.value,
+        signup_campaign_id=session.campaign_id,
     )
     db.add(user)
     db.flush()

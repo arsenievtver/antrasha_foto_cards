@@ -197,6 +197,277 @@ main.content {
   gap: 0.85rem;
 }
 
+.form-stack label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.field-hint {
+  font-size: 0.8rem;
+  color: var(--muted);
+  line-height: 1.45;
+  font-weight: 400;
+}
+
+.field-preview {
+  font-size: 0.8rem;
+  color: var(--ok);
+  font-weight: 500;
+}
+
+.field-preview--warn {
+  color: #e8b86a;
+}
+
+.campaign-created-preview {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.qr-block {
+  margin-top: 0.75rem;
+}
+
+.qr-block__preview {
+  display: block;
+  border-radius: 8px;
+  background: #fff;
+  padding: 8px;
+}
+
+.qr-block__hint {
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin: 0.5rem 0 0.65rem;
+  max-width: 420px;
+  line-height: 1.45;
+}
+
+.qr-block__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.qr-block__actions button {
+  font-size: 0.8rem;
+  padding: 0.4rem 0.65rem;
+}
+
+/* ——— Dashboard ——— */
+.dashboard .dash-section {
+  margin-bottom: 2rem;
+}
+
+.dashboard .dash-section__title {
+  margin: 0 0 0.85rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.dashboard .dash-section__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.85rem;
+}
+
+.dashboard .dash-section__head .dash-section__title {
+  margin: 0;
+}
+
+.stats-grid--traffic {
+  margin-bottom: 1rem;
+}
+
+.dash-traffic-card {
+  max-width: 520px;
+}
+
+.dash-traffic-card__label {
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-bottom: 0.65rem;
+}
+
+.dash-traffic-split__track {
+  display: flex;
+  height: 12px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #222731;
+}
+
+.dash-traffic-split__attr {
+  background: var(--accent);
+  min-width: 2px;
+  transition: width 0.3s ease;
+}
+
+.dash-traffic-split__org {
+  background: #4a5568;
+  min-width: 2px;
+}
+
+.dash-traffic-split__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 1.5rem;
+  margin-top: 0.65rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.dash-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 0.35rem;
+  vertical-align: middle;
+}
+
+.dash-dot--attr {
+  background: var(--accent);
+}
+
+.dash-dot--org {
+  background: #4a5568;
+}
+
+.dash-campaigns-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+.dash-campaigns-card .table-wrap {
+  overflow-x: auto;
+}
+
+.dash-campaigns-table {
+  font-size: 0.88rem;
+}
+
+.dash-campaigns-table th {
+  white-space: nowrap;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.dash-campaigns-table td,
+.dash-campaigns-table th {
+  padding: 0.65rem 0.85rem;
+}
+
+.dash-campaign-name {
+  font-weight: 600;
+}
+
+.dash-campaign-meta {
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin-top: 0.2rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.dash-campaign-link {
+  font-size: 0.78rem;
+  display: inline-block;
+  margin-top: 0.25rem;
+}
+
+.dash-badge {
+  font-size: 0.68rem;
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  background: #3a3040;
+  color: #c9a0a8;
+}
+
+.dash-row--inactive {
+  opacity: 0.65;
+}
+
+.dash-cell-bar {
+  min-width: 120px;
+}
+
+.dash-bar {
+  position: relative;
+  height: 22px;
+  background: #141821;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.dash-bar__fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, #4a7fd4, var(--accent));
+  border-radius: 4px;
+  min-width: 2px;
+}
+
+.dash-bar__n {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  height: 100%;
+  padding: 0 0.4rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-shadow: 0 0 4px #0f1115;
+}
+
+.dash-metric-main {
+  display: block;
+  font-weight: 600;
+}
+
+.dash-metric-sub {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.dash-like {
+  color: var(--ok);
+}
+
+.dash-dislike {
+  color: var(--danger);
+}
+
+.dash-tfoot td {
+  border-top: 2px solid var(--border);
+  background: #141821;
+  font-size: 0.85rem;
+}
+
+.dash-table-note {
+  margin: 0;
+  padding: 0.85rem 1rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+  border-top: 1px solid var(--border);
+  line-height: 1.45;
+}
+
 .error {
   color: var(--danger);
   font-size: 0.9rem;

@@ -190,7 +190,19 @@ class AdminCampaignVisitStat(BaseModel):
     campaign_id: uuid.UUID
     name: str
     slug: str
+    path: str
+    is_active: bool
+    tracking_url: str
     visits: int
+    visits_7d: int
+    visits_30d: int
+    engaged_sessions: int
+    engagement_rate: float
+    interactions: int
+    likes: int
+    dislikes: int
+    registrations: int
+    visit_share: float
 
 
 class AdminStatsOut(BaseModel):
@@ -204,6 +216,8 @@ class AdminStatsOut(BaseModel):
     photos_female: int
     sessions_total: int
     sessions_with_campaign: int
+    sessions_organic: int
+    public_app_url: str
     campaign_visits: list[AdminCampaignVisitStat]
 
 

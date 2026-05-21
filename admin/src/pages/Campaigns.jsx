@@ -1,9 +1,16 @@
-import { useCallback, useEffect, useState } from "react";
-import QRCode from "qrcode";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { createCampaign, fetchCampaigns } from "../api.js";
+import { isValidSlug, previewSlugFromText } from "../utils/campaignSlug.js";
+import {
+  downloadQrPng,
+  downloadQrPngTransparent,
+  downloadQrSvg,
+  qrPreviewDataUrl,
+} from "../utils/qrDownload.js";
 
-function QrPreview({ url }) {
+function QrBlock({ url, slug }) {
   const [src, setSrc] = useState("");
+  const [busy, setBusy] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -11,7 +18,7 @@ function QrPreview({ url }) {
       setSrc("");
       return undefined;
     }
-    QRCode.toDataURL(url, { width: 200, margin: 1 })
+    qrPreviewDataUrl(url, 200)
       .then((dataUrl) => {
         if (!cancelled) setSrc(dataUrl);
       })
@@ -23,15 +30,81 @@ function QrPreview({ url }) {
     };
   }, [url]);
 
-  if (!src) return null;
+  async function runDownload(fn) {
+    if (!url || !slug) return;
+    setBusy("…");
+    try {
+      await fn();
+    } finally {
+      setBusy("");
+    }
+  }
+
+  if (!url) return null;
+
+  const fileSlug = slug || "link";
+
   return (
-    <img
-      src={src}
-      alt="QR-код ссылки"
-      width={200}
-      height={200}
-      style={{ display: "block", marginTop: "0.75rem", borderRadius: 8 }}
-    />
+    <div className="qr-block">
+      {src ? (
+        <img
+          src={src}
+          alt="QR-код"
+          width={200}
+          height={200}
+          className="qr-block__preview"
+        />
+      ) : null}
+      <p className="qr-block__hint">
+        Скачайте файл и вставьте в макет: SVG — для сайтов и векторной графики;
+        PNG 2048 — для сторис, постов и видео; PNG прозрачный — поверх баннера или
+        ролика.
+      </p>
+      <div className="qr-block__actions">
+        <button
+          type="button"
+          className="secondary"
+          disabled={!!busy}
+          onClick={() =>
+            runDownload(() => downloadQrSvg(url, { slug: fileSlug }))
+          }
+        >
+          SVG{busy === "…" ? "…" : ""}
+        </button>
+        <button
+          type="button"
+          className="secondary"
+          disabled={!!busy}
+          onClick={() =>
+            runDownload(() => downloadQrPng(url, { slug: fileSlug, sizePx: 2048 }))
+          }
+        >
+          PNG 2048
+        </button>
+        <button
+          type="button"
+          className="secondary"
+          disabled={!!busy}
+          onClick={() =>
+            runDownload(() => downloadQrPng(url, { slug: fileSlug, sizePx: 1024 }))
+          }
+        >
+          PNG 1024
+        </button>
+        <button
+          type="button"
+          className="secondary"
+          disabled={!!busy}
+          onClick={() =>
+            runDownload(() =>
+              downloadQrPngTransparent(url, { slug: fileSlug, sizePx: 2048 }),
+            )
+          }
+        >
+          PNG прозрачный
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -44,7 +117,16 @@ export default function Campaigns() {
   const [path, setPath] = useState("/");
   const [busy, setBusy] = useState(false);
   const [previewUrl, setPreviewUrl] = useState("");
+  const [previewSlug, setPreviewSlug] = useState("");
   const [copiedId, setCopiedId] = useState("");
+
+  const slugPreview = useMemo(() => {
+    const manual = slug.trim();
+    if (manual) return previewSlugFromText(manual);
+    return previewSlugFromText(name);
+  }, [name, slug]);
+
+  const slugPreviewValid = slugPreview && isValidSlug(slugPreview);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -74,6 +156,7 @@ export default function Campaigns() {
         path: path.trim() || "/",
       });
       setPreviewUrl(created.tracking_url);
+      setPreviewSlug(created.slug);
       setName("");
       setSlug("");
       setPath("/");
@@ -102,59 +185,101 @@ export default function Campaigns() {
   return (
     <div>
       <h2 style={{ marginTop: 0 }}>Рекламные ссылки</h2>
-      <p style={{ color: "var(--muted)", maxWidth: 640 }}>
-        Каждая ссылка добавляет параметр <code>?ref=slug</code>. При первом заходе
-        гостя ref привязывается к сессии и учитывается в статистике.
+      <p style={{ color: "var(--muted)", maxWidth: 720 }}>
+        Ссылка для рекламы = адрес сайта + путь +{" "}
+        <code>?ref=код_кампании</code>. По <code>ref</code> считаются заходы в
+        статистике.
         {data?.public_app_url ? (
           <>
             {" "}
-            Базовый URL: <strong>{data.public_app_url}</strong> (задаётся{" "}
-            <code>PUBLIC_APP_URL</code> на бэкенде).
+            Базовый домен: <strong>{data.public_app_url}</strong> (
+            <code>PUBLIC_APP_URL</code>).
           </>
         ) : null}
       </p>
 
       {err ? <p className="error">{err}</p> : null}
 
-      <div className="card" style={{ maxWidth: 520, marginBottom: "1.5rem" }}>
+      <div className="card" style={{ maxWidth: 560, marginBottom: "1.5rem" }}>
         <h3 style={{ marginTop: 0 }}>Новая кампания</h3>
         <form className="form-stack" onSubmit={onCreate}>
           <label>
-            Название
+            Название (только для вас в админке)
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="VK май 2026"
+              placeholder="VK — май 2026, баннер A"
               required
             />
+            <span className="field-hint">
+              В ссылку не попадает. Нужно, чтобы в списке и статистике было понятно,
+              что за кампания.
+            </span>
           </label>
+
           <label>
-            Slug (ref), необязательно
+            Код в ссылке (ref / slug)
             <input
               value={slug}
               onChange={(e) => setSlug(e.target.value)}
-              placeholder="vk_may26 — из названия, если пусто"
+              placeholder="vk_may26"
             />
+            <span className="field-hint">
+              Часть ссылки после <code>?ref=</code>. Латиница, цифры, <code>_</code> и{" "}
+              <code>-</code>. Если оставить пустым — соберётся из названия (пробелы →
+              подчёркивания, кириллица убирается). Для русского названия код лучше
+              вписать вручную, например <code>vk_may26</code>.
+            </span>
+            {name.trim() && !slug.trim() ? (
+              <span className={`field-preview${slugPreviewValid ? "" : " field-preview--warn"}`}>
+                {slugPreviewValid ? (
+                  <>
+                    Будет в ссылке: <code>?ref={slugPreview}</code>
+                  </>
+                ) : (
+                  <>
+                    Из названия код не получился — укажите ref вручную (латиницей).
+                  </>
+                )}
+              </span>
+            ) : null}
+            {slug.trim() && slugPreview ? (
+              <span className="field-preview">
+                В ссылке: <code>?ref={slugPreview}</code>
+              </span>
+            ) : null}
           </label>
+
           <label>
-            Путь на сайте
+            Страница входа (путь)
             <input
               value={path}
               onChange={(e) => setPath(e.target.value)}
-              placeholder="/ или /swipe/female"
+              placeholder="/"
             />
+            <span className="field-hint">
+              Куда попадёт человек по ссылке: <code>/</code> — главная с выбором
+              коллекции; <code>/swipe/female</code> или <code>/swipe/male</code> — сразу
+              свайп; <code>/about</code> — страница о бренде. Параметр{" "}
+              <code>?ref=…</code> добавится автоматически.
+            </span>
           </label>
-          <button type="submit" disabled={busy || !name.trim()}>
+
+          <button
+            type="submit"
+            disabled={busy || !name.trim() || (!slug.trim() && !slugPreviewValid)}
+          >
             {busy ? "Создание…" : "Создать ссылку"}
           </button>
         </form>
+
         {previewUrl ? (
-          <div style={{ marginTop: "1.25rem", paddingTop: "1rem", borderTop: "1px solid var(--border)" }}>
-            <div style={{ fontSize: "0.85rem", color: "var(--muted)" }}>Последняя созданная ссылка</div>
+          <div className="campaign-created-preview">
+            <div className="field-hint">Последняя созданная ссылка</div>
             <a href={previewUrl} target="_blank" rel="noreferrer">
               {previewUrl}
             </a>
-            <QrPreview url={previewUrl} />
+            <QrBlock url={previewUrl} slug={previewSlug} />
           </div>
         ) : null}
       </div>
@@ -170,7 +295,7 @@ export default function Campaigns() {
                 <th>Название</th>
                 <th>ref</th>
                 <th>Заходы</th>
-                <th>Ссылка / QR</th>
+                <th>Ссылка и QR</th>
               </tr>
             </thead>
             <tbody>
@@ -192,11 +317,11 @@ export default function Campaigns() {
                         style={{ marginTop: "0.35rem" }}
                         onClick={() => copyUrl(row.tracking_url, row.id)}
                       >
-                        {copiedId === row.id ? "Скопировано" : "Копировать"}
+                        {copiedId === row.id ? "Скопировано" : "Копировать ссылку"}
                       </button>
                       <details style={{ marginTop: "0.5rem" }}>
-                        <summary>QR-код</summary>
-                        <QrPreview url={row.tracking_url} />
+                        <summary>QR — скачать</summary>
+                        <QrBlock url={row.tracking_url} slug={row.slug} />
                       </details>
                     </div>
                   </td>

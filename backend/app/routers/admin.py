@@ -71,6 +71,7 @@ from app.schemas.admin import (
 from app.security import hash_pin
 from app.experimental.ximilar.router import router as _ximilar_experimental_router
 from app.services.campaign_links import build_tracking_url, normalize_campaign_path
+from app.services.campaign_stats import count_organic_sessions, fetch_campaign_dashboard_rows
 from app.services.tagging_validation import validate_catalog_tag_selection
 from app.services.yc_photo_sync import run_sync_job_commit
 from app.services.yc_storage import bulk_delete_photo_files_from_object_storage
@@ -324,16 +325,33 @@ def admin_stats(
         )
         or 0
     )
-    campaign_visits = [
-        AdminCampaignVisitStat(
-            campaign_id=cid,
-            name=name,
-            slug=slug,
-            visits=visits,
+    attributed_total = sessions_with_campaign or 0
+    campaign_rows = fetch_campaign_dashboard_rows(db)
+    campaign_visits = []
+    for row in campaign_rows:
+        v = row["visits"]
+        engaged = row["engaged_sessions"]
+        campaign_visits.append(
+            AdminCampaignVisitStat(
+                campaign_id=row["campaign_id"],
+                name=row["name"],
+                slug=row["slug"],
+                path=row["path"],
+                is_active=row["is_active"],
+                tracking_url=row["tracking_url"],
+                visits=v,
+                visits_7d=row["visits_7d"],
+                visits_30d=row["visits_30d"],
+                engaged_sessions=engaged,
+                engagement_rate=round(100.0 * engaged / v, 1) if v else 0.0,
+                interactions=row["interactions"],
+                likes=row["likes"],
+                dislikes=row["dislikes"],
+                registrations=row["registrations"],
+                visit_share=round(100.0 * v / attributed_total, 1) if attributed_total else 0.0,
+            ),
         )
-        for cid, name, slug, visits in _campaign_visit_rows(db)
-        if visits > 0
-    ]
+    sessions_organic = count_organic_sessions(db)
     return AdminStatsOut(
         users=users,
         workers=workers,
@@ -345,6 +363,8 @@ def admin_stats(
         photos_female=photos_female,
         sessions_total=sessions_total,
         sessions_with_campaign=sessions_with_campaign,
+        sessions_organic=sessions_organic,
+        public_app_url=settings.public_app_url.rstrip("/"),
         campaign_visits=campaign_visits,
     )
 

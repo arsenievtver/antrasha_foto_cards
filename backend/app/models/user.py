@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, String, Text, func
+from sqlalchemy import DateTime, ForeignKey, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -32,7 +32,14 @@ class User(Base):
     last_login_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    signup_campaign_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("marketing_campaigns.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
 
     interactions = relationship("Interaction", back_populates="user")
+    signup_campaign = relationship("MarketingCampaign", foreign_keys=[signup_campaign_id])
     tag_weights = relationship("UserTagWeight", back_populates="user")
     tag_pair_weights = relationship("UserTagPairWeight", back_populates="user")
