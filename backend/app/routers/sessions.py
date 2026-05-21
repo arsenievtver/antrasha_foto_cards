@@ -1,14 +1,19 @@
 import logging
 import uuid
 
-from fastapi import APIRouter, Body, Depends
+from fastapi import APIRouter, Body, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import MarketingCampaign, UserSession
 from app.models.marketing_campaign import normalize_campaign_slug
-from app.schemas.session import SessionCreateRequest, SessionCreateResponse
+from app.schemas.session import (
+    SessionAttributionPatch,
+    SessionAttributionResponse,
+    SessionCreateRequest,
+    SessionCreateResponse,
+)
 
 log = logging.getLogger("app.api.sessions")
 router = APIRouter(prefix="/sessions", tags=["sessions"])
@@ -48,3 +53,47 @@ def create_session(
         body.ref,
     )
     return SessionCreateResponse(session_id=s.id)
+
+
+@router.patch("/{session_id}/attribution", response_model=SessionAttributionResponse)
+def bind_session_attribution(
+    session_id: uuid.UUID,
+    body: SessionAttributionPatch,
+    db: Session = Depends(get_db),
+) -> SessionAttributionResponse:
+    """Привязать ref к уже существующей анонимной сессии (если кампания ещё не задана)."""
+    s = db.get(UserSession, session_id)
+    if not s:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+    if s.campaign_id is not None:
+        camp = db.get(MarketingCampaign, s.campaign_id)
+        return SessionAttributionResponse(
+            session_id=s.id,
+            campaign_id=s.campaign_id,
+            campaign_slug=camp.slug if camp else None,
+            bound=False,
+        )
+    campaign_id = _resolve_campaign_id(db, body.ref)
+    if campaign_id is None:
+        return SessionAttributionResponse(
+            session_id=s.id,
+            campaign_id=None,
+            campaign_slug=None,
+            bound=False,
+        )
+    s.campaign_id = campaign_id
+    db.commit()
+    db.refresh(s)
+    camp = db.get(MarketingCampaign, campaign_id)
+    log.info(
+        "PATCH /sessions/%s/attribution campaign_id=%s ref=%s",
+        s.id,
+        s.campaign_id,
+        body.ref,
+    )
+    return SessionAttributionResponse(
+        session_id=s.id,
+        campaign_id=s.campaign_id,
+        campaign_slug=camp.slug if camp else None,
+        bound=True,
+    )

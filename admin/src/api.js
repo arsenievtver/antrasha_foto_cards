@@ -125,6 +125,16 @@ export async function fetchCampaigns() {
   return data;
 }
 
+export async function fetchAttributionDebug({ limit = 25 } = {}) {
+  const q = new URLSearchParams({ limit: String(limit) });
+  const res = await fetch(`${apiUrl("/admin/campaigns/attribution-debug")}?${q}`, {
+    headers: headersJson(),
+  });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
 export async function createCampaign({ name, slug, path }) {
   const res = await fetch(apiUrl("/admin/campaigns"), {
     method: "POST",

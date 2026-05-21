@@ -1,6 +1,7 @@
 import { getStoredRef } from "../utils/attribution.js";
 
 const SESSION_KEY = "antrasha_session_id";
+const REF_BOUND_SESSION_KEY = "antrasha_ref_bound_session";
 const AUTH_KEY = "antrasha_access_token";
 const REFRESH_KEY = "antrasha_refresh_token";
 export const REMEMBER_PHONE_KEY = "antrasha_remember_phone";
@@ -42,10 +43,39 @@ async function postSession() {
 	return res;
 }
 
+/** Привязать ?ref= к уже существующей сессии (если кампания ещё не была задана). */
+async function bindSessionAttribution(sessionId, ref) {
+	const res = await fetch(apiUrl(`/sessions/${sessionId}/attribution`), {
+		method: "PATCH",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({ ref }),
+	});
+	return res;
+}
+
+async function tryBindRefToExistingSession(sessionId) {
+	const ref = getStoredRef();
+	if (!ref || localStorage.getItem(REF_BOUND_SESSION_KEY) === sessionId) {
+		return;
+	}
+	try {
+		const res = await bindSessionAttribution(sessionId, ref);
+		if (res.ok) {
+			localStorage.setItem(REF_BOUND_SESSION_KEY, sessionId);
+		}
+	} catch {
+		/* сеть — не блокируем приложение */
+	}
+}
+
 /** Создаёт сессию один раз и кеширует ID в localStorage */
 export async function ensureSessionId() {
 	let id = localStorage.getItem(SESSION_KEY);
-	if (id) return id;
+	if (id) {
+		await tryBindRefToExistingSession(id);
+		return id;
+	}
+	const ref = getStoredRef();
 	const res = await postSession();
 	if (!res.ok) {
 		const raw = await res.text();
@@ -62,6 +92,9 @@ export async function ensureSessionId() {
 	const data = await res.json();
 	id = data.session_id;
 	localStorage.setItem(SESSION_KEY, id);
+	if (ref) {
+		localStorage.setItem(REF_BOUND_SESSION_KEY, id);
+	}
 	return id;
 }
 

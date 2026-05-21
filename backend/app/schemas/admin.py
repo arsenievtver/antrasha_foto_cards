@@ -243,6 +243,19 @@ class AdminCampaignCreateRequest(BaseModel):
     path: str = Field(default="/", max_length=200)
 
 
+class AdminAttributionDebugSession(BaseModel):
+    session_id: uuid.UUID
+    created_at: datetime
+    campaign_slug: str | None
+    campaign_name: str | None
+
+
+class AdminAttributionDebugOut(BaseModel):
+    campaigns: list[AdminCampaignOut]
+    recent_attributed_sessions: list[AdminAttributionDebugSession]
+    hint: str
+
+
 class FeedSettingsOut(BaseModel):
     """Политика /feed: требовать ли завершённую разметку перед показом карточки."""
 

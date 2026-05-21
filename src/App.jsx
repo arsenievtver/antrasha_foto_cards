@@ -5,6 +5,7 @@ import {
 	useLocation,
 } from "react-router-dom";
 import UserMenu from "./components/UserMenu";
+import SessionBootstrap from "./components/SessionBootstrap";
 import { AuthProvider } from "./context/AuthContext";
 import Home from "./pages/Home";
 import About from "./pages/About";
@@ -54,6 +55,7 @@ export default function App() {
 	return (
 		<AuthProvider>
 			<Router>
+				<SessionBootstrap />
 				<AppShell />
 			</Router>
 		</AuthProvider>

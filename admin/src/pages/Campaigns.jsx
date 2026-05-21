@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { createCampaign, fetchCampaigns } from "../api.js";
+import { createCampaign, fetchAttributionDebug, fetchCampaigns } from "../api.js";
 import { isValidSlug, previewSlugFromText } from "../utils/campaignSlug.js";
 import {
   downloadQrPng,
@@ -119,6 +119,9 @@ export default function Campaigns() {
   const [previewUrl, setPreviewUrl] = useState("");
   const [previewSlug, setPreviewSlug] = useState("");
   const [copiedId, setCopiedId] = useState("");
+  const [debug, setDebug] = useState(null);
+  const [debugErr, setDebugErr] = useState("");
+  const [debugBusy, setDebugBusy] = useState(false);
 
   const slugPreview = useMemo(() => {
     const manual = slug.trim();
@@ -168,6 +171,18 @@ export default function Campaigns() {
     }
   }
 
+  async function loadDebug() {
+    setDebugBusy(true);
+    setDebugErr("");
+    try {
+      setDebug(await fetchAttributionDebug());
+    } catch (e) {
+      setDebugErr(e.message);
+    } finally {
+      setDebugBusy(false);
+    }
+  }
+
   async function copyUrl(url, id) {
     try {
       await navigator.clipboard.writeText(url);
@@ -199,6 +214,80 @@ export default function Campaigns() {
       </p>
 
       {err ? <p className="error">{err}</p> : null}
+
+      <div className="card" style={{ marginBottom: "1.5rem" }}>
+        <h3 style={{ marginTop: 0 }}>Проверка заходов</h3>
+        <p className="field-hint" style={{ marginTop: 0 }}>
+          Регистрация не нужна: считается создание сессии с <code>?ref=</code> при
+          открытии сайта. Для чистого теста — режим инкогнито или очистка данных
+          сайта на телефоне/в браузере.
+        </p>
+        <button
+          type="button"
+          className="secondary"
+          disabled={debugBusy}
+          onClick={loadDebug}
+        >
+          {debugBusy ? "Загрузка…" : "Обновить журнал заходов"}
+        </button>
+        {debugErr ? <p className="error">{debugErr}</p> : null}
+        {debug ? (
+          <>
+            <p className="field-hint" style={{ marginTop: "0.75rem" }}>
+              {debug.hint}
+            </p>
+            <table style={{ marginTop: "0.75rem" }}>
+              <thead>
+                <tr>
+                  <th>Кампания</th>
+                  <th>ref</th>
+                  <th>Заходов в статистике</th>
+                </tr>
+              </thead>
+              <tbody>
+                {debug.campaigns.map((c) => (
+                  <tr key={c.id}>
+                    <td>{c.name}</td>
+                    <td>
+                      <code>{c.slug}</code>
+                    </td>
+                    <td>{c.visits}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <h4 style={{ margin: "1rem 0 0.5rem", fontSize: "0.9rem" }}>
+              Последние зафиксированные сессии с ref
+            </h4>
+            {!debug.recent_attributed_sessions?.length ? (
+              <p style={{ color: "var(--muted)", margin: 0 }}>
+                Пока нет — откройте ссылку в инкогнито и нажмите «Обновить».
+              </p>
+            ) : (
+              <table>
+                <thead>
+                  <tr>
+                    <th>Время (UTC)</th>
+                    <th>ref</th>
+                    <th>Кампания</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {debug.recent_attributed_sessions.map((row) => (
+                    <tr key={row.session_id}>
+                      <td>{new Date(row.created_at).toLocaleString("ru-RU")}</td>
+                      <td>
+                        <code>{row.campaign_slug}</code>
+                      </td>
+                      <td>{row.campaign_name}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </>
+        ) : null}
+      </div>
 
       <div className="card" style={{ maxWidth: 560, marginBottom: "1.5rem" }}>
         <h3 style={{ marginTop: 0 }}>Новая кампания</h3>

@@ -48,6 +48,8 @@ from app.schemas.admin import (
     AdminFittingRequestOut,
     AdminBrandListResponse,
     AdminBrandOut,
+    AdminAttributionDebugOut,
+    AdminAttributionDebugSession,
     AdminCampaignCreateRequest,
     AdminCampaignListResponse,
     AdminCampaignOut,
@@ -1504,6 +1506,50 @@ def create_campaign(
         ) from None
     db.refresh(c)
     return _campaign_out(c, visits=0)
+
+
+@router.get("/campaigns/attribution-debug", response_model=AdminAttributionDebugOut)
+def attribution_debug(
+    db: Session = Depends(get_db),
+    _su: AdminPrincipal = Depends(require_superuser),
+    limit: int = Query(25, ge=1, le=100),
+) -> AdminAttributionDebugOut:
+    _ = _su
+    visit_map = {
+        cid: visits for cid, _name, _slug, visits in _campaign_visit_rows(db)
+    }
+    campaigns = db.scalars(
+        select(MarketingCampaign).order_by(MarketingCampaign.created_at.desc()),
+    ).all()
+    rows = db.execute(
+        select(
+            UserSession.id,
+            UserSession.created_at,
+            MarketingCampaign.slug,
+            MarketingCampaign.name,
+        )
+        .outerjoin(MarketingCampaign, MarketingCampaign.id == UserSession.campaign_id)
+        .where(UserSession.campaign_id.is_not(None))
+        .order_by(UserSession.created_at.desc())
+        .limit(limit),
+    ).all()
+    return AdminAttributionDebugOut(
+        campaigns=[_campaign_out(c, visits=visit_map.get(c.id, 0)) for c in campaigns],
+        recent_attributed_sessions=[
+            AdminAttributionDebugSession(
+                session_id=r[0],
+                created_at=r[1],
+                campaign_slug=r[2],
+                campaign_name=r[3],
+            )
+            for r in rows
+        ],
+        hint=(
+            "Заход считается при создании сессии с ?ref= (без регистрации). "
+            "Повторный визит в том же браузере не создаёт новую сессию — для теста "
+            "используйте режим инкогнито или очистите данные сайта."
+        ),
+    )
 
 
 router.include_router(_ximilar_experimental_router)
