@@ -24,7 +24,8 @@ ensure_compose() {
 }
 
 compose() {
-  docker compose -f "$COMPOSE_FILE" --project-directory "$DEPLOY_DIR" "$@"
+  docker compose -f "$COMPOSE_FILE" --project-directory "$DEPLOY_DIR" \
+    --env-file "$DEPLOY_DIR/env/.env.prod" "$@"
 }
 
 ensure_env_files() {
