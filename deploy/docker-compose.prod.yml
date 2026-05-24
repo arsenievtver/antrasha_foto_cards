@@ -6,6 +6,13 @@ services:
       - ./env/.env.postgres.prod
     volumes:
       - antrasha_pg_data:/var/lib/postgresql/data
+    logging:
+      driver: loki
+      options:
+        loki-url: "http://${INFRA_HOST}/loki/api/v1/push"
+        loki-external-labels: "app=antrasha,service=postgres"
+        loki-batch-size: "400"
+        loki-retries: "3"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 10s
@@ -19,6 +26,7 @@ services:
     build:
       context: ../backend
       dockerfile: Dockerfile
+    command: ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
     restart: unless-stopped
     env_file:
       - ./env/.env.backend.prod
@@ -26,15 +34,58 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    logging:
+      driver: loki
+      options:
+        loki-url: "http://${INFRA_HOST}/loki/api/v1/push"
+        loki-external-labels: "app=antrasha,service=backend"
+        loki-batch-size: "400"
+        loki-retries: "3"
+        loki-pipeline-stages: |
+          - regex:
+              expression: '^(?P<level>DEBUG|INFO|WARNING|ERROR|CRITICAL)'
+          - labels:
+              level:
     # Только localhost — удобная проверка API до поднятия nginx: curl http://127.0.0.1:8000/health
     ports:
       - "127.0.0.1:8000:8000"
+    volumes:
+      - ai_ingest_tmp:/app/var/ai_ingest_tmp
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8000/health >/dev/null || exit 1"]
       interval: 15s
       timeout: 10s
       retries: 8
       start_period: 90s
+    networks:
+      - antrasha_net
+
+  ai-ingest-worker:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    command: ["python", "-m", "jobs.ai_ingest_worker"]
+    restart: unless-stopped
+    env_file:
+      - ./env/.env.backend.prod
+      - ./env/.env.postgres.prod
+    depends_on:
+      postgres:
+        condition: service_healthy
+    logging:
+      driver: loki
+      options:
+        loki-url: "http://${INFRA_HOST}/loki/api/v1/push"
+        loki-external-labels: "app=antrasha,service=ai-ingest-worker"
+        loki-batch-size: "400"
+        loki-retries: "3"
+        loki-pipeline-stages: |
+          - regex:
+              expression: '^(?P<level>DEBUG|INFO|WARNING|ERROR|CRITICAL)'
+          - labels:
+              level:
+    volumes:
+      - ai_ingest_tmp:/app/var/ai_ingest_tmp
     networks:
       - antrasha_net
 
@@ -65,6 +116,13 @@ services:
     restart: unless-stopped
     env_file:
       - ./env/.env.prod
+    logging:
+      driver: loki
+      options:
+        loki-url: "http://${INFRA_HOST}/loki/api/v1/push"
+        loki-external-labels: "app=antrasha,service=nginx"
+        loki-batch-size: "400"
+        loki-retries: "3"
     depends_on:
       backend:
         condition: service_healthy
@@ -93,6 +151,7 @@ services:
 
 volumes:
   antrasha_pg_data:
+  ai_ingest_tmp:
 
 networks:
   antrasha_net:

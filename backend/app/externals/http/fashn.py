@@ -1,0 +1,177 @@
+"""Fashn API client (product-to-model)."""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+import time
+from pathlib import Path
+
+from app.externals.http.base import BaseApiClient
+from app.externals.http.exceptions import ApiClientAbortableException
+
+log = logging.getLogger("app.fashn")
+
+POLL_INTERVAL_SEC = 3.0
+POLL_TIMEOUT_SEC = 300.0
+MAX_RETRIES = 2
+
+ASPECT_RATIO = "4:5"
+RESOLUTION = "1k"
+NUM_IMAGES = 1
+SEED = 42
+
+_PROMPTS_DIR = Path(__file__).resolve().parent.parent.parent / "prompts"
+_PROMPT_CACHE: dict[str, str] = {}
+
+
+def load_prompt_for_gender(gender: str) -> str:
+    key = gender.strip().lower()
+    if key in _PROMPT_CACHE:
+        return _PROMPT_CACHE[key]
+    names = {"male": "promt_male.txt", "female": "promt_female.txt"}
+    if key not in names:
+        raise ValueError("gender must be male or female")
+    path = _PROMPTS_DIR / names[key]
+    if not path.is_file():
+        raise FileNotFoundError(f"Prompt file missing: {path}")
+    _PROMPT_CACHE[key] = path.read_text(encoding="utf-8")
+    return _PROMPT_CACHE[key]
+
+
+class FashnClient(BaseApiClient):
+    BASE_URL = "https://api.fashn.ai/v1/"
+
+    def __init__(
+        self,
+        api_key: str,
+        *,
+        proxy: str | None = None,
+        connect_timeout: float = 10.0,
+        submit_timeout: float = 60.0,
+        poll_timeout: float = 30.0,
+        download_timeout: float = 60.0,
+    ) -> None:
+        super().__init__(keep_session=True)
+        self._api_key = api_key.strip()
+        self._proxy = proxy or None
+        self._connect_timeout = connect_timeout
+        self._submit_timeout = submit_timeout
+        self._poll_timeout = poll_timeout
+        self._download_timeout = download_timeout
+
+    @property
+    def base_url(self) -> str:
+        return self.BASE_URL
+
+    @property
+    def base_headers(self) -> dict:
+        return {
+            "Authorization": f"Bearer {self._api_key}",
+            "Content-Type": "application/json",
+        }
+
+    def _proxy_kwargs(self) -> dict:
+        return {"proxy": self._proxy} if self._proxy else {}
+
+    async def submit(self, *, product_image_data_url: str, prompt: str) -> str:
+        """Submits a job to the Fashn API, returns job_id."""
+        payload = {
+            "model_name": "product-to-model",
+            "inputs": {
+                "product_image": product_image_data_url,
+                "prompt": prompt,
+                "aspect_ratio": ASPECT_RATIO,
+                "resolution": RESOLUTION,
+                "num_images": NUM_IMAGES,
+                "output_format": "png",
+                "return_base64": False,
+                "seed": SEED,
+            },
+        }
+        try:
+            resp = await self.post("/run", json=payload, **self._proxy_kwargs())
+        except ApiClientAbortableException as e:
+            log.warning(
+                "fashn submit HTTP %s body=%s",
+                e.response.status,
+                str(e.parsed_response)[:500],
+            )
+            raise
+        log.info("fashn submit HTTP %s body=%s", resp.status, str(resp.parsed_response)[:300])
+        job_id = (resp.parsed_response or {}).get("id")
+        if not job_id:
+            raise ValueError(f"Fashn: response missing id (HTTP {resp.status}): {resp.parsed_response}")
+        jid = str(job_id)
+        log.info("fashn submit OK remote_id=%s… (len=%s)", jid[:10], len(jid))
+        return jid
+
+    async def poll_status(self, job_id: str) -> list[str]:
+        """Polls job status until completion, returns list of result URLs."""
+        started = time.monotonic()
+        next_log_at = 0.0
+        while True:
+            elapsed = time.monotonic() - started
+            if elapsed > POLL_TIMEOUT_SEC:
+                raise TimeoutError(f"Fashn: polling timeout after {POLL_TIMEOUT_SEC}s (job={job_id})")
+            try:
+                resp = await self.get(f"/status/{job_id}", **self._proxy_kwargs())
+            except ApiClientAbortableException as e:
+                raise RuntimeError(f"Fashn poll HTTP {e.response.status}") from e
+
+            data: dict = resp.parsed_response or {}
+            status = data.get("status")
+
+            now = time.monotonic()
+            if now >= next_log_at:
+                log.info(
+                    "fashn poll id=%s… status=%s elapsed=%.0fs/%.0fs",
+                    job_id[:12], status, now - started, POLL_TIMEOUT_SEC,
+                )
+                next_log_at = now + 45.0
+
+            if status == "completed":
+                out = data.get("output") or []
+                if not isinstance(out, list):
+                    raise ValueError("Fashn: unexpected output format")
+                return [str(u) for u in out if u]
+            if status == "failed":
+                raise RuntimeError(f"Fashn job failed: {str(data.get('error') or data)[:500]}")
+
+            await asyncio.sleep(POLL_INTERVAL_SEC)
+
+    async def download_png(self, url: str) -> bytes:
+        """Downloads PNG from a Fashn result URL."""
+        async with self.session.get(url, **self._proxy_kwargs()) as resp:
+            if resp.status != 200:
+                raise RuntimeError(f"Fashn download HTTP {resp.status}: {url}")
+            return await resp.read()
+
+    async def run_product_to_model(
+        self, *, gender: str, product_image_data_url: str
+    ) -> bytes:
+        """Full submit → poll → download cycle with MAX_RETRIES attempts."""
+        prompt = load_prompt_for_gender(gender)
+        last_err: Exception = RuntimeError("Unknown error")
+        try:
+            for attempt in range(MAX_RETRIES):
+                log.info("fashn product-to-model attempt %s/%s gender=%s", attempt + 1, MAX_RETRIES, gender)
+                try:
+                    job_id = await self.submit(
+                        product_image_data_url=product_image_data_url,
+                        prompt=prompt,
+                    )
+                    urls = await self.poll_status(job_id)
+                    if not urls:
+                        raise ValueError("Fashn: empty output")
+                    return await self.download_png(urls[0])
+                except Exception as e:
+                    last_err = e
+                    log.warning(
+                        "fashn attempt %s/%s failed: %s: %s",
+                        attempt + 1, MAX_RETRIES, type(e).__name__, e,
+                        exc_info=True,
+                    )
+            raise last_err
+        finally:
+            await self.close()
