@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import time
 
 from sqlalchemy.exc import ProgrammingError
 
@@ -10,15 +9,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import DOTENV_LOADED_PATHS, settings
 from app.logging_config import setup_logging
 from app.database import SessionLocal
-from app.routers import admin, admin_ai_ingest, auth, feed, guest, interactions, internal_sync, sessions
-from app.services.ai_ingest_worker import reset_stale_processing_jobs, try_process_one_ingest_job
+from app.routers import admin, admin_ai_ingest, auth, feed, guest, interactions, internal_sync, sessions, ximilar
+from app.services.ai_ingest_worker import reset_stale_processing_jobs
 from app.services.yc_photo_sync import run_sync_job_commit
 
 log = logging.getLogger("app.main")
-
-# Чтобы не забивать лог при concurrency>1: одно предупреждение на все слоты воркера.
-_last_ai_ingest_skip_warn_monotonic: float = 0.0
-
 
 async def _yc_auto_sync_loop() -> None:
     interval_sec = max(60, settings.yc_auto_sync_interval_minutes * 60)
@@ -37,34 +32,6 @@ async def _yc_auto_sync_loop() -> None:
         except Exception:
             log.exception("yc_auto_sync: ошибка синхронизации с Object Storage")
         await asyncio.sleep(interval_sec)
-
-
-async def _ai_ingest_worker_slots() -> None:
-    n = max(1, settings.ai_ingest_worker_concurrency)
-    await asyncio.gather(*[_ai_ingest_worker_slot() for _ in range(n)])
-
-
-async def _ai_ingest_worker_slot() -> None:
-    global _last_ai_ingest_skip_warn_monotonic
-    while True:
-        await asyncio.sleep(0.28)
-        if not settings.fashn_configured or not settings.yc_s3_configured:
-            now = time.monotonic()
-            if now - _last_ai_ingest_skip_warn_monotonic >= 90:
-                _last_ai_ingest_skip_warn_monotonic = now
-                log.warning(
-                    "ai_ingest: воркер не обрабатывает очередь — нужны FASHN_API_KEY и пара "
-                    "YC_S3_ACCESS_KEY_ID / YC_S3_SECRET_ACCESS_KEY. Сейчас fashn_configured=%s "
-                    "yc_s3_configured=%s",
-                    settings.fashn_configured,
-                    settings.yc_s3_configured,
-                )
-            await asyncio.sleep(2.5)
-            continue
-        try:
-            await asyncio.to_thread(try_process_one_ingest_job, settings)
-        except Exception:
-            log.exception("ai_ingest worker")
 
 
 async def lifespan(_app: FastAPI):
@@ -94,24 +61,10 @@ async def lifespan(_app: FastAPI):
         db_boot.close()
 
     task: asyncio.Task | None = None
-    ai_task: asyncio.Task | None = None
     if settings.yc_auto_sync_interval_minutes > 0:
         task = asyncio.create_task(_yc_auto_sync_loop())
         log.info("Фоновая синхронизация Object Storage включена")
-    ai_task = asyncio.create_task(_ai_ingest_worker_slots())
-    log.info(
-        "Очередь ИИ-ingest: concurrency=%s fashn=%s yc=%s",
-        settings.ai_ingest_worker_concurrency,
-        settings.fashn_configured,
-        settings.yc_s3_configured,
-    )
     yield
-    if ai_task:
-        ai_task.cancel()
-        try:
-            await ai_task
-        except asyncio.CancelledError:
-            pass
     if task:
         task.cancel()
         try:
@@ -138,9 +91,15 @@ app.include_router(auth.router)
 app.include_router(admin.router)
 app.include_router(admin_ai_ingest.router)
 app.include_router(internal_sync.router)
+app.include_router(ximilar.router)
 
 
 @app.get("/health")
 def health() -> dict[str, str]:
+    return {"status": "ok"}
+
+
+@app.get("/ping/")
+def ping() -> dict[str, str]:
     return {"status": "ok"}
 

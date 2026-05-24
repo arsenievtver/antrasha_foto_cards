@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 import uuid
@@ -13,8 +14,8 @@ from sqlalchemy.orm import Session, noload
 
 from app.config import Settings, settings
 from app.database import SessionLocal
+from app.externals.http.fashn import FashnClient
 from app.models import AiIngestJob
-from app.services.fashn_client import run_product_to_model_png
 from app.services.image_prepare import (
     build_fashn_product_image_data_url,
     png_bytes_to_webp,
@@ -148,27 +149,32 @@ def run_single_ingest_job(cfg: Settings, job_id: uuid.UUID) -> None:
             len(data_url),
         )
         t0 = time.monotonic()
-        png_bytes, err = run_product_to_model_png(
-            cfg,
-            gender=job.gender,
-            product_image_data_url=data_url,
-        )
-        dt = time.monotonic() - t0
-        if err or not png_bytes:
-            log.warning(
-                "ai_ingest job_id=%s Fashn за %.1fs: ошибка: %s",
-                job_id,
-                dt,
-                (err or "")[:500],
+        try:
+            client = FashnClient(
+                api_key=str(cfg.fashn_api_key).strip(),
+                proxy=str(cfg.fashn_https_proxy).strip() if cfg.fashn_https_proxy else None,
+                connect_timeout=cfg.fashn_http_connect_timeout,
+                submit_timeout=cfg.fashn_http_read_timeout_submit,
+                poll_timeout=cfg.fashn_http_read_timeout_poll,
+                download_timeout=cfg.fashn_http_read_timeout_download,
             )
-            _fail_job(db, job, err or "Fashn не вернул изображение")
+            png_bytes = asyncio.run(
+                client.run_product_to_model(
+                    gender=job.gender,
+                    product_image_data_url=data_url,
+                )
+            )
+        except Exception as e:
+            dt = time.monotonic() - t0
+            log.warning(
+                "ai_ingest job_id=%s Fashn за %.1fs: ошибка %s: %s",
+                job_id, dt, type(e).__name__, str(e)[:500],
+                exc_info=True,
+            )
+            _fail_job(db, job, f"{type(e).__name__}: {e}")
             return
-        log.info(
-            "ai_ingest job_id=%s Fashn OK за %.1fs, png=%s байт",
-            job_id,
-            dt,
-            len(png_bytes),
-        )
+        dt = time.monotonic() - t0
+        log.info("ai_ingest job_id=%s Fashn OK за %.1fs, png=%s байт", job_id, dt, len(png_bytes))
 
         try:
             webp_bytes = png_bytes_to_webp(png_bytes, quality=100)
