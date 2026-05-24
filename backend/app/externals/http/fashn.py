@@ -153,23 +153,25 @@ class FashnClient(BaseApiClient):
         """Full submit → poll → download cycle with MAX_RETRIES attempts."""
         prompt = load_prompt_for_gender(gender)
         last_err: Exception = RuntimeError("Unknown error")
-        for attempt in range(MAX_RETRIES):
-            log.info("fashn product-to-model attempt %s/%s gender=%s", attempt + 1, MAX_RETRIES, gender)
-            try:
-                job_id = await self.submit(
-                    product_image_data_url=product_image_data_url,
-                    prompt=prompt,
-                )
-                urls = await self.poll_status(job_id)
-                if not urls:
-                    raise ValueError("Fashn: empty output")
-                return await self.download_png(urls[0])
-            except Exception as e:
-                last_err = e
-                log.warning(
-                    "fashn attempt %s/%s failed: %s: %s",
-                    attempt + 1, MAX_RETRIES, type(e).__name__, e,
-                    exc_info=True,
-                )
-        await self.close()
-        raise last_err
+        try:
+            for attempt in range(MAX_RETRIES):
+                log.info("fashn product-to-model attempt %s/%s gender=%s", attempt + 1, MAX_RETRIES, gender)
+                try:
+                    job_id = await self.submit(
+                        product_image_data_url=product_image_data_url,
+                        prompt=prompt,
+                    )
+                    urls = await self.poll_status(job_id)
+                    if not urls:
+                        raise ValueError("Fashn: empty output")
+                    return await self.download_png(urls[0])
+                except Exception as e:
+                    last_err = e
+                    log.warning(
+                        "fashn attempt %s/%s failed: %s: %s",
+                        attempt + 1, MAX_RETRIES, type(e).__name__, e,
+                        exc_info=True,
+                    )
+            raise last_err
+        finally:
+            await self.close()
