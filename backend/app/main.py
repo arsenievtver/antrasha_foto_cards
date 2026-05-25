@@ -5,6 +5,7 @@ from sqlalchemy.exc import ProgrammingError
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from app.config import DOTENV_LOADED_PATHS, settings
 from app.logging_config import setup_logging
@@ -93,13 +94,10 @@ app.include_router(admin_ai_ingest.router)
 app.include_router(internal_sync.router)
 app.include_router(ximilar.router)
 
+Instrumentator().instrument(app).expose(app)
+
 
 @app.get("/health")
 def health() -> dict[str, str]:
-    return {"status": "ok"}
-
-
-@app.get("/ping/")
-def ping() -> dict[str, str]:
     return {"status": "ok"}
 
