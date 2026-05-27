@@ -97,6 +97,9 @@ class Settings(BaseSettings):
     # Очередь телефон → ИИ → Object Storage: лимиты и каталог временных файлов
     ai_ingest_max_files_per_upload: int = 40
     ai_ingest_max_file_bytes: int = 35 * 1024 * 1024
+    promo_banner_max_file_bytes: int = 8 * 1024 * 1024
+    # Локальные файлы баннеров (1–3 шт., без Object Storage). Пусто = backend/data/promo-banners
+    promo_banner_media_dir: str | None = None
     ai_ingest_max_pending_jobs: int = 400
     ai_ingest_worker_concurrency: int = 2
     # Пусто = backend/var/ai_ingest_tmp (создаётся при старте загрузки)
@@ -124,6 +127,12 @@ class Settings(BaseSettings):
         if self.ai_ingest_temp_dir and str(self.ai_ingest_temp_dir).strip():
             return Path(self.ai_ingest_temp_dir).expanduser().resolve()
         return (_BACKEND_DIR / "var" / "ai_ingest_tmp").resolve()
+
+    @property
+    def promo_banner_media_path(self) -> Path:
+        if self.promo_banner_media_dir and str(self.promo_banner_media_dir).strip():
+            return Path(self.promo_banner_media_dir).expanduser().resolve()
+        return (_BACKEND_DIR / "data" / "promo-banners").resolve()
 
     @property
     def max_notify_configured(self) -> bool:

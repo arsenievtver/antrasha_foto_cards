@@ -169,11 +169,38 @@ function storeLoginTokens(data) {
 	setAuthToken(data.access_token, data.refresh_token ?? null);
 }
 
-export async function loadFeed(gender, { limit = 30 } = {}) {
+async function sessionAuthHeaders() {
 	await ensureSessionId();
 	const headers = { "X-Session-Id": localStorage.getItem(SESSION_KEY) };
 	const t = getAuthToken();
 	if (t) headers.Authorization = `Bearer ${t}`;
+	return headers;
+}
+
+export async function fetchActivePromoBanner() {
+	const headers = await sessionAuthHeaders();
+	const res = await fetch(apiUrl("/promo-banners/active"), { headers });
+	if (!res.ok) {
+		const text = await res.text();
+		throw new Error(text || `promo-banners ${res.status}`);
+	}
+	return res.json();
+}
+
+export async function markPromoBannerSeen(bannerId) {
+	const headers = await sessionAuthHeaders();
+	const res = await fetch(apiUrl(`/promo-banners/${bannerId}/seen`), {
+		method: "POST",
+		headers,
+	});
+	if (!res.ok && res.status !== 204) {
+		const text = await res.text();
+		throw new Error(text || `promo seen ${res.status}`);
+	}
+}
+
+export async function loadFeed(gender, { limit = 30 } = {}) {
+	const headers = await sessionAuthHeaders();
 	const q = new URLSearchParams({ gender, limit: String(limit) });
 	const res = await fetch(`${apiUrl("/feed")}?${q}`, { headers });
 	if (!res.ok) {

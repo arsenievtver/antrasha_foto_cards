@@ -528,3 +528,56 @@ export async function deleteAiIngestJob(jobId) {
     throw new Error(detail(data, res.statusText));
   }
 }
+
+export async function fetchPromoBanners() {
+  const res = await fetch(apiUrl("/admin/promo-banners"), { headers: headersJson() });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
+export async function createPromoBanner(body) {
+  const res = await fetch(apiUrl("/admin/promo-banners"), {
+    method: "POST",
+    headers: headersJson(),
+    body: JSON.stringify(body),
+  });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
+export async function updatePromoBanner(id, body) {
+  const res = await fetch(apiUrl(`/admin/promo-banners/${id}`), {
+    method: "PATCH",
+    headers: headersJson(),
+    body: JSON.stringify(body),
+  });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
+export async function deletePromoBanner(id) {
+  const res = await fetch(apiUrl(`/admin/promo-banners/${id}`), {
+    method: "DELETE",
+    headers: headersJson(),
+  });
+  if (!res.ok && res.status !== 204) {
+    const data = await parseResponseJson(res);
+    throw new Error(detail(data, res.statusText));
+  }
+}
+
+export async function uploadPromoBannerImage(id, file) {
+  const fd = new FormData();
+  fd.append("file", file);
+  const res = await fetch(apiUrl(`/admin/promo-banners/${id}/image`), {
+    method: "POST",
+    headers: headersAuthOnly(),
+    body: fd,
+  });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}

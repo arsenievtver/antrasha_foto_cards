@@ -4,6 +4,7 @@ from app.models.feed_settings import FeedSettings
 from app.models.fitting_request import FittingRequest, FittingRequestLikedPhoto
 from app.models.interaction import Interaction
 from app.models.marketing_campaign import MarketingCampaign
+from app.models.promo_banner import PromoBanner, PromoBannerDisplayMode, PromoBannerImpression
 from app.models.photo import PHOTO_SOURCE_YC_OBJECT_STORAGE, Photo, PhotoTag, Tag, TagGroup
 from app.models.session import UserSession
 from app.models.user import User, UserRole
@@ -20,6 +21,9 @@ __all__ = [
     "UserRole",
     "UserSession",
     "MarketingCampaign",
+    "PromoBanner",
+    "PromoBannerDisplayMode",
+    "PromoBannerImpression",
     "Photo",
     "PHOTO_SOURCE_YC_OBJECT_STORAGE",
     "Tag",

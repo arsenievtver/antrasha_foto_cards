@@ -23,6 +23,8 @@ services:
     env_file:
       - ./env/.env.backend.prod
       - ./env/.env.postgres.prod
+    volumes:
+      - antrasha_promo_media:/app/data/promo-banners
     depends_on:
       postgres:
         condition: service_healthy
@@ -93,6 +95,7 @@ services:
 
 volumes:
   antrasha_pg_data:
+  antrasha_promo_media:
 
 networks:
   antrasha_net:

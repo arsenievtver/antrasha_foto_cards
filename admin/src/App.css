@@ -76,7 +76,8 @@ button:disabled {
 }
 
 input,
-select {
+select,
+textarea {
   font: inherit;
   padding: 0.5rem 0.65rem;
   border-radius: 8px;
@@ -1050,6 +1051,27 @@ button.switch-toggle:not(:disabled):hover {
 .tagging-group-card-meta {
   font-size: 0.78rem;
   color: var(--muted);
+}
+
+.promo-banner-admin-preview {
+  margin-top: 0.75rem;
+  max-width: 280px;
+  max-height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #0f1115;
+  border: 1px solid var(--border);
+}
+
+.promo-banner-admin-preview img {
+  max-width: 100%;
+  max-height: 200px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
 }
 
 .tagging-group-modal-overlay {

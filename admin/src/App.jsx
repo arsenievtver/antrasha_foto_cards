@@ -11,6 +11,7 @@ import UserDetail from "./pages/UserDetail.jsx";
 import AiIngest from "./pages/AiIngest.jsx";
 import FittingRequests from "./pages/FittingRequests.jsx";
 import Campaigns from "./pages/Campaigns.jsx";
+import PromoBanners from "./pages/PromoBanners.jsx";
 import { getRole, getToken } from "./api.js";
 
 function RequireAuth({ children }) {
@@ -110,6 +111,14 @@ export default function App() {
             element={
               <RoleRoute roles={["superuser"]}>
                 <Campaigns />
+              </RoleRoute>
+            }
+          />
+          <Route
+            path="/promo-banners"
+            element={
+              <RoleRoute roles={["superuser"]}>
+                <PromoBanners />
               </RoleRoute>
             }
           />

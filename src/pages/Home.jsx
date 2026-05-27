@@ -1,5 +1,8 @@
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { MaleShape, FemaleShape } from "../components/DiagonalCards";
+import PromoBannerModal from "../components/PromoBannerModal.jsx";
+import { ensureSessionId, fetchActivePromoBanner } from "../api/client.js";
 import logo from "../assets/image/лого А на черном-cropped.svg";
 import "./Home.css"
 import menImage from "../assets/image/2m.jpeg";
@@ -8,9 +11,35 @@ import womenImage from "../assets/image/1w.jpeg";
 
 export default function Home() {
   const navigate = useNavigate();
+  const [promoBanner, setPromoBanner] = useState(null);
+  const [promoDismissed, setPromoDismissed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        await ensureSessionId();
+        const data = await fetchActivePromoBanner();
+        if (!cancelled) setPromoBanner(data.banner ?? null);
+      } catch {
+        /* сеть — главная без баннера */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const showPromo = promoBanner && !promoDismissed;
 
   return (
       <div className="page">
+        {showPromo ? (
+          <PromoBannerModal
+            banner={promoBanner}
+            onClose={() => setPromoDismissed(true)}
+          />
+        ) : null}
         <div className="page-home-body">
           <img src={logo} alt="Logo" className="logo" />
           <div className="home">

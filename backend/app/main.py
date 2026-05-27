@@ -6,11 +6,23 @@ from sqlalchemy.exc import ProgrammingError
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.config import DOTENV_LOADED_PATHS, settings
 from app.logging_config import setup_logging
 from app.database import SessionLocal
-from app.routers import admin, admin_ai_ingest, auth, feed, guest, interactions, internal_sync, sessions
+from app.routers import (
+    admin,
+    admin_ai_ingest,
+    admin_promo_banners,
+    auth,
+    feed,
+    guest,
+    interactions,
+    internal_sync,
+    promo_banners,
+    sessions,
+)
 from app.services.ai_ingest_worker import reset_stale_processing_jobs, try_process_one_ingest_job
 from app.services.yc_photo_sync import run_sync_job_commit
 
@@ -136,9 +148,18 @@ app.include_router(feed.router)
 app.include_router(interactions.router)
 app.include_router(auth.router)
 app.include_router(admin.router)
+app.include_router(admin_promo_banners.router)
 app.include_router(admin_ai_ingest.router)
+app.include_router(promo_banners.router)
 app.include_router(internal_sync.router)
 
+_promo_media = settings.promo_banner_media_path
+_promo_media.mkdir(parents=True, exist_ok=True)
+app.mount(
+    "/media/promo-banners",
+    StaticFiles(directory=str(_promo_media)),
+    name="promo-banner-media",
+)
 
 @app.get("/health")
 def health() -> dict[str, str]:

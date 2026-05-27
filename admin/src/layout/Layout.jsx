@@ -27,6 +27,11 @@ export default function Layout() {
             Рекламные ссылки
           </NavLink>
         )}
+        {isSuperuser && (
+          <NavLink to="/promo-banners" className={({ isActive }) => (isActive ? "active" : "")}>
+            Баннеры на главной
+          </NavLink>
+        )}
         <NavLink to="/photos" className={({ isActive }) => (isActive ? "active" : "")}>
           Фото и теги
         </NavLink>
