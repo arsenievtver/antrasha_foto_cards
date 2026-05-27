@@ -71,7 +71,6 @@ from app.schemas.admin import (
     assert_pin_for_role,
 )
 from app.security import hash_pin
-from app.experimental.ximilar.router import router as _ximilar_experimental_router
 from app.services.campaign_links import build_tracking_url, normalize_campaign_path
 from app.services.campaign_stats import (
     count_organic_sessions,
@@ -1552,4 +1551,3 @@ def attribution_debug(
     )
 
 
-router.include_router(_ximilar_experimental_router)
