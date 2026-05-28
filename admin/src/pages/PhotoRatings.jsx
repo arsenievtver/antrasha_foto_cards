@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import { fetchBrands, fetchPhotos } from "../api.js";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { bulkDeletePhotos, fetchBrands, fetchPhotos } from "../api.js";
 import { useHoverPreview } from "../utils/usePhotoHover.jsx";
 
 /**
@@ -10,9 +10,6 @@ import { useHoverPreview } from "../utils/usePhotoHover.jsx";
  * для зарегистрированного — user_id, для анонимного — session_id.
  * Повторные свайпы той же идентичности не учитываются; переключение
  * (лайк → дизлайк и обратно) меняет сторону.
- *
- * Эта страница только для просмотра — управление фотографиями и тегами
- * остаётся на странице «Фото и теги».
  */
 
 /** Значения должны совпадать с ADMIN_PHOTOS_SORTS в backend/app/routers/admin.py. */
@@ -34,11 +31,13 @@ export default function PhotoRatings() {
   const [brands, setBrands] = useState([]);
   const [activeOnly, setActiveOnly] = useState(false);
   const [taggingDoneOnly, setTaggingDoneOnly] = useState(false);
+  const [noReactionsOnly, setNoReactionsOnly] = useState(false);
   const [sort, setSort] = useState("top_rating");
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(true);
-  /** Фото в модалке — только для просмотра увеличенной версии. */
   const [previewPhoto, setPreviewPhoto] = useState(null);
+  const [selected, setSelected] = useState({});
+  const [deleting, setDeleting] = useState(false);
   const photoHover = useHoverPreview();
 
   const loadList = useCallback(async () => {
@@ -50,11 +49,12 @@ export default function PhotoRatings() {
       activeOnly,
       taggingDoneOnly,
       brandId: brandFilter || undefined,
+      noReactionsOnly,
       sort,
     });
     setItems(data.items || []);
     setTotal(data.total ?? 0);
-  }, [skip, gender, activeOnly, taggingDoneOnly, brandFilter, sort]);
+  }, [skip, gender, activeOnly, taggingDoneOnly, brandFilter, noReactionsOnly, sort]);
 
   useEffect(() => {
     let c = false;
@@ -88,6 +88,98 @@ export default function PhotoRatings() {
     };
   }, [loadList]);
 
+  const selectedCount = useMemo(
+    () => Object.values(selected).filter(Boolean).length,
+    [selected],
+  );
+
+  const allOnPageSelected =
+    items.length > 0 && items.every((p) => selected[p.id]);
+
+  function togglePick(id, e) {
+    e.stopPropagation();
+    setSelected((s) => ({ ...s, [id]: !s[id] }));
+  }
+
+  function toggleSelectAllPage() {
+    if (allOnPageSelected) {
+      setSelected((s) => {
+        const n = { ...s };
+        for (const p of items) {
+          delete n[p.id];
+        }
+        return n;
+      });
+    } else {
+      setSelected((s) => {
+        const n = { ...s };
+        for (const p of items) {
+          n[p.id] = true;
+        }
+        return n;
+      });
+    }
+  }
+
+  async function doBulkDelete() {
+    const ids = Object.entries(selected)
+      .filter(([, v]) => v)
+      .map(([id]) => id);
+    if (ids.length === 0) return;
+    if (
+      !confirm(
+        `Удалить ${ids.length} фото? Записи в БД будут удалены; файлы в Object Storage — если URL относится к вашим бакетам и заданы ключи S3.`,
+      )
+    ) {
+      return;
+    }
+    setDeleting(true);
+    setErr("");
+    const batchSize = 50;
+    try {
+      const allResults = [];
+      for (let i = 0; i < ids.length; i += batchSize) {
+        const chunk = ids.slice(i, i + batchSize);
+        const data = await bulkDeletePhotos(chunk);
+        allResults.push(...(data.results || []));
+      }
+      const failed = allResults.filter((r) => !r.ok);
+      setSelected((s) => {
+        const n = { ...s };
+        for (const r of allResults) {
+          if (r.ok) delete n[r.id];
+        }
+        return n;
+      });
+      if (previewPhoto && allResults.some((r) => r.ok && r.id === previewPhoto.id)) {
+        setPreviewPhoto(null);
+      }
+      if (failed.length) {
+        setErr(
+          failed.map((f) => `${f.id}: ${f.detail || "ошибка"}`).join("\n"),
+        );
+      }
+    } catch (e) {
+      setSelected((s) => {
+        const n = { ...s };
+        for (const id of ids) delete n[id];
+        return n;
+      });
+      setPreviewPhoto(null);
+      setErr(
+        `Не удалось дождаться ответа сервера: ${e.message || e}. ` +
+          "Часть фото могла быть уже удалена — список обновлён.",
+      );
+    } finally {
+      try {
+        await loadList();
+      } catch (e2) {
+        setErr((prev) => prev || e2.message || String(e2));
+      }
+      setDeleting(false);
+    }
+  }
+
   const canMore = skip + items.length < total;
 
   return (
@@ -108,8 +200,9 @@ export default function PhotoRatings() {
       >
         Считаются уникальные зрители: для зарегистрированных — пользователь,
         для анонимных — сессия. Повторные свайпы не учитываются; переключение
-        (лайк ⇄ дизлайк) меняет сторону. Эта страница — только для оценки
-        реакций; теги и удаление — на странице «Фото и теги».
+        (лайк ⇄ дизлайк) меняет сторону. Можно отмечать фото и удалять пакетом
+        (как на «Фото и теги»); фильтр «Без реакций» — для нерейтинговых
+        карточек. Разметка тегов — на странице «Фото и теги».
       </p>
       <div className="toolbar">
         <div>
@@ -181,6 +274,36 @@ export default function PhotoRatings() {
           />
           Только размеченные
         </label>
+        <label style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
+          <input
+            type="checkbox"
+            checked={noReactionsOnly}
+            onChange={(e) => {
+              setSkip(0);
+              setNoReactionsOnly(e.target.checked);
+            }}
+          />
+          Без реакций
+        </label>
+        <label style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
+          <input
+            type="checkbox"
+            checked={allOnPageSelected}
+            onChange={toggleSelectAllPage}
+            disabled={items.length === 0 || deleting || loading}
+          />
+          Выбрать все на странице
+        </label>
+        <button
+          type="button"
+          className="danger"
+          disabled={selectedCount === 0 || deleting || loading}
+          onClick={doBulkDelete}
+        >
+          {deleting
+            ? "Удаление…"
+            : `Удалить выбранные (${selectedCount})`}
+        </button>
       </div>
       {err && <p className="error">{err}</p>}
       {loading ? (
@@ -189,6 +312,7 @@ export default function PhotoRatings() {
         <>
           <p style={{ color: "var(--muted)", fontSize: "0.9rem" }}>
             Показано {items.length} из {total}
+            {selectedCount > 0 ? ` · выбрано ${selectedCount}` : ""}
           </p>
           <div className="photo-grid">
             {items.map((p) => {
@@ -198,10 +322,19 @@ export default function PhotoRatings() {
               return (
                 <div
                   key={p.id}
-                  className="photo-cell"
+                  className={`photo-cell ${selected[p.id] ? "selected" : ""}`}
                   style={{ position: "relative" }}
                   {...photoHover.hoverProps(p.url)}
                 >
+                  <input
+                    type="checkbox"
+                    className="pick"
+                    checked={!!selected[p.id]}
+                    onChange={(e) => togglePick(p.id, e)}
+                    onClick={(e) => e.stopPropagation()}
+                    title="Выбрать для удаления"
+                    aria-label="Выбрать фото"
+                  />
                   <span
                     style={{
                       position: "absolute",

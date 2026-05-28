@@ -171,6 +171,7 @@ export async function fetchPhotos({
   activeOnly,
   taggingDoneOnly,
   brandId,
+  noReactionsOnly,
   sort,
 } = {}) {
   const q = new URLSearchParams({ skip: String(skip), limit: String(limit) });
@@ -178,6 +179,7 @@ export async function fetchPhotos({
   if (activeOnly) q.set("active_only", "true");
   if (taggingDoneOnly) q.set("tagging_done_only", "true");
   if (brandId) q.set("brand_id", brandId);
+  if (noReactionsOnly) q.set("no_reactions_only", "true");
   if (sort && sort !== "recent") q.set("sort", sort);
   const res = await fetch(`${apiUrl("/admin/photos")}?${q}`, { headers: headersJson() });
   const data = await parseResponseJson(res);

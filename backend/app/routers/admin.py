@@ -437,6 +437,10 @@ def list_photos(
     active_only: bool = Query(False),
     tagging_done_only: bool = Query(False, description="только завершённая разметка"),
     brand_id: uuid.UUID | None = Query(None, description="фильтр по бренду"),
+    no_reactions_only: bool = Query(
+        False,
+        description="только без лайков и дизлайков (likes_count=0 и dislikes_count=0)",
+    ),
     sort: str = Query(
         "recent",
         description="recent | top_likes | top_dislikes | top_rating | bottom_rating",
@@ -455,6 +459,9 @@ def list_photos(
         cond.append(Photo.tagging_review_done.is_(True))
     if brand_id is not None:
         cond.append(Photo.brand_id == brand_id)
+    if no_reactions_only:
+        cond.append(Photo.likes_count == 0)
+        cond.append(Photo.dislikes_count == 0)
     count_q = select(func.count()).select_from(Photo)
     if cond:
         count_q = count_q.where(*cond)
