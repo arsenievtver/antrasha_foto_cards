@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { bulkDeletePhotos, fetchBrands, fetchPhotos } from "../api.js";
+import {
+  bulkDeletePhotos,
+  fetchAllPhotoIds,
+  fetchBrands,
+  fetchPhotos,
+} from "../api.js";
 import { useHoverPreview } from "../utils/usePhotoHover.jsx";
 
 /**
@@ -38,23 +43,27 @@ export default function PhotoRatings() {
   const [previewPhoto, setPreviewPhoto] = useState(null);
   const [selected, setSelected] = useState({});
   const [deleting, setDeleting] = useState(false);
+  const [selectingAll, setSelectingAll] = useState(false);
   const photoHover = useHoverPreview();
 
-  const loadList = useCallback(async () => {
-    setErr("");
-    const data = await fetchPhotos({
-      skip,
-      limit,
+  const listFilters = useMemo(
+    () => ({
       gender: gender || undefined,
       activeOnly,
       taggingDoneOnly,
       brandId: brandFilter || undefined,
       noReactionsOnly,
       sort,
-    });
+    }),
+    [gender, activeOnly, taggingDoneOnly, brandFilter, noReactionsOnly, sort],
+  );
+
+  const loadList = useCallback(async () => {
+    setErr("");
+    const data = await fetchPhotos({ skip, limit, ...listFilters });
     setItems(data.items || []);
     setTotal(data.total ?? 0);
-  }, [skip, gender, activeOnly, taggingDoneOnly, brandFilter, noReactionsOnly, sort]);
+  }, [skip, listFilters]);
 
   useEffect(() => {
     let c = false;
@@ -118,6 +127,35 @@ export default function PhotoRatings() {
         }
         return n;
       });
+    }
+  }
+
+  function clearSelection() {
+    setSelected({});
+  }
+
+  async function selectAllByFilter() {
+    if (selectingAll || deleting || loading || total === 0) return;
+    if (
+      !confirm(
+        `Выбрать все ${total} фото по текущим фильтрам? Можно листать страницы — выделение сохранится.`,
+      )
+    ) {
+      return;
+    }
+    setSelectingAll(true);
+    setErr("");
+    try {
+      const { ids } = await fetchAllPhotoIds(listFilters);
+      setSelected((s) => {
+        const n = { ...s };
+        for (const id of ids) n[id] = true;
+        return n;
+      });
+    } catch (e) {
+      setErr(e.message || String(e));
+    } finally {
+      setSelectingAll(false);
     }
   }
 
@@ -200,9 +238,9 @@ export default function PhotoRatings() {
       >
         Считаются уникальные зрители: для зарегистрированных — пользователь,
         для анонимных — сессия. Повторные свайпы не учитываются; переключение
-        (лайк ⇄ дизлайк) меняет сторону. Можно отмечать фото и удалять пакетом
-        (как на «Фото и теги»); фильтр «Без реакций» — для нерейтинговых
-        карточек. Разметка тегов — на странице «Фото и теги».
+        (лайк ⇄ дизлайк) меняет сторону. Отметьте фото чекбоксом на карточке
+        или «Все по фильтру» — выделение сохраняется при листании страниц.
+        Разметка тегов — на «Фото и теги».
       </p>
       <div className="toolbar">
         <div>
@@ -285,19 +323,40 @@ export default function PhotoRatings() {
           />
           Без реакций
         </label>
-        <label style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
-          <input
-            type="checkbox"
-            checked={allOnPageSelected}
-            onChange={toggleSelectAllPage}
-            disabled={items.length === 0 || deleting || loading}
-          />
-          Выбрать все на странице
-        </label>
+        <button
+          type="button"
+          className="secondary"
+          disabled={
+            items.length === 0 || deleting || loading || selectingAll
+          }
+          onClick={toggleSelectAllPage}
+        >
+          {allOnPageSelected ? "Снять на странице" : "На странице"}
+        </button>
+        <button
+          type="button"
+          className="secondary"
+          disabled={total === 0 || deleting || loading || selectingAll}
+          onClick={selectAllByFilter}
+        >
+          {selectingAll
+            ? "Загрузка списка…"
+            : `Все по фильтру (${total})`}
+        </button>
+        <button
+          type="button"
+          className="secondary"
+          disabled={selectedCount === 0 || deleting || loading || selectingAll}
+          onClick={clearSelection}
+        >
+          Снять выделение
+        </button>
         <button
           type="button"
           className="danger"
-          disabled={selectedCount === 0 || deleting || loading}
+          disabled={
+            selectedCount === 0 || deleting || loading || selectingAll
+          }
           onClick={doBulkDelete}
         >
           {deleting
@@ -336,9 +395,10 @@ export default function PhotoRatings() {
                     aria-label="Выбрать фото"
                   />
                   <span
+                    className="photo-rating-badge"
                     style={{
                       position: "absolute",
-                      left: 6,
+                      right: 6,
                       top: 6,
                       zIndex: 2,
                       fontSize: "0.72rem",

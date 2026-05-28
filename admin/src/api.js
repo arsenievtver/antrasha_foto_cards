@@ -190,6 +190,40 @@ export async function fetchPhotos({
   return data;
 }
 
+/** Все id фото по тем же фильтрам, что fetchPhotos (постранично, limit до 200). */
+export async function fetchAllPhotoIds({
+  gender,
+  activeOnly,
+  taggingDoneOnly,
+  brandId,
+  noReactionsOnly,
+  sort,
+} = {}) {
+  const pageSize = 200;
+  const ids = [];
+  let skip = 0;
+  let total = 0;
+  for (;;) {
+    const data = await fetchPhotos({
+      skip,
+      limit: pageSize,
+      gender,
+      activeOnly,
+      taggingDoneOnly,
+      brandId,
+      noReactionsOnly,
+      sort,
+    });
+    total = data.total ?? 0;
+    for (const item of data.items || []) {
+      if (item.id) ids.push(item.id);
+    }
+    skip += pageSize;
+    if (skip >= total || !(data.items?.length)) break;
+  }
+  return { ids, total };
+}
+
 export async function fetchAdminPhoto(photoId) {
   const res = await fetch(apiUrl(`/admin/photos/${photoId}`), { headers: headersJson() });
   const data = await parseResponseJson(res);

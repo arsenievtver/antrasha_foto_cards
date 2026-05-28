@@ -499,7 +499,7 @@ main.content {
   position: absolute;
   top: 6px;
   left: 6px;
-  z-index: 2;
+  z-index: 3;
   width: 1.15rem;
   height: 1.15rem;
   cursor: pointer;
