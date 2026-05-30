@@ -993,6 +993,130 @@ button.switch-toggle:not(:disabled):hover {
   white-space: nowrap;
 }
 
+.tagging-catalog-scroll {
+  margin: 0.35rem 0 0.5rem;
+  padding-bottom: 0.25rem;
+}
+
+.tagging-catalog-group {
+  margin-bottom: 1rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.tagging-catalog-group:last-child {
+  border-bottom: none;
+  margin-bottom: 0.25rem;
+}
+
+.tagging-catalog-group--over {
+  padding: 0.5rem 0.55rem 0.85rem;
+  margin-left: -0.55rem;
+  margin-right: -0.55rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 183, 77, 0.55);
+  background: rgba(255, 183, 77, 0.06);
+}
+
+.tagging-catalog-group-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.45rem;
+}
+
+.tagging-catalog-group-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.tagging-catalog-group-meta {
+  font-size: 0.78rem;
+  flex-shrink: 0;
+}
+
+.tagging-catalog-group-warn {
+  margin: 0 0 0.4rem;
+  font-size: 0.82rem;
+  color: #ffcc80;
+}
+
+.tagging-catalog-empty {
+  margin: 0 0 0.5rem;
+  font-size: 0.85rem;
+}
+
+.tagging-catalog-subgroup {
+  margin-bottom: 0.35rem;
+}
+
+.tagging-catalog-subgroup-label {
+  margin: 0 0 0.3rem;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.tagging-editor-meta-row {
+  margin-bottom: 0.65rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  font-size: 0.9rem;
+}
+
+.tagging-brand-label {
+  display: flex;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.tagging-quick-brand-input {
+  max-width: 180px;
+}
+
+.tagging-moysklad-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.9rem;
+  max-width: 100%;
+  margin-bottom: 0.65rem;
+}
+
+.tagging-moysklad-label input {
+  max-width: 480px;
+  width: 100%;
+  padding: 0.4rem 0.5rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--background);
+  color: var(--text);
+}
+
+.tagging-moysklad-hint {
+  font-weight: 400;
+  font-size: 0.82rem;
+}
+
+.tagging-claim-hint {
+  margin: 0 0 0.75rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: 8px;
+  border-left: 3px solid #b8860b;
+  background: rgba(184, 134, 11, 0.12);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.tagging-add-custom--inline {
+  margin-top: 0.35rem;
+  margin-bottom: 0;
+}
+
 .tagging-group-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));

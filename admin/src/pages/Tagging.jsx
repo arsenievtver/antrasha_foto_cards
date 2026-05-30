@@ -12,7 +12,7 @@ import {
   putPhotoTags,
   releaseTaggingPhoto,
 } from "../api.js";
-import { catalogGroups, findCatalogGroup } from "../utils/tagCatalog.js";
+import { catalogGroups } from "../utils/tagCatalog.js";
 
 function countSelectedInGroup(selected, group) {
   const ids = new Set();
@@ -28,17 +28,8 @@ function countSelectedInGroup(selected, group) {
   return n;
 }
 
-/** В пределах нормы — можно сохранять по этой группе (лимит max, минимум не требуется). */
 function groupSelectionOk(selected, group) {
-  const n = countSelectedInGroup(selected, group);
-  return n <= group.max_tags;
-}
-
-/** Галочка: в норме или при превышении max (чтобы было видно, что группа «заполнена», даже если нужно убрать лишнее). */
-function groupShowsGreenCheck(selected, group) {
-  const n = countSelectedInGroup(selected, group);
-  if (n > group.max_tags) return true;
-  return groupSelectionOk(selected, group);
+  return countSelectedInGroup(selected, group) <= group.max_tags;
 }
 
 function allCatalogGroupsComplete(catalog, selected) {
@@ -50,8 +41,12 @@ function allCatalogGroupsComplete(catalog, selected) {
   return true;
 }
 
-function groupHintText(g) {
-  return `до ${g.max_tags} тег(ов)`;
+function allTagsInGroup(group) {
+  const out = [];
+  for (const sg of group.subgroups || []) {
+    for (const t of sg.tags || []) out.push(t);
+  }
+  return out;
 }
 
 export default function Tagging() {
@@ -67,9 +62,7 @@ export default function Tagging() {
 
   const [editorPhoto, setEditorPhoto] = useState(null);
   const [selected, setSelected] = useState({});
-  const [groupModal, setGroupModal] = useState(null);
-  const [subgroupIdx, setSubgroupIdx] = useState(0);
-  const [newTagName, setNewTagName] = useState("");
+  const [newTagByGroup, setNewTagByGroup] = useState({});
   const [signalLove, setSignalLove] = useState(false);
   const [signalHit, setSignalHit] = useState(false);
   const [signalHard, setSignalHard] = useState(false);
@@ -85,7 +78,6 @@ export default function Tagging() {
     [catalog, selected],
   );
 
-  /** Не даём странице под модалкой скроллиться (в т.ч. iOS Safari). */
   useEffect(() => {
     if (!editorPhoto) return undefined;
     const scrollY = window.scrollY;
@@ -157,13 +149,6 @@ export default function Tagging() {
         )
       : null;
 
-  /** Лимит выбора в открытой модалке группы — блокируем лишние теги до сохранения. */
-  const modalPickStats = useMemo(() => {
-    if (!groupModal) return { n: 0, atMax: false };
-    const n = countSelectedInGroup(selected, groupModal);
-    return { n, atMax: n >= groupModal.max_tags };
-  }, [groupModal, selected]);
-
   const loadQueue = useCallback(
     async (opts) => {
       setErr("");
@@ -200,12 +185,29 @@ export default function Tagging() {
       m[pt.tag_id] = true;
     }
     setSelected(m);
+    setNewTagByGroup({});
     setSignalLove(!!photo.worker_signal_love);
     setSignalHit(!!photo.worker_signal_hit);
     setSignalHard(!!photo.worker_signal_hard);
     setEditorBrandId(photo.brand_id || "");
-    setEditorMoySkladId(photo.moy_sklad_id != null && photo.moy_sklad_id !== "" ? String(photo.moy_sklad_id) : "");
+    setEditorMoySkladId(
+      photo.moy_sklad_id != null && photo.moy_sklad_id !== ""
+        ? String(photo.moy_sklad_id)
+        : "",
+    );
     setQuickBrandName("");
+  }
+
+  function toggleTagInGroup(tagId, group) {
+    setSelected((s) => {
+      if (s[tagId]) {
+        return { ...s, [tagId]: false };
+      }
+      if (countSelectedInGroup(s, group) >= group.max_tags) {
+        return s;
+      }
+      return { ...s, [tagId]: true };
+    });
   }
 
   async function onQuickAddBrandEditor(e) {
@@ -233,8 +235,6 @@ export default function Tagging() {
 
   async function openEditor(photo, { claimFirst } = { claimFirst: false }) {
     setErr("");
-    setGroupModal(null);
-    setNewTagName("");
     if (!claimFirst || role !== "worker") {
       setEditorPhoto(photo);
       initFromPhoto(photo);
@@ -255,7 +255,6 @@ export default function Tagging() {
   async function handleAcquireNext() {
     setErr("");
     setBusy(true);
-    setGroupModal(null);
     try {
       const p = await acquireNextTaggingPhoto();
       setEditorPhoto(p);
@@ -265,10 +264,6 @@ export default function Tagging() {
     } finally {
       setBusy(false);
     }
-  }
-
-  function toggleTag(id) {
-    setSelected((s) => ({ ...s, [id]: !s[id] }));
   }
 
   async function handleSave() {
@@ -292,7 +287,7 @@ export default function Tagging() {
       });
       setEditorPhoto(null);
       setSelected({});
-      setGroupModal(null);
+      setNewTagByGroup({});
       setSkip(0);
     } catch (e) {
       if (e.status === 409) {
@@ -332,21 +327,20 @@ export default function Tagging() {
     }
     setEditorPhoto(null);
     setSelected({});
-    setGroupModal(null);
+    setNewTagByGroup({});
     await loadQueue();
   }
 
-  async function handleAddCustomTag() {
-    if (!groupModal || !newTagName.trim()) return;
+  async function handleAddCustomTag(group) {
+    const name = (newTagByGroup[group.id] || "").trim();
+    if (!name || busy) return;
     setBusy(true);
     setErr("");
     try {
-      await createTagInGroup(groupModal.id, newTagName.trim());
-      setNewTagName("");
+      const created = await createTagInGroup(group.id, name);
+      setNewTagByGroup((prev) => ({ ...prev, [group.id]: "" }));
       await reloadCatalog();
-      const fresh = await fetchTagCatalog();
-      const nextGroup = findCatalogGroup(fresh, groupModal.id);
-      if (nextGroup) setGroupModal(nextGroup);
+      setSelected((s) => ({ ...s, [created.id]: true }));
     } catch (e) {
       setErr(e.message);
     } finally {
@@ -360,8 +354,8 @@ export default function Tagging() {
     <div className="tagging-page">
       <h2 className="tagging-title">Разметка тегов</h2>
       <p className="tagging-lead">
-        Отмечайте теги по группам в пределах лимита. Группы можно оставить пустыми — сохранение
-        доступно, если нигде не превышен максимум.
+        Пролистайте группы ниже, нажимайте теги (повторное нажатие снимает выбор). Сохраните, когда
+        готово — пустые группы допустимы, но в одной группе нельзя выбрать больше лимита.
       </p>
 
       {err && <p className="error">{err}</p>}
@@ -429,43 +423,25 @@ export default function Tagging() {
         <div
           className="tagging-editor-backdrop"
           role="presentation"
-          onClick={() => !busy && !groupModal && handleCancelEditor()}
+          onClick={() => !busy && handleCancelEditor()}
         >
           <div
             className="tagging-editor tagging-editor-wide"
             role="dialog"
+            aria-label="Разметка фото"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="tagging-editor-img-wrap">
               <img src={editorPhoto.url} alt="" className="tagging-editor-img" />
             </div>
             {editorPhoto?.claim_expires_at && !editorPhoto?.claim_is_mine ? (
-              <p
-                style={{
-                  margin: "0 0 0.75rem",
-                  padding: "0.5rem 0.65rem",
-                  borderRadius: 8,
-                  borderLeft: "3px solid #b8860b",
-                  background: "rgba(184, 134, 11, 0.12)",
-                  fontSize: "0.88rem",
-                  lineHeight: 1.45,
-                }}
-              >
+              <p className="tagging-claim-hint">
                 Фото сейчас у другого сотрудника (активная бронь). Можно продолжать; при конфликте
                 версии форма обновится с сервера.
               </p>
             ) : null}
-            <div
-              style={{
-                marginBottom: "0.65rem",
-                display: "flex",
-                flexWrap: "wrap",
-                gap: "0.5rem",
-                alignItems: "center",
-                fontSize: "0.9rem",
-              }}
-            >
-              <label style={{ display: "flex", gap: "0.35rem", alignItems: "center" }}>
+            <div className="tagging-editor-meta-row">
+              <label className="tagging-brand-label">
                 <span>Бренд</span>
                 <select
                   value={editorBrandId}
@@ -485,7 +461,7 @@ export default function Tagging() {
                 placeholder="Новый бренд"
                 value={quickBrandName}
                 onChange={(e) => setQuickBrandName(e.target.value)}
-                style={{ maxWidth: 180 }}
+                className="tagging-quick-brand-input"
                 disabled={quickBrandBusy || busy}
               />
               <button
@@ -497,42 +473,21 @@ export default function Tagging() {
                 {quickBrandBusy ? "…" : "+ В базу"}
               </button>
             </div>
-            <div style={{ marginBottom: "0.65rem" }}>
-              <label
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "0.3rem",
-                  fontSize: "0.9rem",
-                  maxWidth: "100%",
-                }}
-              >
-                <span>
-                  ID в «МойСклад»{" "}
-                  <span className="muted" style={{ fontWeight: 400, fontSize: "0.82rem" }}>
-                    (вручную; далее — из ERP)
-                  </span>
-                </span>
-                <input
-                  type="text"
-                  value={editorMoySkladId}
-                  onChange={(e) => setEditorMoySkladId(e.target.value)}
-                  placeholder="uuid / id в МойСклад"
-                  maxLength={128}
-                  autoComplete="off"
-                  disabled={busy}
-                  style={{
-                    maxWidth: 480,
-                    width: "100%",
-                    padding: "0.4rem 0.5rem",
-                    borderRadius: 6,
-                    border: "1px solid var(--border)",
-                    background: "var(--background)",
-                    color: "var(--text)",
-                  }}
-                />
-              </label>
-            </div>
+            <label className="tagging-moysklad-label">
+              <span>
+                ID в «МойСклад»{" "}
+                <span className="muted tagging-moysklad-hint">(вручную; далее — из ERP)</span>
+              </span>
+              <input
+                type="text"
+                value={editorMoySkladId}
+                onChange={(e) => setEditorMoySkladId(e.target.value)}
+                placeholder="uuid / id в МойСклад"
+                maxLength={128}
+                autoComplete="off"
+                disabled={busy}
+              />
+            </label>
             {displaySeconds != null && (
               <p className="tagging-timer">
                 Бронь: {Math.floor(displaySeconds / 60)}:
@@ -565,36 +520,108 @@ export default function Tagging() {
               </button>
             </div>
 
-            <div className="tagging-group-grid">
+            <div className="tagging-catalog-scroll">
               {catalogGroupList.map((g) => {
                 const n = countSelectedInGroup(selected, g);
-                const ok = groupSelectionOk(selected, g);
                 const overLimit = n > g.max_tags;
-                const showCheck = groupShowsGreenCheck(selected, g);
+                const atMax = n >= g.max_tags;
+                const tags = allTagsInGroup(g);
+                const showSubgroupLabels = (g.subgroups || []).length > 1;
+
                 return (
-                  <button
+                  <section
                     key={g.id}
-                    type="button"
-                    className={`tagging-group-card ${ok ? "tagging-group-card--ok" : ""} ${overLimit ? "tagging-group-card--over" : ""}`}
-                    onClick={() => {
-                      setGroupModal(g);
-                      setSubgroupIdx(0);
-                      setNewTagName("");
-                    }}
+                    className={`tagging-catalog-group ${overLimit ? "tagging-catalog-group--over" : ""}`}
                   >
-                    <span className="tagging-group-card-head">
-                      <span className="tagging-group-card-title">{g.title}</span>
-                      {showCheck ? (
-                        <span className="tagging-group-check" aria-hidden>
-                          ✓
-                        </span>
-                      ) : null}
-                    </span>
-                    <span className="tagging-group-card-meta">
-                      {n} выбрано · {groupHintText(g)}
-                      {overLimit ? " · сверх нормы" : ""}
-                    </span>
-                  </button>
+                    <div className="tagging-catalog-group-head">
+                      <h3 className="tagging-catalog-group-title">{g.title}</h3>
+                      <span className="tagging-catalog-group-meta muted">
+                        {n} / до {g.max_tags}
+                      </span>
+                    </div>
+                    {overLimit ? (
+                      <p className="tagging-catalog-group-warn">
+                        Слишком много тегов — снимите {n - g.max_tags} лишних
+                      </p>
+                    ) : null}
+                    {tags.length === 0 ? (
+                      <p className="muted tagging-catalog-empty">В группе пока нет тегов</p>
+                    ) : showSubgroupLabels ? (
+                      (g.subgroups || []).map((sg, sgIdx) => (
+                        <div
+                          key={`${g.id}-${sg.key ?? "x"}-${sgIdx}`}
+                          className="tagging-catalog-subgroup"
+                        >
+                          {sg.label && sg.label !== "Теги" ? (
+                            <p className="tagging-catalog-subgroup-label">{sg.label}</p>
+                          ) : null}
+                          <div className="tag-pill-wrap">
+                            {(sg.tags || []).map((t) => {
+                              const blocked = !selected[t.id] && atMax;
+                              return (
+                                <button
+                                  key={t.id}
+                                  type="button"
+                                  className={`tag-pill ${selected[t.id] ? "on" : ""} ${blocked ? "tag-pill--blocked" : ""}`}
+                                  title={
+                                    blocked
+                                      ? `Лимит ${g.max_tags} — снимите другой тег в «${g.title}»`
+                                      : undefined
+                                  }
+                                  onClick={() => toggleTagInGroup(t.id, g)}
+                                >
+                                  {t.name}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="tag-pill-wrap">
+                        {tags.map((t) => {
+                          const blocked = !selected[t.id] && atMax;
+                          return (
+                            <button
+                              key={t.id}
+                              type="button"
+                              className={`tag-pill ${selected[t.id] ? "on" : ""} ${blocked ? "tag-pill--blocked" : ""}`}
+                              title={
+                                blocked
+                                  ? `Лимит ${g.max_tags} — снимите другой тег в «${g.title}»`
+                                  : undefined
+                              }
+                              onClick={() => toggleTagInGroup(t.id, g)}
+                            >
+                              {t.name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                    <div className="tagging-add-custom tagging-add-custom--inline">
+                      <input
+                        value={newTagByGroup[g.id] || ""}
+                        onChange={(e) =>
+                          setNewTagByGroup((prev) => ({
+                            ...prev,
+                            [g.id]: e.target.value,
+                          }))
+                        }
+                        placeholder="Новый тег"
+                        maxLength={100}
+                        disabled={busy}
+                      />
+                      <button
+                        type="button"
+                        className="secondary"
+                        disabled={busy || !(newTagByGroup[g.id] || "").trim()}
+                        onClick={() => handleAddCustomTag(g)}
+                      >
+                        +
+                      </button>
+                    </div>
+                  </section>
                 );
               })}
             </div>
@@ -622,96 +649,6 @@ export default function Tagging() {
               </button>
             </div>
           </div>
-
-          {groupModal && (
-            <div
-              className="tagging-group-modal-overlay"
-              role="presentation"
-              onClick={(e) => {
-                e.stopPropagation();
-                setGroupModal(null);
-              }}
-            >
-              <div
-                className="tagging-group-modal"
-                role="dialog"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <h3 className="tagging-group-modal-title">{groupModal.title}</h3>
-                <p className="muted">Не больше {groupModal.max_tags} тег(ов) в этой группе</p>
-                {(groupModal.subgroups || []).length > 1 && (
-                  <div className="tag-type-tabs" role="tablist">
-                    {(groupModal.subgroups || []).map((sg, i) => (
-                      <button
-                        key={sg.key ?? "flat"}
-                        type="button"
-                        className={`tag-type-tab ${subgroupIdx === i ? "active" : ""}`}
-                        onClick={() => setSubgroupIdx(i)}
-                      >
-                        {sg.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-                <div className="tag-pill-wrap">
-                  {((groupModal.subgroups || [])[subgroupIdx]?.tags || []).map((t) => {
-                    const blocked = !selected[t.id] && modalPickStats.atMax;
-                    return (
-                      <button
-                        key={t.id}
-                        type="button"
-                        className={`tag-pill ${selected[t.id] ? "on" : ""} ${blocked ? "tag-pill--blocked" : ""}`}
-                        title={
-                          blocked
-                            ? "Лимит тегов для этой группы — снимите выделение с другого тега"
-                            : undefined
-                        }
-                        onClick={() => {
-                          if (selected[t.id]) {
-                            toggleTag(t.id);
-                            return;
-                          }
-                          if (modalPickStats.atMax) return;
-                          toggleTag(t.id);
-                        }}
-                      >
-                        {t.name}
-                      </button>
-                    );
-                  })}
-                </div>
-                {modalPickStats.atMax ? (
-                  <p className="muted" style={{ fontSize: "0.82rem", marginBottom: "0.65rem" }}>
-                    Выбрано максимум ({groupModal.max_tags}) для «{groupModal.title}». Снимите отметку с
-                    тега, чтобы выбрать другой.
-                  </p>
-                ) : null}
-                <div className="tagging-add-custom">
-                  <input
-                    value={newTagName}
-                    onChange={(e) => setNewTagName(e.target.value)}
-                    placeholder="Новый тег для группы"
-                    maxLength={100}
-                  />
-                  <button
-                    type="button"
-                    className="secondary"
-                    disabled={busy || !newTagName.trim()}
-                    onClick={handleAddCustomTag}
-                  >
-                    + Добавить
-                  </button>
-                </div>
-                <button
-                  type="button"
-                  className="secondary tagging-group-modal-close"
-                  onClick={() => setGroupModal(null)}
-                >
-                  Готово
-                </button>
-              </div>
-            </div>
-          )}
         </div>
       )}
     </div>
