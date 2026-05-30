@@ -117,8 +117,8 @@ class Tag(Base):
     )
 
     group = relationship("TagGroup", back_populates="tags")
-    photo_tags = relationship("PhotoTag", back_populates="tag")
-    user_weights = relationship("UserTagWeight", back_populates="tag")
+    photo_tags = relationship("PhotoTag", back_populates="tag", passive_deletes=True)
+    user_weights = relationship("UserTagWeight", back_populates="tag", passive_deletes=True)
 
 
 class PhotoTag(Base):

@@ -999,12 +999,32 @@ def delete_tag(
     tag_id: uuid.UUID,
     db: Session = Depends(get_db),
     _principal: AdminPrincipal = Depends(get_admin_principal),
-) -> None:
-    t = db.get(Tag, tag_id)
-    if not t:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tag not found")
-    db.delete(t)
-    db.commit()
+) -> Response:
+    """SQL DELETE: ORM session.delete(tag) даёт 500 — пытается обнулить photo_tags.tag_id (NOT NULL)."""
+    try:
+        result = db.execute(delete(Tag).where(Tag.id == tag_id))
+        if result.rowcount == 0:
+            db.rollback()
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tag not found")
+        db.commit()
+    except HTTPException:
+        db.rollback()
+        raise
+    except IntegrityError:
+        db.rollback()
+        log.warning("delete_tag integrity_error tag_id=%s", tag_id)
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Нельзя удалить тег: в БД остались связанные записи.",
+        ) from None
+    except SQLAlchemyError:
+        db.rollback()
+        log.exception("delete_tag failed tag_id=%s", tag_id)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Ошибка базы при удалении тега.",
+        ) from None
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.patch("/tags/{tag_id}", response_model=AdminTagOut)
