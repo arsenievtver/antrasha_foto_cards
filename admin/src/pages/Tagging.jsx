@@ -12,13 +12,7 @@ import {
   putPhotoTags,
   releaseTaggingPhoto,
 } from "../api.js";
-
-const SECTION_LABELS = {
-  basic: "Базовые",
-  style_visual: "Стиль и визуал",
-  formality: "Формальность",
-  behavioral: "Поведенческие",
-};
+import { catalogGroups, findCatalogGroup } from "../utils/tagCatalog.js";
 
 function countSelectedInGroup(selected, group) {
   const ids = new Set();
@@ -48,11 +42,10 @@ function groupShowsGreenCheck(selected, group) {
 }
 
 function allCatalogGroupsComplete(catalog, selected) {
-  if (!catalog?.sections?.length) return false;
-  for (const sec of catalog.sections) {
-    for (const g of sec.groups || []) {
-      if (!groupSelectionOk(selected, g)) return false;
-    }
+  const groups = catalogGroups(catalog);
+  if (!groups.length) return false;
+  for (const g of groups) {
+    if (!groupSelectionOk(selected, g)) return false;
   }
   return true;
 }
@@ -74,7 +67,6 @@ export default function Tagging() {
 
   const [editorPhoto, setEditorPhoto] = useState(null);
   const [selected, setSelected] = useState({});
-  const [sectionKey, setSectionKey] = useState("");
   const [groupModal, setGroupModal] = useState(null);
   const [subgroupIdx, setSubgroupIdx] = useState(0);
   const [newTagName, setNewTagName] = useState("");
@@ -124,10 +116,7 @@ export default function Tagging() {
     (async () => {
       try {
         const data = await fetchTagCatalog();
-        if (!c) {
-          setCatalog(data);
-          if (data.sections?.length) setSectionKey(data.sections[0].key);
-        }
+        if (!c) setCatalog(data);
       } catch (e) {
         if (!c) setErr(e.message);
       }
@@ -203,10 +192,7 @@ export default function Tagging() {
     };
   }, [loadQueue]);
 
-  const currentSection = useMemo(() => {
-    if (!catalog?.sections?.length) return null;
-    return catalog.sections.find((s) => s.key === sectionKey) || catalog.sections[0];
-  }, [catalog, sectionKey]);
+  const catalogGroupList = useMemo(() => catalogGroups(catalog), [catalog]);
 
   function initFromPhoto(photo) {
     const m = {};
@@ -359,15 +345,7 @@ export default function Tagging() {
       setNewTagName("");
       await reloadCatalog();
       const fresh = await fetchTagCatalog();
-      const gid = groupModal.id;
-      let nextGroup = null;
-      for (const sec of fresh.sections || []) {
-        const g = (sec.groups || []).find((x) => x.id === gid);
-        if (g) {
-          nextGroup = g;
-          break;
-        }
-      }
+      const nextGroup = findCatalogGroup(fresh, groupModal.id);
       if (nextGroup) setGroupModal(nextGroup);
     } catch (e) {
       setErr(e.message);
@@ -587,22 +565,8 @@ export default function Tagging() {
               </button>
             </div>
 
-            <div className="tagging-section-tabs" role="tablist">
-              {(catalog.sections || []).map((sec) => (
-                <button
-                  key={sec.key}
-                  type="button"
-                  role="tab"
-                  className={`tag-type-tab ${sectionKey === sec.key ? "active" : ""}`}
-                  onClick={() => setSectionKey(sec.key)}
-                >
-                  {SECTION_LABELS[sec.key] || sec.key}
-                </button>
-              ))}
-            </div>
-
             <div className="tagging-group-grid">
-              {(currentSection?.groups || []).map((g) => {
+              {catalogGroupList.map((g) => {
                 const n = countSelectedInGroup(selected, g);
                 const ok = groupSelectionOk(selected, g);
                 const overLimit = n > g.max_tags;

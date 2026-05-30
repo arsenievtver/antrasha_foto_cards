@@ -57,6 +57,10 @@ from app.schemas.admin import (
     AdminStatsOut,
     AdminTagCatalogResponse,
     AdminTagCreateRequest,
+    AdminTagGroupCreateRequest,
+    AdminTagGroupListResponse,
+    AdminTagGroupOut,
+    AdminTagGroupUpdateRequest,
     AdminTagListResponse,
     AdminTagOut,
     AdminTagUpdateRequest,
@@ -82,6 +86,8 @@ from app.services.yc_photo_sync import run_sync_job_commit
 from app.services.yc_storage import bulk_delete_photo_files_from_object_storage
 
 TAGGING_CLAIM_TTL = timedelta(minutes=5)
+
+_CATALOG_SKIP_GROUP_SLUGS = frozenset({"legacy", "garment_gender"})
 
 SUBGROUP_LABELS = {
     "palette": "Основная палитра",
@@ -175,14 +181,66 @@ def _tag_catalog_selectinloads():
     )
 
 
+def _catalog_group_out(g: TagGroup, tglist: list[Tag]) -> AdminCatalogGroupOut:
+    def subgroup_sort_key(sk: str | None) -> tuple:
+        order = {None: 0, "palette": 1, "tone": 2}
+        return (order.get(sk, 50), sk or "")
+
+    sub_map: dict[str | None, list[Tag]] = {}
+    for t in tglist:
+        sub_map.setdefault(t.subgroup_key, []).append(t)
+    subgroups_out: list[AdminCatalogSubgroupOut] = []
+    for sk in sorted(sub_map.keys(), key=subgroup_sort_key):
+        label = "Теги" if sk is None else SUBGROUP_LABELS.get(sk, sk)
+        subgroups_out.append(
+            AdminCatalogSubgroupOut(
+                key=sk,
+                label=label,
+                tags=[
+                    AdminCatalogTagOut(
+                        id=t.id,
+                        name=t.name,
+                        subgroup_key=t.subgroup_key,
+                        sort_order=t.sort_order,
+                        recommendation_weight=t.recommendation_weight,
+                    )
+                    for t in sub_map[sk]
+                ],
+            ),
+        )
+    if not subgroups_out:
+        subgroups_out.append(AdminCatalogSubgroupOut(key=None, label="Теги", tags=[]))
+    return AdminCatalogGroupOut(
+        id=g.id,
+        slug=g.slug,
+        title=g.title,
+        min_tags=g.min_tags,
+        max_tags=g.max_tags,
+        swipe_tier=g.swipe_tier,
+        subgroups=subgroups_out,
+    )
+
+
+def _tag_group_out(g: TagGroup) -> AdminTagGroupOut:
+    return AdminTagGroupOut(
+        id=g.id,
+        slug=g.slug,
+        title=g.title,
+        min_tags=g.min_tags,
+        max_tags=g.max_tags,
+        swipe_tier=g.swipe_tier,
+        group_sort=g.group_sort,
+    )
+
+
 def build_tag_catalog(db: Session) -> AdminTagCatalogResponse:
     groups = db.scalars(
         select(TagGroup)
-        .where(TagGroup.slug.not_in(("legacy", "garment_gender")))
-        .order_by(TagGroup.section_sort, TagGroup.group_sort),
+        .where(TagGroup.slug.not_in(_CATALOG_SKIP_GROUP_SLUGS))
+        .order_by(TagGroup.group_sort, TagGroup.title),
     ).all()
     if not groups:
-        return AdminTagCatalogResponse(sections=[])
+        return AdminTagCatalogResponse(groups=[], sections=[])
     gids = [g.id for g in groups]
     tag_rows = db.scalars(
         select(Tag).where(Tag.group_id.in_(gids)).order_by(Tag.sort_order, Tag.name),
@@ -191,59 +249,8 @@ def build_tag_catalog(db: Session) -> AdminTagCatalogResponse:
     for t in tag_rows:
         by_gid.setdefault(t.group_id, []).append(t)
 
-    sections_map: dict[str, dict] = {}
-
-    def subgroup_sort_key(sk: str | None) -> tuple:
-        order = {None: 0, "palette": 1, "tone": 2}
-        return (order.get(sk, 50), sk or "")
-
-    for g in groups:
-        sec_key = g.section
-        if sec_key not in sections_map:
-            sections_map[sec_key] = {"sort": g.section_sort, "groups": []}
-        tglist = by_gid.get(g.id, [])
-        sub_map: dict[str | None, list[Tag]] = {}
-        for t in tglist:
-            sub_map.setdefault(t.subgroup_key, []).append(t)
-        subgroups_out: list[AdminCatalogSubgroupOut] = []
-        for sk in sorted(sub_map.keys(), key=subgroup_sort_key):
-            if sk is None:
-                label = "Теги"
-            else:
-                label = SUBGROUP_LABELS.get(sk, sk)
-            subgroups_out.append(
-                AdminCatalogSubgroupOut(
-                    key=sk,
-                    label=label,
-                    tags=[
-                        AdminCatalogTagOut(
-                            id=t.id,
-                            name=t.name,
-                            subgroup_key=t.subgroup_key,
-                            sort_order=t.sort_order,
-                            recommendation_weight=t.recommendation_weight,
-                        )
-                        for t in sub_map[sk]
-                    ],
-                ),
-            )
-        sections_map[sec_key]["groups"].append(
-            AdminCatalogGroupOut(
-                id=g.id,
-                slug=g.slug,
-                title=g.title,
-                min_tags=g.min_tags,
-                max_tags=g.max_tags,
-                swipe_tier=g.swipe_tier,
-                subgroups=subgroups_out,
-            ),
-        )
-
-    ordered_sections = sorted(sections_map.items(), key=lambda x: x[1]["sort"])
-    sections = [
-        AdminCatalogSectionOut(key=k, sort=v["sort"], groups=v["groups"]) for k, v in ordered_sections
-    ]
-    return AdminTagCatalogResponse(sections=sections)
+    groups_out = [_catalog_group_out(g, by_gid.get(g.id, [])) for g in groups]
+    return AdminTagCatalogResponse(groups=groups_out, sections=[])
 
 
 def _viewer_id(principal: AdminPrincipal) -> uuid.UUID | None:
@@ -869,6 +876,120 @@ def put_photo_tags(
     return _photo_out(photo, viewer_user_id=_viewer_id(principal))
 
 
+@router.get("/tag-groups", response_model=AdminTagGroupListResponse)
+def list_tag_groups(
+    db: Session = Depends(get_db),
+    _principal: AdminPrincipal = Depends(get_admin_principal),
+) -> AdminTagGroupListResponse:
+    rows = db.scalars(
+        select(TagGroup)
+        .where(TagGroup.slug.not_in(_CATALOG_SKIP_GROUP_SLUGS))
+        .order_by(TagGroup.group_sort, TagGroup.title),
+    ).all()
+    return AdminTagGroupListResponse(items=[_tag_group_out(g) for g in rows])
+
+
+@router.post("/tag-groups", response_model=AdminTagGroupOut, status_code=status.HTTP_201_CREATED)
+def create_tag_group(
+    body: AdminTagGroupCreateRequest,
+    db: Session = Depends(get_db),
+    _principal: AdminPrincipal = Depends(get_admin_principal),
+) -> AdminTagGroupOut:
+    slug = body.slug.strip().lower().replace(" ", "_")
+    if slug in _CATALOG_SKIP_GROUP_SLUGS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Такой slug зарезервирован",
+        )
+    if db.scalar(select(TagGroup.id).where(TagGroup.slug == slug)):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Группа с таким slug уже есть",
+        )
+    mx = db.scalar(select(func.coalesce(func.max(TagGroup.group_sort), -1)))
+    sort_order = int(mx) + 1 if mx is not None else 0
+    g = TagGroup(
+        slug=slug,
+        title=body.title.strip(),
+        section="catalog",
+        section_sort=0,
+        group_sort=sort_order,
+        min_tags=body.min_tags,
+        max_tags=body.max_tags,
+        swipe_tier="strong",
+    )
+    db.add(g)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Не удалось создать группу",
+        ) from None
+    db.refresh(g)
+    return _tag_group_out(g)
+
+
+@router.patch("/tag-groups/{group_id}", response_model=AdminTagGroupOut)
+def update_tag_group(
+    group_id: uuid.UUID,
+    body: AdminTagGroupUpdateRequest,
+    db: Session = Depends(get_db),
+    _principal: AdminPrincipal = Depends(get_admin_principal),
+) -> AdminTagGroupOut:
+    g = db.get(TagGroup, group_id)
+    if not g or g.slug in _CATALOG_SKIP_GROUP_SLUGS:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Group not found")
+    if body.title is not None:
+        g.title = body.title.strip()
+    if body.min_tags is not None:
+        g.min_tags = body.min_tags
+    if body.max_tags is not None:
+        g.max_tags = body.max_tags
+    if body.group_sort is not None:
+        g.group_sort = body.group_sort
+    db.commit()
+    db.refresh(g)
+    return _tag_group_out(g)
+
+
+@router.delete("/tag-groups/{group_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_tag_group(
+    group_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    _principal: AdminPrincipal = Depends(get_admin_principal),
+) -> Response:
+    g = db.get(TagGroup, group_id)
+    if not g or g.slug in _CATALOG_SKIP_GROUP_SLUGS:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Group not found")
+    try:
+        db.execute(delete(Tag).where(Tag.group_id == group_id))
+        result = db.execute(delete(TagGroup).where(TagGroup.id == group_id))
+        if result.rowcount == 0:
+            db.rollback()
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Group not found")
+        db.commit()
+    except HTTPException:
+        db.rollback()
+        raise
+    except IntegrityError:
+        db.rollback()
+        log.warning("delete_tag_group integrity_error group_id=%s", group_id)
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Нельзя удалить группу: остались связанные записи.",
+        ) from None
+    except SQLAlchemyError:
+        db.rollback()
+        log.exception("delete_tag_group failed group_id=%s", group_id)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Ошибка базы при удалении группы.",
+        ) from None
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.get("/tag/catalog", response_model=AdminTagCatalogResponse)
 def get_tag_catalog(
     db: Session = Depends(get_db),
@@ -886,7 +1007,7 @@ def create_tag_in_group(
 ) -> AdminCatalogTagOut:
     """Добавить тег в группу (виден всем сотрудникам)."""
     g = db.get(TagGroup, group_id)
-    if not g or g.slug == "legacy":
+    if not g or g.slug in _CATALOG_SKIP_GROUP_SLUGS:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Group not found")
     name = body.name.strip()
     exists = db.scalar(select(Tag.id).where(Tag.group_id == g.id, Tag.name == name))
@@ -931,17 +1052,24 @@ def list_tags(
     db: Session = Depends(get_db),
     _principal: AdminPrincipal = Depends(get_admin_principal),
 ) -> AdminTagListResponse:
-    rows = db.scalars(select(Tag).options(selectinload(Tag.group)).order_by(Tag.type, Tag.name)).all()
+    rows = db.scalars(
+        select(Tag)
+        .join(TagGroup, Tag.group_id == TagGroup.id)
+        .where(TagGroup.slug.not_in(_CATALOG_SKIP_GROUP_SLUGS))
+        .options(selectinload(Tag.group))
+        .order_by(TagGroup.group_sort, TagGroup.title, Tag.name),
+    ).all()
     items = []
     for t in rows:
-        gsl = t.group.slug if t.group else None
+        g = t.group
         items.append(
             AdminTagOut(
                 id=t.id,
                 name=t.name,
                 type=t.type,
                 group_id=t.group_id,
-                group_slug=gsl,
+                group_slug=g.slug if g else None,
+                group_title=g.title if g else None,
             ),
         )
     return AdminTagListResponse(items=items)
@@ -957,12 +1085,13 @@ def create_tag(
     g: TagGroup | None = None
     if body.group_id:
         g = db.get(TagGroup, body.group_id)
-    if g is None:
-        g = db.scalar(select(TagGroup).where(TagGroup.slug == body.type.strip()))
-    if g is None:
+    type_slug = (body.type or "").strip()
+    if g is None and type_slug:
+        g = db.scalar(select(TagGroup).where(TagGroup.slug == type_slug))
+    if g is None or g.slug in _CATALOG_SKIP_GROUP_SLUGS:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Неизвестная группа: задайте group_id или type = slug группы (например product_type)",
+            detail="Выберите группу (group_id) из списка категорий",
         )
     mx = db.scalar(select(func.coalesce(func.max(Tag.sort_order), -1)).where(Tag.group_id == g.id))
     sort_order = int(mx) + 1 if mx is not None else 0
@@ -991,6 +1120,7 @@ def create_tag(
         type=t.type,
         group_id=t.group_id,
         group_slug=g.slug,
+        group_title=g.title,
     )
 
 

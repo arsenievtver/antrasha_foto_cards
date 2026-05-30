@@ -14,14 +14,7 @@ import {
   suggestXimilarTags,
 } from "../api.js";
 import { useHoverPreview } from "../utils/usePhotoHover.jsx";
-
-/** Подписи секций каталога — как на странице «Разметка тегов». */
-const SECTION_LABELS = {
-  basic: "Базовые",
-  style_visual: "Стиль и визуал",
-  formality: "Формальность",
-  behavioral: "Поведенческие",
-};
+import { catalogGroups } from "../utils/tagCatalog.js";
 
 export default function Photos() {
   const [items, setItems] = useState([]);
@@ -868,67 +861,53 @@ export default function Photos() {
               className="photos-modal-tag-catalog"
               style={{ maxHeight: "min(52vh, 420px)", overflowY: "auto", marginTop: "0.35rem" }}
             >
-              {!tagCatalog?.sections?.length ? (
+              {!catalogGroups(tagCatalog).length ? (
                 <p style={{ color: "var(--muted)", fontSize: "0.88rem", margin: "0.35rem 0" }}>
-                  Каталог тегов загружается или недоступен.
+                  Каталог тегов загружается или недоступен. Группы задаются на странице «Теги».
                 </p>
               ) : (
-                tagCatalog.sections.map((section) => (
-                  <div key={section.key} style={{ marginBottom: "0.9rem" }}>
+                catalogGroups(tagCatalog).map((group) => (
+                  <div
+                    key={group.id}
+                    style={{
+                      marginBottom: "0.5rem",
+                      padding: "0.5rem 0.65rem",
+                      borderRadius: 10,
+                      border: "1px solid var(--border)",
+                      background: "var(--surface)",
+                      boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
+                    }}
+                  >
                     <div
                       style={{
-                        fontSize: "0.68rem",
+                        fontSize: "0.82rem",
                         fontWeight: 600,
-                        color: "var(--muted)",
-                        marginBottom: "0.45rem",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.06em",
+                        marginBottom: "0.4rem",
+                        color: "var(--text)",
                       }}
                     >
-                      {SECTION_LABELS[section.key] || section.key}
+                      {group.title}
                     </div>
-                    {section.groups.map((group) => (
-                      <div
-                        key={group.id}
-                        style={{
-                          marginBottom: "0.5rem",
-                          padding: "0.5rem 0.65rem",
-                          borderRadius: 10,
-                          border: "1px solid var(--border)",
-                          background: "var(--surface)",
-                          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
-                        }}
-                      >
+                    {group.subgroups.map((sg, sgIdx) => {
+                      const showSubgroupTitle =
+                        group.subgroups.length > 1 ||
+                        (Boolean(sg.label) && sg.label !== "Теги");
+                      return (
                         <div
-                          style={{
-                            fontSize: "0.82rem",
-                            fontWeight: 600,
-                            marginBottom: "0.4rem",
-                            color: "var(--text)",
-                          }}
+                          key={`${group.id}-${sg.key ?? "x"}-${sg.label}-${sgIdx}`}
+                          style={{ marginBottom: sgIdx < group.subgroups.length - 1 ? "0.5rem" : 0 }}
                         >
-                          {group.title}
-                        </div>
-                        {group.subgroups.map((sg, sgIdx) => {
-                          const showSubgroupTitle =
-                            group.subgroups.length > 1 ||
-                            (Boolean(sg.label) && sg.label !== "Теги");
-                          return (
+                          {showSubgroupTitle ? (
                             <div
-                              key={`${group.id}-${sg.key ?? "x"}-${sg.label}-${sgIdx}`}
-                              style={{ marginBottom: sgIdx < group.subgroups.length - 1 ? "0.5rem" : 0 }}
+                              style={{
+                                fontSize: "0.72rem",
+                                color: "var(--muted)",
+                                marginBottom: "0.28rem",
+                              }}
                             >
-                              {showSubgroupTitle ? (
-                                <div
-                                  style={{
-                                    fontSize: "0.72rem",
-                                    color: "var(--muted)",
-                                    marginBottom: "0.28rem",
-                                  }}
-                                >
-                                  {sg.label}
-                                </div>
-                              ) : null}
+                              {sg.label}
+                            </div>
+                          ) : null}
                               <div
                                 className="tag-checks"
                                 style={{ margin: "0.1rem 0 0", flexWrap: "wrap", gap: "0.45rem" }}
@@ -945,18 +924,13 @@ export default function Photos() {
                                         }))
                                       }
                                     />
-                                    {t.name}{" "}
-                                    <span style={{ color: "var(--muted)", fontSize: "0.78rem" }}>
-                                      ({group.slug})
-                                    </span>
+                                    {t.name}
                                   </label>
                                 ))}
                               </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ))}
+                        </div>
+                      );
+                    })}
                   </div>
                 ))
               )}

@@ -23,6 +23,35 @@ class AdminTagOut(BaseModel):
     type: str
     group_id: uuid.UUID | None = None
     group_slug: str | None = None
+    group_title: str | None = None
+
+
+class AdminTagGroupOut(BaseModel):
+    id: uuid.UUID
+    slug: str
+    title: str
+    min_tags: int
+    max_tags: int
+    swipe_tier: str = "strong"
+    group_sort: int = 0
+
+
+class AdminTagGroupListResponse(BaseModel):
+    items: list[AdminTagGroupOut]
+
+
+class AdminTagGroupCreateRequest(BaseModel):
+    slug: str = Field(min_length=1, max_length=80)
+    title: str = Field(min_length=1, max_length=200)
+    min_tags: int = Field(default=0, ge=0, le=99)
+    max_tags: int = Field(default=99, ge=1, le=99)
+
+
+class AdminTagGroupUpdateRequest(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=200)
+    min_tags: int | None = Field(default=None, ge=0, le=99)
+    max_tags: int | None = Field(default=None, ge=1, le=99)
+    group_sort: int | None = None
 
 
 class AdminPhotoTagOut(BaseModel):
@@ -122,7 +151,7 @@ class AdminTagListResponse(BaseModel):
 
 class AdminTagCreateRequest(BaseModel):
     name: str = Field(min_length=1, max_length=100)
-    type: str = Field(min_length=1, max_length=50)
+    type: str = Field(default="", max_length=50)
     group_id: uuid.UUID | None = None
 
 
@@ -179,7 +208,9 @@ class AdminCatalogSectionOut(BaseModel):
 
 
 class AdminTagCatalogResponse(BaseModel):
-    sections: list[AdminCatalogSectionOut]
+    """Плоский список групп из БД (title — подпись в разметке). sections — устаревшее, для совместимости."""
+    groups: list[AdminCatalogGroupOut] = Field(default_factory=list)
+    sections: list[AdminCatalogSectionOut] = Field(default_factory=list)
 
 
 class AdminWorkerTagCreateBody(BaseModel):

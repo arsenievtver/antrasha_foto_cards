@@ -250,15 +250,63 @@ export async function fetchTags() {
   return data;
 }
 
-export async function createTag(name, type) {
+export async function createTag(name, { groupId, type } = {}) {
+  const body = { name };
+  if (groupId) body.group_id = groupId;
+  else if (type) body.type = type;
   const res = await fetch(apiUrl("/admin/tags"), {
     method: "POST",
     headers: headersJson(),
-    body: JSON.stringify({ name, type }),
+    body: JSON.stringify(body),
   });
   const data = await parseResponseJson(res);
   if (!res.ok) throw new Error(detail(data, res.statusText));
   return data;
+}
+
+export async function fetchTagGroups() {
+  const res = await fetch(apiUrl("/admin/tag-groups"), { headers: headersJson() });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
+export async function createTagGroup({ slug, title, maxTags = 99, minTags = 0 }) {
+  const res = await fetch(apiUrl("/admin/tag-groups"), {
+    method: "POST",
+    headers: headersJson(),
+    body: JSON.stringify({
+      slug,
+      title,
+      max_tags: maxTags,
+      min_tags: minTags,
+    }),
+  });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
+export async function updateTagGroup(groupId, patch) {
+  const res = await fetch(apiUrl(`/admin/tag-groups/${groupId}`), {
+    method: "PATCH",
+    headers: headersJson(),
+    body: JSON.stringify(patch),
+  });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
+export async function deleteTagGroup(groupId) {
+  const res = await fetch(apiUrl(`/admin/tag-groups/${groupId}`), {
+    method: "DELETE",
+    headers: headersJson(),
+  });
+  if (!res.ok) {
+    const data = await parseResponseJson(res);
+    throw new Error(detail(data, res.statusText));
+  }
 }
 
 export async function deleteTag(tagId) {
@@ -345,7 +393,7 @@ export async function fetchTagCatalog() {
   const res = await fetch(apiUrl("/admin/tag/catalog"), { headers: headersJson() });
   const data = await parseResponseJson(res);
   if (!res.ok) throw new Error(detail(data, res.statusText));
-  if (!Array.isArray(data.sections)) {
+  if (!Array.isArray(data.groups) && !Array.isArray(data.sections)) {
     throw new Error("Неверный ответ каталога тегов.");
   }
   return data;
