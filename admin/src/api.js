@@ -16,6 +16,10 @@ export function apiUrl(path) {
 
 /** Не глотать HTML/текст от nginx как пустой JSON — иначе очереди и списки «пустые» без ошибки. */
 async function parseResponseJson(res) {
+  if (res.status === 401 && getToken()) {
+    redirectToLogin();
+    throw new Error("Сессия истекла");
+  }
   const text = await res.text();
   if (res.status === 204 || !text.trim()) return {};
   try {
@@ -47,6 +51,37 @@ async function parseResponseJson(res) {
 
 export function getToken() {
   return localStorage.getItem(TOKEN_KEY);
+}
+
+function isAccessTokenExpired(token) {
+  try {
+    const part = token.split(".")[1];
+    if (!part) return true;
+    const payload = JSON.parse(atob(part.replace(/-/g, "+").replace(/_/g, "/")));
+    if (!payload.exp) return false;
+    return payload.exp * 1000 <= Date.now();
+  } catch {
+    return true;
+  }
+}
+
+/** Токен есть и не просрочен; просроченный сбрасывает сессию. */
+export function hasValidSession() {
+  const t = getToken();
+  if (!t) return false;
+  if (isAccessTokenExpired(t)) {
+    clearSession();
+    return false;
+  }
+  return true;
+}
+
+function redirectToLogin() {
+  clearSession();
+  const path = window.location.pathname.replace(/\/$/, "") || "/";
+  if (path !== "/login") {
+    window.location.replace("/login");
+  }
 }
 
 export function setSession(token, role) {

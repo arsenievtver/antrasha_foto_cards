@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { getToken, loginSuperuser, loginWorker, setSession } from "../api.js";
+import { hasValidSession, loginSuperuser, loginWorker, setSession } from "../api.js";
 import {
 	formatPhoneMask,
 	formatPinMask,
@@ -18,7 +18,7 @@ export default function Login() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  if (getToken()) {
+  if (hasValidSession()) {
     return <Navigate to="/" replace />;
   }
 

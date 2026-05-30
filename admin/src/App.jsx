@@ -12,26 +12,23 @@ import AiIngest from "./pages/AiIngest.jsx";
 import FittingRequests from "./pages/FittingRequests.jsx";
 import Campaigns from "./pages/Campaigns.jsx";
 import PromoBanners from "./pages/PromoBanners.jsx";
-import { getRole, getToken } from "./api.js";
+import { getRole, hasValidSession } from "./api.js";
 
 function RequireAuth({ children }) {
-  const t = getToken();
-  if (!t) return <Navigate to="/login" replace />;
+  if (!hasValidSession()) return <Navigate to="/login" replace />;
   return children;
 }
 
 function RoleRoute({ children, roles }) {
-  const t = getToken();
   const r = getRole();
-  if (!t) return <Navigate to="/login" replace />;
+  if (!hasValidSession()) return <Navigate to="/login" replace />;
   if (!roles.includes(r)) return <Navigate to="/login" replace />;
   return children;
 }
 
 function HomeRoute() {
-  const t = getToken();
   const r = getRole();
-  if (!t) return <Navigate to="/login" replace />;
+  if (!hasValidSession()) return <Navigate to="/login" replace />;
   if (r === "superuser") return <Dashboard />;
   if (r === "worker") return <Navigate to="/photos" replace />;
   return <Navigate to="/login" replace />;

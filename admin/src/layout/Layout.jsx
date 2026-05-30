@@ -1,15 +1,14 @@
 import { NavLink, Navigate, Outlet, useNavigate } from "react-router-dom";
-import { clearSession, getRole, getToken } from "../api.js";
+import { clearSession, getRole, hasValidSession } from "../api.js";
 
 export default function Layout() {
   const nav = useNavigate();
   const role = getRole();
-  const hasToken = !!getToken();
   const isSuperuser = role === "superuser";
   const isWorker = role === "worker";
   const hasAdminAccess = isSuperuser || isWorker;
 
-  if (!hasToken || !hasAdminAccess) {
+  if (!hasValidSession() || !hasAdminAccess) {
     return <Navigate to="/login" replace />;
   }
 
