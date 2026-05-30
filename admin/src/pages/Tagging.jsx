@@ -34,12 +34,10 @@ function countSelectedInGroup(selected, group) {
   return n;
 }
 
-/** В пределах нормы — можно сохранять по этой группе. */
+/** В пределах нормы — можно сохранять по этой группе (лимит max, минимум не требуется). */
 function groupSelectionOk(selected, group) {
   const n = countSelectedInGroup(selected, group);
-  if (n > group.max_tags) return false;
-  if (group.min_tags === 0) return true;
-  return n >= group.min_tags;
+  return n <= group.max_tags;
 }
 
 /** Галочка: в норме или при превышении max (чтобы было видно, что группа «заполнена», даже если нужно убрать лишнее). */
@@ -60,10 +58,7 @@ function allCatalogGroupsComplete(catalog, selected) {
 }
 
 function groupHintText(g) {
-  if (g.min_tags === 0) {
-    return `необязательно · до ${g.max_tags}`;
-  }
-  return `${g.min_tags}–${g.max_tags} тег(ов)`;
+  return `до ${g.max_tags} тег(ов)`;
 }
 
 export default function Tagging() {
@@ -387,8 +382,8 @@ export default function Tagging() {
     <div className="tagging-page">
       <h2 className="tagging-title">Разметка тегов</h2>
       <p className="tagging-lead">
-        Заполните все обязательные группы (галочка станет зелёной). Дополнительные группы можно
-        пропустить или заполнить в пределах лимита.
+        Отмечайте теги по группам в пределах лимита. Группы можно оставить пустыми — сохранение
+        доступно, если нигде не превышен максимум.
       </p>
 
       {err && <p className="error">{err}</p>}
@@ -647,7 +642,7 @@ export default function Tagging() {
                 onClick={handleSave}
                 title={
                   !canSave
-                    ? "Все группы в норме по числу тегов (если есть «сверх нормы» — уберите лишнее)"
+                    ? "Уберите лишние теги в группах, где превышен максимум"
                     : undefined
                 }
               >
@@ -679,11 +674,7 @@ export default function Tagging() {
                 onClick={(e) => e.stopPropagation()}
               >
                 <h3 className="tagging-group-modal-title">{groupModal.title}</h3>
-                <p className="muted">
-                  {groupModal.min_tags === 0
-                    ? `Дополнительно: не больше ${groupModal.max_tags} тег(ов)`
-                    : `Выберите от ${groupModal.min_tags} до ${groupModal.max_tags} тег(ов)`}
-                </p>
+                <p className="muted">Не больше {groupModal.max_tags} тег(ов) в этой группе</p>
                 {(groupModal.subgroups || []).length > 1 && (
                   <div className="tag-type-tabs" role="tablist">
                     {(groupModal.subgroups || []).map((sg, i) => (

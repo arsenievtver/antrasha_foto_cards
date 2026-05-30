@@ -19,17 +19,13 @@ def validate_catalog_tag_selection(
 ) -> list[str]:
     """
     Для каждой группы каталога (кроме legacy и garment_gender):
-    - min_tags > 0: число выбранных тегов в [min, max]
-    - min_tags == 0 (дополнительные): достаточно не превысить max (0 тегов допустимо)
+    не больше max_tags выбранных тегов (0 тегов в группе допустимо).
     """
     errors: list[str] = []
     groups = db.scalars(select(TagGroup)).all()
     catalog_groups = [g for g in groups if g.slug not in _CATALOG_SKIP_SLUGS]
 
     if not tag_ids:
-        for g in catalog_groups:
-            if g.min_tags > 0:
-                errors.append(f"«{g.title}»: минимум {g.min_tags} тег(ов)")
         return errors
 
     tags = db.scalars(
@@ -46,7 +42,4 @@ def validate_catalog_tag_selection(
         n = len(by_group.get(g.id, []))
         if n > g.max_tags:
             errors.append(f"«{g.title}»: не больше {g.max_tags} тег(ов)")
-            continue
-        if g.min_tags > 0 and n < g.min_tags:
-            errors.append(f"«{g.title}»: минимум {g.min_tags} тег(ов)")
     return errors
