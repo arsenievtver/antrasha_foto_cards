@@ -25,6 +25,7 @@ services:
       - ./env/.env.postgres.prod
     volumes:
       - antrasha_promo_media:/app/data/promo-banners
+      - antrasha_ai_ingest_tmp:/app/var/ai_ingest_tmp
     depends_on:
       postgres:
         condition: service_healthy
@@ -37,6 +38,25 @@ services:
       timeout: 10s
       retries: 8
       start_period: 90s
+    networks:
+      - antrasha_net
+
+  ai-ingest-worker:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    command: ["python", "-m", "jobs.ai_ingest_worker"]
+    env_file:
+      - ./env/.env.backend.prod
+      - ./env/.env.postgres.prod
+    volumes:
+      - antrasha_ai_ingest_tmp:/app/var/ai_ingest_tmp
+    depends_on:
+      postgres:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
     networks:
       - antrasha_net
 
@@ -96,6 +116,7 @@ services:
 volumes:
   antrasha_pg_data:
   antrasha_promo_media:
+  antrasha_ai_ingest_tmp:
 
 networks:
   antrasha_net:

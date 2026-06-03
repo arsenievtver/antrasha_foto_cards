@@ -12,9 +12,11 @@ BACKEND_PORT="${BACKEND_PORT:-8000}"
 FRONTEND_PORT="${FRONTEND_PORT:-5173}"
 ADMIN_PORT="${ADMIN_PORT:-5174}"
 PID_BACKEND="$SCRIPT_DIR/.backend.pid"
+PID_INGEST="$SCRIPT_DIR/.ai-ingest-worker.pid"
 PID_FRONT="$SCRIPT_DIR/.frontend.pid"
 PID_ADMIN="$SCRIPT_DIR/.admin.pid"
 LOG_BACKEND="$SCRIPT_DIR/logs-backend.txt"
+LOG_INGEST="$SCRIPT_DIR/logs-ai-ingest-worker.txt"
 LOG_FRONT="$SCRIPT_DIR/logs-frontend.txt"
 LOG_ADMIN="$SCRIPT_DIR/logs-admin.txt"
 
@@ -56,6 +58,19 @@ else
 		echo $! >"$PID_BACKEND"
 	)
 	echo "[up] backend http://127.0.0.1:${BACKEND_PORT} (лог: $LOG_BACKEND, PID: $PID_BACKEND)"
+fi
+
+if [[ "${SKIP_AI_INGEST_WORKER:-0}" == "1" ]]; then
+	echo "[up] SKIP_AI_INGEST_WORKER=1 — воркер очереди ИИ не поднимаю"
+elif [[ -f "$PID_INGEST" ]] && kill -0 "$(cat "$PID_INGEST")" 2>/dev/null; then
+	echo "[up] ai-ingest worker уже запущен (PID $(cat "$PID_INGEST")) — пропуск"
+else
+	(
+		cd "$REPO_ROOT/backend"
+		nohup python -m jobs.ai_ingest_worker >"$LOG_INGEST" 2>&1 &
+		echo $! >"$PID_INGEST"
+	)
+	echo "[up] ai-ingest worker (лог: $LOG_INGEST, PID: $PID_INGEST)"
 fi
 
 if [[ -f "$PID_FRONT" ]] && kill -0 "$(cat "$PID_FRONT")" 2>/dev/null; then

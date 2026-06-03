@@ -219,14 +219,21 @@ export default function AiIngest() {
           {limits.max_pending_jobs} задач в статусе «В очереди», параллельно воркеров:{" "}
           {limits.worker_concurrency}.
           <div style={{ marginTop: "0.5rem" }}>
-            Пайплайн Fashn→S3 (воркер активен):{" "}
+            Ключи Fashn + YC на API:{" "}
             <strong style={{ color: limits.pipeline_ready ? "var(--accent)" : "var(--danger)" }}>
-              {limits.pipeline_ready ? "да" : "нет"}
+              {limits.pipeline_ready ? "заданы" : "не заданы"}
             </strong>
-            {limits.pipeline_ready ? "" : " — пока нет, задачи не уйдут с очереди"}
+            {limits.pipeline_ready
+              ? ""
+              : " — upload вернёт 503, пока не настроите env на бэкенде"}
             {" · "}
-            Fashn ключ …{limits.fashn_key_last4 ?? "????"}, YC access key …
-            {limits.yc_access_key_id_last4 ?? "????"}
+            Fashn …{limits.fashn_key_last4 ?? "????"}, YC …{limits.yc_access_key_id_last4 ?? "????"}
+          </div>
+          <div style={{ marginTop: "0.35rem", color: "var(--muted)" }}>
+            Очередь обрабатывает <strong style={{ color: "var(--text)" }}>отдельный процесс</strong>{" "}
+            <code style={{ fontSize: "0.82em" }}>python -m jobs.ai_ingest_worker</code> (не uvicorn).
+            На dev: <code style={{ fontSize: "0.82em" }}>scripts/dev-up.sh</code> поднимает его вместе с API.
+            В Docker prod — сервис <code style={{ fontSize: "0.82em" }}>ai-ingest-worker</code>.
           </div>
         </div>
       )}
@@ -247,7 +254,9 @@ export default function AiIngest() {
           </div>
           {(stats.processing > 0 || stats.pending > 0) && (
             <p style={{ margin: "0.45rem 0 0", color: "var(--muted)", fontSize: "0.88rem" }}>
-              Идёт очередь или запрос к ИИ — дождитесь статуса «Готово» или текста ошибки в таблице.
+              {stats.pending > 0 && stats.processing === 0
+                ? "Задачи в «В очереди», но обработка 0 — скорее всего не запущен воркер (см. подсказку выше). Запустите python -m jobs.ai_ingest_worker или перезапустите dev-up / docker compose."
+                : "Идёт очередь или запрос к ИИ — дождитесь статуса «Готово» или текста ошибки в таблице."}
             </p>
           )}
         </div>

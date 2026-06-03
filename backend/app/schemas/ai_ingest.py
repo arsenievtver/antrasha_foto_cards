@@ -14,7 +14,7 @@ class AiIngestLimitsOut(BaseModel):
     # Ниже — не секреты, чтобы сверить окружение сервера со скриптом у себя на машине.
     fashn_configured: bool = False
     yc_s3_configured: bool = False
-    # Оба True → фоновый воркер реально вызывает Fashn и грузит результат в бакет.
+    # Оба True → upload разрешён; обработку делает отдельный процесс jobs.ai_ingest_worker.
     pipeline_ready: bool = False
     fashn_calls_from: str = "server_only"
     env_dotenv_candidates: list[str] = []

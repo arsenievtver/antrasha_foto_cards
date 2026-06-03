@@ -15,7 +15,7 @@ echo "[step] git pull --ff-only"
 git pull --ff-only
 
 echo "[step] rebuilding images"
-compose build backend frontend admin
+compose build backend ai-ingest-worker frontend admin
 
 echo "[step] ensuring postgres up"
 compose up -d postgres

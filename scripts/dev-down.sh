@@ -13,6 +13,7 @@ ADMIN_PORT="${ADMIN_PORT:-5174}"
 FRONTEND_PREVIEW_PORT="${FRONTEND_PREVIEW_PORT:-4173}"
 ADMIN_PREVIEW_PORT="${ADMIN_PREVIEW_PORT:-4174}"
 PID_BACKEND="$SCRIPT_DIR/.backend.pid"
+PID_INGEST="$SCRIPT_DIR/.ai-ingest-worker.pid"
 PID_FRONT="$SCRIPT_DIR/.frontend.pid"
 PID_ADMIN="$SCRIPT_DIR/.admin.pid"
 
@@ -35,6 +36,7 @@ stop_by_pidfile() {
 }
 
 stop_by_pidfile "$PID_BACKEND" "backend"
+stop_by_pidfile "$PID_INGEST" "ai-ingest worker"
 stop_by_pidfile "$PID_FRONT" "frontend"
 stop_by_pidfile "$PID_ADMIN" "admin (vite)"
 
