@@ -6,7 +6,7 @@ import base64
 import io
 from pathlib import Path
 
-from PIL import Image
+from PIL import Image, ImageOps
 
 # Большой JSON с base64 на POST /v1/run часто рвёт TLS (UNEXPECTED_EOF_WHILE_READING).
 _JPEG_REENCODE_IF_LARGER_THAN_BYTES = 2_500_000
@@ -29,65 +29,78 @@ def _register_heif_once() -> None:
     _HEIF_REGISTERED = True
 
 
-def _reencode_jpeg_smaller_for_transport(raw: bytes) -> bytes:
-    """Уменьшает разрешение/вес JPEG для стабильного HTTPS POST на api.fashn.ai."""
-    img = Image.open(io.BytesIO(raw))
-    img.load()
-    w, h = img.size
-    m = max(w, h)
-    if m > _JPEG_MAX_LONG_EDGE_PX:
-        scale = _JPEG_MAX_LONG_EDGE_PX / m
-        new_w = max(1, int(w * scale))
-        new_h = max(1, int(h * scale))
-        img = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
+def _apply_exif_orientation(img: Image.Image) -> Image.Image:
+    """Снимки с телефона часто лежат «боком» в пикселях, ориентация — в EXIF."""
+    try:
+        return ImageOps.exif_transpose(img)
+    except Exception:
+        return img
+
+
+def _image_to_rgb(img: Image.Image) -> Image.Image:
     if img.mode == "LA":
         img = img.convert("RGBA")
     if img.mode in ("RGBA",) or (img.mode == "P" and "transparency" in getattr(img, "info", {})):
         rgba = img.convert("RGBA")
         bg = Image.new("RGB", rgba.size, (255, 255, 255))
         bg.paste(rgba, mask=rgba.split()[-1])
-        img = bg
-    elif img.mode == "P":
-        img = img.convert("RGB")
-    elif img.mode == "L":
-        img = img.convert("RGB")
-    elif img.mode != "RGB":
-        img = img.convert("RGB")
+        return bg
+    if img.mode == "P":
+        return img.convert("RGB")
+    if img.mode == "L":
+        return img.convert("RGB")
+    if img.mode != "RGB":
+        return img.convert("RGB")
+    return img
+
+
+def _resize_long_edge(img: Image.Image, max_px: int = _JPEG_MAX_LONG_EDGE_PX) -> Image.Image:
+    w, h = img.size
+    m = max(w, h)
+    if m <= max_px:
+        return img
+    scale = max_px / m
+    new_w = max(1, int(w * scale))
+    new_h = max(1, int(h * scale))
+    return img.resize((new_w, new_h), Image.Resampling.LANCZOS)
+
+
+def _reencode_jpeg_smaller_for_transport(raw: bytes) -> bytes:
+    """Уменьшает разрешение/вес JPEG для стабильного HTTPS POST на api.fashn.ai."""
+    img = Image.open(io.BytesIO(raw))
+    img.load()
+    img = _apply_exif_orientation(img)
+    img = _image_to_rgb(img)
+    img = _resize_long_edge(img)
     buf = io.BytesIO()
     img.save(buf, format="JPEG", quality=_JPEG_REENCODE_QUALITY, optimize=True)
     return buf.getvalue()
 
 
-def build_fashn_image_data_url_from_bytes(raw: bytes) -> str:
-    """Любое фото пользователя → JPEG data URL для Fashn."""
+def normalize_png_bytes(png_bytes: bytes) -> bytes:
+    """PNG от Fashn → с корректной ориентацией и без лишнего EXIF."""
+    img = Image.open(io.BytesIO(png_bytes))
+    img.load()
+    img = _apply_exif_orientation(img)
+    img = _image_to_rgb(img)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG", optimize=True)
+    return buf.getvalue()
+
+
+def build_fashn_image_data_url_from_bytes(raw: bytes) -> tuple[str, tuple[int, int]]:
+    """Фото пользователя → JPEG data URL для Fashn. Возвращает (url, (width, height))."""
     _register_heif_once()
     img = Image.open(io.BytesIO(raw))
     img.load()
-    w, h = img.size
-    m = max(w, h)
-    if m > _JPEG_MAX_LONG_EDGE_PX:
-        scale = _JPEG_MAX_LONG_EDGE_PX / m
-        new_w = max(1, int(w * scale))
-        new_h = max(1, int(h * scale))
-        img = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
-    if img.mode == "LA":
-        img = img.convert("RGBA")
-    if img.mode in ("RGBA",) or (img.mode == "P" and "transparency" in getattr(img, "info", {})):
-        rgba = img.convert("RGBA")
-        bg = Image.new("RGB", rgba.size, (255, 255, 255))
-        bg.paste(rgba, mask=rgba.split()[-1])
-        img = bg
-    elif img.mode == "P":
-        img = img.convert("RGB")
-    elif img.mode == "L":
-        img = img.convert("RGB")
-    elif img.mode != "RGB":
-        img = img.convert("RGB")
+    img = _apply_exif_orientation(img)
+    img = _image_to_rgb(img)
+    img = _resize_long_edge(img)
     buf = io.BytesIO()
     img.save(buf, format="JPEG", quality=92, optimize=True)
     jpeg = buf.getvalue()
     b64 = base64.b64encode(jpeg).decode("ascii")
-    return f"data:image/jpeg;base64,{b64}"
+    return f"data:image/jpeg;base64,{b64}", img.size
 
 
 def build_fashn_product_image_data_url(path: Path) -> str:
@@ -111,6 +124,7 @@ def build_fashn_product_image_data_url(path: Path) -> str:
 
     img = Image.open(path)
     img.load()
+    img = _apply_exif_orientation(img)
 
     if img.mode == "LA":
         img = img.convert("RGBA")

@@ -209,8 +209,9 @@ export default function TryOnExperiment() {
 						<section className="tryon-block">
 							<h2 className="tryon-block__title">1. Ваше фото</h2>
 							<p className="tryon-hint">
-								В полный рост или по пояс, лицо хорошо видно, нейтральный фон — так
-								результат обычно лучше.
+								Вертикальное фото в полный рост или по пояс, лицо и торс видны, без
+								сильного наклона — так модель лучше «садится» на кадр. Не
+								поворачивайте снимок в галерее перед отправкой.
 							</p>
 							<div className="tryon-person-row">
 								{personPreview ? (

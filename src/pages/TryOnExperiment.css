@@ -115,11 +115,22 @@
 	flex-wrap: wrap;
 }
 
-.tryon-person-preview,
+.tryon-person-preview {
+	display: block;
+	width: min(100%, 200px);
+	max-height: min(52vh, 360px);
+	height: auto;
+	object-fit: contain;
+	object-position: top center;
+	image-orientation: from-image;
+	border-radius: 8px;
+	border: 1px solid var(--tryon-line);
+	background: #1a1a18;
+}
+
 .tryon-person-placeholder {
 	width: 120px;
-	height: 160px;
-	object-fit: cover;
+	min-height: 160px;
 	border-radius: 8px;
 	border: 1px solid var(--tryon-line);
 	background: #1a1a18;
@@ -192,31 +203,32 @@
 	border-color: var(--tryon-accent);
 }
 
+/* Лента образов: 2 колонки, кадр целиком (без обрезки) */
 .tryon-grid {
 	display: grid;
-	grid-template-columns: repeat(3, 1fr);
-	gap: 8px;
-	max-height: 320px;
-	overflow-y: auto;
-	padding-right: 4px;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 12px;
+	align-items: start;
 }
 
 .tryon-grid__item {
-	position: relative;
-	padding: 0;
+	display: block;
+	width: 100%;
+	padding: 6px;
 	border: 2px solid transparent;
-	border-radius: 6px;
-	overflow: hidden;
+	border-radius: 8px;
 	cursor: pointer;
-	background: #111;
-	aspect-ratio: 4 / 5;
+	background: #141413;
+	box-sizing: border-box;
 }
 
 .tryon-grid__item img {
-	width: 100%;
-	height: 100%;
-	object-fit: cover;
 	display: block;
+	width: 100%;
+	height: auto;
+	object-fit: contain;
+	object-position: center top;
+	border-radius: 4px;
 }
 
 .tryon-grid__item--selected {
@@ -269,11 +281,16 @@
 }
 
 .tryon-result {
-	width: 100%;
+	display: block;
+	width: auto;
 	max-width: 100%;
+	max-height: min(78vh, 720px);
+	height: auto;
+	margin: 0 auto 16px;
+	object-fit: contain;
 	border-radius: 10px;
 	border: 1px solid var(--tryon-line);
-	margin-bottom: 16px;
+	background: #111;
 }
 
 .tryon-block--result {

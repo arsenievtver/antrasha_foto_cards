@@ -22,7 +22,10 @@ from app.schemas.try_on_experiment import (
     TryOnExperimentStatusOut,
     TryOnRunResponse,
 )
-from app.services.image_prepare import build_fashn_image_data_url_from_bytes
+from app.services.image_prepare import (
+    build_fashn_image_data_url_from_bytes,
+    normalize_png_bytes,
+)
 from app.services.weights import touch_session
 
 log = logging.getLogger("app.api.try_on_experiment")
@@ -119,18 +122,19 @@ async def run_try_on(
         )
 
     try:
-        model_data_url = build_fashn_image_data_url_from_bytes(raw)
+        model_data_url, person_size = build_fashn_image_data_url_from_bytes(raw)
     except Exception as e:
         log.warning("try_on: не удалось обработать фото пользователя: %s", e)
         raise HTTPException(status_code=400, detail="Не удалось прочитать изображение") from e
 
     garment_url = photo.url.strip()
     log.info(
-        "try_on run session=%s photo_id=%s garment_url_len=%s person_b64_len=%s",
+        "try_on run session=%s photo_id=%s garment_url_len=%s person_px=%sx%s",
         session_id,
         photo_id,
         len(garment_url),
-        len(model_data_url),
+        person_size[0],
+        person_size[1],
     )
 
     t0 = time.monotonic()
@@ -157,6 +161,7 @@ async def run_try_on(
             detail=f"Ошибка примерки: {type(e).__name__}",
         ) from e
     elapsed = time.monotonic() - t0
+    png = normalize_png_bytes(png)
 
     # Отдаём результат как data URL, чтобы не зависеть от срока жизни CDN Fashn.
     b64 = base64.b64encode(png).decode("ascii")
