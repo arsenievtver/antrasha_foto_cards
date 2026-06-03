@@ -36,6 +36,38 @@ _MAX_PERSON_BYTES = 12 * 1024 * 1024
 _ALLOWED_CONTENT_PREFIX = "image/"
 
 
+def _user_facing_fashn_error(exc: Exception) -> str:
+    """Текст для UI: в логах полный traceback, пользователю — суть."""
+    msg = str(exc).strip()
+    if isinstance(exc, TimeoutError):
+        return "Слишком долгое ожидание ответа FASHN — попробуйте ещё раз."
+    if msg.startswith("Fashn job failed:"):
+        inner = msg.removeprefix("Fashn job failed:").strip()
+        low = inner.lower()
+        if "poseerror" in low or "pose" in low:
+            return (
+                "FASHN не распознал позу на фото. Нужен чёткий снимок человека "
+                "(в полный рост или по пояс, лицо и торс видны, без сильного наклона)."
+            )
+        if "moderation" in low or "content" in low:
+            return "Изображение не прошло модерацию FASHN — попробуйте другое фото."
+        if "credit" in low or "balance" in low or "payment" in low:
+            return "На аккаунте FASHN закончились кредиты — проверьте баланс API."
+        if inner:
+            return f"FASHN не выполнил примерку: {inner[:220]}"
+        return "FASHN не смог обработать эти фото — попробуйте другой снимок или образ."
+    if "Fashn poll HTTP" in msg:
+        code = msg.split("HTTP", 1)[-1].strip() if "HTTP" in msg else ""
+        if code.startswith("401") or code.startswith("403"):
+            return "Ошибка авторизации FASHN на сервере (проверьте FASHN_API_KEY)."
+        return "Сбой связи с FASHN при проверке статуса — повторите позже."
+    if "Fashn download HTTP" in msg:
+        return "Результат сгенерирован, но не скачался — повторите попытку."
+    if msg.startswith("Fashn tryon:") or msg.startswith("Fashn:"):
+        return msg[:240]
+    return msg[:240] if msg else "Неизвестная ошибка примерки."
+
+
 def _require_fashn() -> None:
     if not settings.fashn_configured:
         raise HTTPException(
@@ -153,12 +185,21 @@ async def run_try_on(
             garment_photo_type="model",
         )
     except TimeoutError as e:
-        raise HTTPException(status_code=504, detail="Fashn: превышено время ожидания") from e
+        raise HTTPException(
+            status_code=504,
+            detail=_user_facing_fashn_error(e),
+        ) from e
     except Exception as e:
-        log.exception("try_on Fashn failed session=%s photo_id=%s", session_id, photo_id)
+        log.exception(
+            "try_on Fashn failed session=%s photo_id=%s err=%s: %s",
+            session_id,
+            photo_id,
+            type(e).__name__,
+            e,
+        )
         raise HTTPException(
             status_code=502,
-            detail=f"Ошибка примерки: {type(e).__name__}",
+            detail=_user_facing_fashn_error(e),
         ) from e
     elapsed = time.monotonic() - t0
     png = normalize_png_bytes(png)
