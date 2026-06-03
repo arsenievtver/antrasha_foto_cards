@@ -40,6 +40,8 @@ export default function TryOnExperiment() {
 	const [err, setErr] = useState("");
 	const [resultUrl, setResultUrl] = useState(null);
 	const [elapsed, setElapsed] = useState(null);
+	const [saveBusy, setSaveBusy] = useState(false);
+	const [saveHint, setSaveHint] = useState("");
 	const galleryInputRef = useRef(null);
 	const cameraInputRef = useRef(null);
 
@@ -115,6 +117,7 @@ export default function TryOnExperiment() {
 		setErr("");
 		setResultUrl(null);
 		setElapsed(null);
+		setSaveHint("");
 		try {
 			const data = await runTryOnExperiment({
 				photoId: selectedId,
@@ -133,38 +136,78 @@ export default function TryOnExperiment() {
 		setResultUrl(null);
 		setElapsed(null);
 		setSelectedId(null);
+		setSaveHint("");
+	}
+
+	async function saveResultToGallery() {
+		if (!resultUrl) return;
+		setSaveBusy(true);
+		setSaveHint("");
+		try {
+			const blob = await (await fetch(resultUrl)).blob();
+			const name = `antrasha-primerka-${Date.now()}.png`;
+			const file = new File([blob], name, { type: blob.type || "image/png" });
+
+			if (
+				typeof navigator.share === "function" &&
+				(typeof navigator.canShare !== "function" ||
+					navigator.canShare({ files: [file] }))
+			) {
+				await navigator.share({ files: [file], title: "Примерка ANTRASHA" });
+				setSaveHint("В меню выберите «Сохранить в Фото» или «Добавить в Фото».");
+				return;
+			}
+
+			const url = URL.createObjectURL(blob);
+			const a = document.createElement("a");
+			a.href = url;
+			a.download = name;
+			document.body.appendChild(a);
+			a.click();
+			a.remove();
+			URL.revokeObjectURL(url);
+			setSaveHint(
+				"Если файл не сохранился: удержите результат → «Сохранить изображение».",
+			);
+		} catch (ex) {
+			if (ex?.name !== "AbortError") {
+				setSaveHint("Удержите фото результата → «Сохранить в Фото».");
+			}
+		} finally {
+			setSaveBusy(false);
+		}
 	}
 
 	const selectedPhoto = catalog.find((p) => p.id === selectedId);
 
 	return (
 		<div className="tryon-page">
-			<header className="tryon-topbar">
-				<button
-					type="button"
-					className="tryon-back"
-					onClick={() => navigate("/")}
-					aria-label="На главную"
-				>
-					<span className="tryon-back__chevron" aria-hidden />
-					назад
-				</button>
-				<span className="tryon-badge">эксперимент</span>
-			</header>
+			<div className="tryon-hero">
+				<header className="tryon-topbar">
+					<button
+						type="button"
+						className="tryon-back"
+						onClick={() => navigate("/")}
+						aria-label="На главную"
+					>
+						<span className="tryon-back__chevron" aria-hidden />
+						назад
+					</button>
+					<span className="tryon-badge">эксперимент</span>
+				</header>
 
-			<main className="tryon-main">
-				<h1 className="tryon-title">Примерка</h1>
-				<p className="tryon-lead">
-					Сначала выберите пол, затем своё фото и образ из каталога. Тестовая страница,
-					~1 запрос к FASHN за попытку.
-				</p>
+				<div className="tryon-hero__inner">
+					<h1 className="tryon-title">Примерка</h1>
+					<p className="tryon-lead">
+						Сначала выберите пол, затем своё фото и образ из каталога. Тестовая
+						страница, ~1 запрос к FASHN за попытку.
+					</p>
 
-				{enabled === false ? (
-					<p className="tryon-error">{err || "Сервис выключен"}</p>
-				) : null}
+					{enabled === false ? (
+						<p className="tryon-error">{err || "Сервис выключен"}</p>
+					) : null}
 
-				{enabled ? (
-					<>
+					{enabled ? (
 						<section className="tryon-block tryon-block--gender">
 							<h2 className="tryon-block__title">Кто примеряет?</h2>
 							<p className="tryon-hint">
@@ -204,8 +247,12 @@ export default function TryOnExperiment() {
 								</p>
 							) : null}
 						</section>
+					) : null}
+				</div>
+			</div>
 
-						{gender ? (
+			{enabled && gender ? (
+				<main className="tryon-main">
 						<>
 						<section className="tryon-block">
 							<h2 className="tryon-block__title">1. Ваше фото</h2>
@@ -322,13 +369,26 @@ export default function TryOnExperiment() {
 									<p className="tryon-hint">Готово за {elapsed} с</p>
 								) : null}
 								<img src={resultUrl} alt="Результат примерки" className="tryon-result" />
-								<button
-									type="button"
-									className="tryon-btn tryon-btn--secondary"
-									onClick={resetExperiment}
-								>
-									Попробовать другой образ
-								</button>
+								<div className="tryon-result-actions">
+									<button
+										type="button"
+										className="tryon-btn tryon-btn--secondary"
+										disabled={saveBusy}
+										onClick={saveResultToGallery}
+									>
+										{saveBusy ? "Открываем…" : "Сохранить в галерею"}
+									</button>
+									<button
+										type="button"
+										className="tryon-btn tryon-btn--ghost"
+										onClick={resetExperiment}
+									>
+										Другой образ
+									</button>
+								</div>
+								{saveHint ? (
+									<p className="tryon-hint tryon-save-hint">{saveHint}</p>
+								) : null}
 							</section>
 						) : (
 							<div className="tryon-run-wrap">
@@ -344,10 +404,8 @@ export default function TryOnExperiment() {
 							</div>
 						)}
 						</>
-						) : null}
-					</>
-				) : null}
-			</main>
+				</main>
+			) : null}
 		</div>
 	);
 }
