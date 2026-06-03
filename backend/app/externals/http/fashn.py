@@ -147,6 +147,79 @@ class FashnClient(BaseApiClient):
                 raise RuntimeError(f"Fashn download HTTP {resp.status}: {url}")
             return await resp.read()
 
+    async def submit_tryon_v16(
+        self,
+        *,
+        model_image: str,
+        garment_image: str,
+        garment_photo_type: str = "model",
+    ) -> str:
+        """Virtual try-on v1.6: person + garment → job_id."""
+        payload = {
+            "model_name": "tryon-v1.6",
+            "inputs": {
+                "model_image": model_image,
+                "garment_image": garment_image,
+                "garment_photo_type": garment_photo_type,
+                "output_format": "png",
+                "return_base64": False,
+            },
+        }
+        try:
+            resp = await self.post("/run", json=payload, **self._proxy_kwargs())
+        except ApiClientAbortableException as e:
+            log.warning(
+                "fashn tryon submit HTTP %s body=%s",
+                e.response.status,
+                str(e.parsed_response)[:500],
+            )
+            raise
+        log.info("fashn tryon submit HTTP %s body=%s", resp.status, str(resp.parsed_response)[:300])
+        job_id = (resp.parsed_response or {}).get("id")
+        if not job_id:
+            raise ValueError(
+                f"Fashn tryon: response missing id (HTTP {resp.status}): {resp.parsed_response}"
+            )
+        jid = str(job_id)
+        log.info("fashn tryon submit OK remote_id=%s…", jid[:10])
+        return jid
+
+    async def run_tryon_v16(
+        self,
+        *,
+        model_image: str,
+        garment_image: str,
+        garment_photo_type: str = "model",
+    ) -> bytes:
+        """submit → poll → download PNG."""
+        last_err: Exception = RuntimeError("Unknown error")
+        try:
+            for attempt in range(MAX_RETRIES):
+                log.info("fashn tryon-v1.6 attempt %s/%s", attempt + 1, MAX_RETRIES)
+                try:
+                    job_id = await self.submit_tryon_v16(
+                        model_image=model_image,
+                        garment_image=garment_image,
+                        garment_photo_type=garment_photo_type,
+                    )
+                    urls = await self.poll_status(job_id)
+                    if not urls:
+                        raise ValueError("Fashn tryon: empty output")
+                    return await self.download_png(urls[0])
+                except Exception as e:
+                    last_err = e
+                    log.warning(
+                        "fashn tryon attempt %s/%s failed: %s: %s",
+                        attempt + 1,
+                        MAX_RETRIES,
+                        type(e).__name__,
+                        e,
+                        exc_info=True,
+                    )
+            raise last_err
+        finally:
+            await self.close()
+
     async def run_product_to_model(
         self, *, gender: str, product_image_data_url: str
     ) -> bytes:

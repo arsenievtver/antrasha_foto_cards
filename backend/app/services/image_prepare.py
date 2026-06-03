@@ -58,6 +58,38 @@ def _reencode_jpeg_smaller_for_transport(raw: bytes) -> bytes:
     return buf.getvalue()
 
 
+def build_fashn_image_data_url_from_bytes(raw: bytes) -> str:
+    """Любое фото пользователя → JPEG data URL для Fashn."""
+    _register_heif_once()
+    img = Image.open(io.BytesIO(raw))
+    img.load()
+    w, h = img.size
+    m = max(w, h)
+    if m > _JPEG_MAX_LONG_EDGE_PX:
+        scale = _JPEG_MAX_LONG_EDGE_PX / m
+        new_w = max(1, int(w * scale))
+        new_h = max(1, int(h * scale))
+        img = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
+    if img.mode == "LA":
+        img = img.convert("RGBA")
+    if img.mode in ("RGBA",) or (img.mode == "P" and "transparency" in getattr(img, "info", {})):
+        rgba = img.convert("RGBA")
+        bg = Image.new("RGB", rgba.size, (255, 255, 255))
+        bg.paste(rgba, mask=rgba.split()[-1])
+        img = bg
+    elif img.mode == "P":
+        img = img.convert("RGB")
+    elif img.mode == "L":
+        img = img.convert("RGB")
+    elif img.mode != "RGB":
+        img = img.convert("RGB")
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", quality=92, optimize=True)
+    jpeg = buf.getvalue()
+    b64 = base64.b64encode(jpeg).decode("ascii")
+    return f"data:image/jpeg;base64,{b64}"
+
+
 def build_fashn_product_image_data_url(path: Path) -> str:
     """
     `product_image` для Fashn: `data:image/jpeg;base64,...`

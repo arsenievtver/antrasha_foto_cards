@@ -335,6 +335,67 @@ export async function createGuestFittingRequest({ phone, note } = {}) {
 	return data;
 }
 
+export async function fetchTryOnStatus() {
+	const headers = await sessionAuthHeaders();
+	const res = await fetch(apiUrl("/try-on-experiment/status"), { headers });
+	if (!res.ok) {
+		const text = await res.text();
+		throw new Error(text || `try-on status ${res.status}`);
+	}
+	return res.json();
+}
+
+export async function fetchTryOnCatalog(gender, { limit = 48 } = {}) {
+	const headers = await sessionAuthHeaders();
+	const q = new URLSearchParams({ gender, limit: String(limit) });
+	const res = await fetch(apiUrl(`/try-on-experiment/photos?${q}`), { headers });
+	if (!res.ok) {
+		let data = {};
+		try {
+			data = await res.json();
+		} catch {
+			/* empty */
+		}
+		throw new Error(parseErrorPayload(data, `Каталог ${res.status}`));
+	}
+	return res.json();
+}
+
+/** Долгий запрос (FASHN 30–120 с). */
+export async function runTryOnExperiment({ photoId, personFile }) {
+	const headers = await sessionAuthHeaders();
+	const fd = new FormData();
+	fd.append("photo_id", photoId);
+	fd.append("person_image", personFile);
+	const controller = new AbortController();
+	const timeout = setTimeout(() => controller.abort(), 300_000);
+	try {
+		const res = await fetch(apiUrl("/try-on-experiment/run"), {
+			method: "POST",
+			headers,
+			body: fd,
+			signal: controller.signal,
+		});
+		let data = {};
+		try {
+			data = await res.json();
+		} catch {
+			/* empty */
+		}
+		if (!res.ok) {
+			throw new Error(parseErrorPayload(data, `Примерка ${res.status}`));
+		}
+		return data;
+	} catch (ex) {
+		if (ex.name === "AbortError") {
+			throw new Error("Слишком долгое ожидание — попробуйте ещё раз");
+		}
+		throw ex;
+	} finally {
+		clearTimeout(timeout);
+	}
+}
+
 export async function postInteraction({ photoId, action, viewTimeMs }) {
 	await ensureSessionId();
 	const headers = {

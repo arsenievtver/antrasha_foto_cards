@@ -12,6 +12,7 @@ import About from "./pages/About";
 import Swipe from "./pages/Swipe";
 import ThankYou from "./pages/ThankYou";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
+import TryOnExperiment from "./pages/TryOnExperiment";
 import "./App.css";
 import {
 	captureRefFromUrl,
@@ -26,7 +27,8 @@ function AppShell() {
 	const scrollMain =
 		pathname === "/thank-you" ||
 		pathname === "/about" ||
-		pathname === "/privacy";
+		pathname === "/privacy" ||
+		pathname === "/experiment/try-on";
 	const showUserMenu =
 		pathname === "/" ||
 		pathname === "/thank-you" ||
@@ -45,6 +47,7 @@ function AppShell() {
 					<Route path="/swipe/:gender" element={<Swipe />} />
 					<Route path="/thank-you" element={<ThankYou />} />
 					<Route path="/privacy" element={<PrivacyPolicy />} />
+					<Route path="/experiment/try-on" element={<TryOnExperiment />} />
 				</Routes>
 			</div>
 		</div>

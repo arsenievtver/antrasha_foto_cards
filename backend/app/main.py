@@ -22,6 +22,7 @@ from app.routers import (
     internal_sync,
     promo_banners,
     sessions,
+    try_on_experiment,
     ximilar,
 )
 from app.services.ai_ingest_worker import reset_stale_processing_jobs
@@ -109,6 +110,7 @@ app.include_router(admin_ai_ingest.router)
 app.include_router(promo_banners.router)
 app.include_router(internal_sync.router)
 app.include_router(ximilar.router)
+app.include_router(try_on_experiment.router)
 
 Instrumentator().instrument(app).expose(app)
 
