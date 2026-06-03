@@ -40,7 +40,8 @@ export default function TryOnExperiment() {
 	const [err, setErr] = useState("");
 	const [resultUrl, setResultUrl] = useState(null);
 	const [elapsed, setElapsed] = useState(null);
-	const fileRef = useRef(null);
+	const galleryInputRef = useRef(null);
+	const cameraInputRef = useRef(null);
 
 	const loadCatalog = useCallback(async () => {
 		setCatalogLoading(true);
@@ -224,8 +225,20 @@ export default function TryOnExperiment() {
 									<div className="tryon-person-placeholder">нет фото</div>
 								)}
 								<div className="tryon-person-actions">
+									{/* Без capture — на iPhone откроется «Фото», «Выбрать файл» и т.д. */}
 									<input
-										ref={fileRef}
+										ref={galleryInputRef}
+										type="file"
+										accept="image/*"
+										className="tryon-file-input"
+										onChange={(e) => {
+											const f = e.target.files?.[0];
+											onPickPerson(f);
+											e.target.value = "";
+										}}
+									/>
+									<input
+										ref={cameraInputRef}
 										type="file"
 										accept="image/*"
 										capture="user"
@@ -239,9 +252,16 @@ export default function TryOnExperiment() {
 									<button
 										type="button"
 										className="tryon-btn tryon-btn--secondary"
-										onClick={() => fileRef.current?.click()}
+										onClick={() => galleryInputRef.current?.click()}
 									>
-										Камера / галерея
+										Из галереи
+									</button>
+									<button
+										type="button"
+										className="tryon-btn tryon-btn--secondary"
+										onClick={() => cameraInputRef.current?.click()}
+									>
+										Сделать селфи
 									</button>
 									{personPreview ? (
 										<button
