@@ -1,0 +1,108 @@
+.tryon-guide-backdrop {
+	position: fixed;
+	inset: 0;
+	z-index: 200;
+	display: flex;
+	align-items: flex-end;
+	justify-content: center;
+	padding: 12px;
+	padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+	background: rgba(0, 0, 0, 0.72);
+	backdrop-filter: blur(6px);
+	-webkit-backdrop-filter: blur(6px);
+}
+
+.tryon-guide-dialog {
+	width: 100%;
+	max-width: 420px;
+	max-height: min(92vh, 720px);
+	overflow-y: auto;
+	padding: 20px 18px 18px;
+	border-radius: 14px 14px 12px 12px;
+	background: #121211;
+	color: #f2f1ee;
+	border: 1px solid rgba(255, 255, 255, 0.14);
+	box-sizing: border-box;
+}
+
+.tryon-guide-dialog__title {
+	margin: 0 0 8px;
+	font-size: 1.125rem;
+	font-weight: 500;
+}
+
+.tryon-guide-dialog__lead {
+	margin: 0 0 14px;
+	font-size: 0.82rem;
+	line-height: 1.45;
+	color: rgba(242, 241, 238, 0.62);
+}
+
+.tryon-guide-figure {
+	margin: 0 0 14px;
+}
+
+.tryon-guide-figure__img {
+	display: block;
+	width: 100%;
+	height: auto;
+	border-radius: 8px;
+	border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.tryon-guide-figure__labels {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 6px;
+	margin-top: 8px;
+	font-size: 0.68rem;
+	letter-spacing: 0.03em;
+	text-align: center;
+	color: #c4a484;
+}
+
+.tryon-guide-list {
+	margin: 0 0 18px;
+	padding-left: 1.1rem;
+	font-size: 0.8rem;
+	line-height: 1.5;
+	color: rgba(242, 241, 238, 0.75);
+}
+
+.tryon-guide-list li + li {
+	margin-top: 6px;
+}
+
+.tryon-guide-dialog__actions {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.tryon-guide-btn {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 100%;
+	padding: 14px 16px;
+	border-radius: 8px;
+	font: inherit;
+	font-size: 0.9rem;
+	cursor: pointer;
+	-webkit-tap-highlight-color: transparent;
+}
+
+.tryon-guide-btn--primary {
+	border: 1px solid #c4a484;
+	background: transparent;
+	color: #c4a484;
+	font-weight: 500;
+}
+
+.tryon-guide-btn--ghost {
+	border: none;
+	background: transparent;
+	color: rgba(242, 241, 238, 0.5);
+	font-size: 0.8rem;
+	padding: 10px;
+}

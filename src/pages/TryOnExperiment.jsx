@@ -6,6 +6,10 @@ import {
 	fetchTryOnStatus,
 	runTryOnExperiment,
 } from "../api/client";
+import TryOnPhotoGuide, {
+	dismissPhotoGuideForever,
+	isPhotoGuideDismissed,
+} from "../components/TryOnPhotoGuide.jsx";
 import "./TryOnExperiment.css";
 
 const GENDER_STORAGE_KEY = "tryon_experiment_gender";
@@ -44,6 +48,8 @@ export default function TryOnExperiment() {
 	const [saveHint, setSaveHint] = useState("");
 	const galleryInputRef = useRef(null);
 	const cameraInputRef = useRef(null);
+	const [guideOpen, setGuideOpen] = useState(false);
+	const [pendingPicker, setPendingPicker] = useState(null);
 
 	const loadCatalog = useCallback(async () => {
 		setCatalogLoading(true);
@@ -99,6 +105,28 @@ export default function TryOnExperiment() {
 		const nextParams = new URLSearchParams(searchParams);
 		nextParams.set("gender", next);
 		setSearchParams(nextParams, { replace: true });
+	}
+
+	function openPicker(kind) {
+		if (kind === "gallery") galleryInputRef.current?.click();
+		else cameraInputRef.current?.click();
+	}
+
+	function requestPersonPhoto(kind) {
+		if (isPhotoGuideDismissed()) {
+			openPicker(kind);
+			return;
+		}
+		setPendingPicker(kind);
+		setGuideOpen(true);
+	}
+
+	function closeGuide({ forever = false } = {}) {
+		if (forever) dismissPhotoGuideForever();
+		setGuideOpen(false);
+		const pending = pendingPicker;
+		setPendingPicker(null);
+		if (pending) openPicker(pending);
 	}
 
 	function onPickPerson(file) {
@@ -179,9 +207,21 @@ export default function TryOnExperiment() {
 	}
 
 	const selectedPhoto = catalog.find((p) => p.id === selectedId);
+	const canRun = Boolean(personFile && selectedId);
+	const showStickyDock = Boolean(!resultUrl && (selectedId || personFile));
+	const dockHint = !personFile
+		? "Добавьте своё фото"
+		: !selectedId
+			? "Выберите образ из каталога"
+			: "";
 
 	return (
-		<div className="tryon-page">
+		<div className={`tryon-page${showStickyDock ? " tryon-page--dock" : ""}`}>
+			<TryOnPhotoGuide
+				open={guideOpen}
+				onClose={() => closeGuide()}
+				onDismissForever={() => closeGuide({ forever: true })}
+			/>
 			<div className="tryon-hero">
 				<header className="tryon-topbar">
 					<button
@@ -257,9 +297,17 @@ export default function TryOnExperiment() {
 						<section className="tryon-block">
 							<h2 className="tryon-block__title">1. Ваше фото</h2>
 							<p className="tryon-hint">
-								Вертикальное фото в полный рост или по пояс, лицо и торс видны, без
-								сильного наклона — так модель лучше «садится» на кадр. Не
-								поворачивайте снимок в галерее перед отправкой.
+								Нужен чёткий снимок вас в кадре.{" "}
+								<button
+									type="button"
+									className="tryon-link-btn"
+									onClick={() => {
+										setPendingPicker(null);
+										setGuideOpen(true);
+									}}
+								>
+									Пример и подсказка
+								</button>
 							</p>
 							<div className="tryon-person-row">
 								{personPreview ? (
@@ -299,14 +347,14 @@ export default function TryOnExperiment() {
 									<button
 										type="button"
 										className="tryon-btn tryon-btn--secondary"
-										onClick={() => galleryInputRef.current?.click()}
+										onClick={() => requestPersonPhoto("gallery")}
 									>
 										Из галереи
 									</button>
 									<button
 										type="button"
 										className="tryon-btn tryon-btn--secondary"
-										onClick={() => cameraInputRef.current?.click()}
+										onClick={() => requestPersonPhoto("camera")}
 									>
 										Сделать селфи
 									</button>
@@ -390,21 +438,28 @@ export default function TryOnExperiment() {
 									<p className="tryon-hint tryon-save-hint">{saveHint}</p>
 								) : null}
 							</section>
-						) : (
-							<div className="tryon-run-wrap">
-								{err ? <p className="tryon-error">{err}</p> : null}
-								<button
-									type="button"
-									className="tryon-btn tryon-btn--primary"
-									disabled={busy || !personFile || !selectedId}
-									onClick={onRun}
-								>
-									{busy ? "Генерируем… (до 2 мин)" : "Примерить на меня"}
-								</button>
-							</div>
-						)}
+						) : null}
 						</>
 				</main>
+			) : null}
+
+			{showStickyDock ? (
+				<div className="tryon-dock" role="region" aria-label="Запуск примерки">
+					<div className="tryon-dock__inner">
+						{err ? <p className="tryon-error tryon-dock__err">{err}</p> : null}
+						{!canRun && dockHint ? (
+							<p className="tryon-dock__hint">{dockHint}</p>
+						) : null}
+						<button
+							type="button"
+							className="tryon-btn tryon-btn--primary"
+							disabled={busy || !canRun}
+							onClick={onRun}
+						>
+							{busy ? "Генерируем… (до 2 мин)" : "Примерить на меня"}
+						</button>
+					</div>
+				</div>
 			) : null}
 		</div>
 	);
