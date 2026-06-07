@@ -7,19 +7,28 @@ import {
 	useCallback,
 } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+import {
+	motion,
+	AnimatePresence,
+	useReducedMotion,
+	useMotionValue,
+	useTransform,
+	animate,
+} from "framer-motion";
 import { loadFeed, postInteraction } from "../api/client";
-import { useAuth } from "../context/AuthContext";
 import swipeHandAsset from "../assets/swipe.svg";
 import "./Swipe.css";
 
-const SWIPE_GUEST_COACH_KEY = "swipe_guest_coach_dismissed";
+const SWIPE_COACH_KEY = "swipe_coach_v2_dismissed";
 
-function readGuestCoachDismissed() {
+const DRAG_FEEDBACK_PX = 50;
+const COMMIT_OFFSET_PX = 80;
+const COMMIT_VELOCITY = 800;
+function readCoachDismissed() {
 	try {
 		return (
 			typeof localStorage !== "undefined" &&
-			localStorage.getItem(SWIPE_GUEST_COACH_KEY) === "1"
+			localStorage.getItem(SWIPE_COACH_KEY) === "1"
 		);
 	} catch {
 		return true;
@@ -97,8 +106,6 @@ function CardImage({ url, fetchPriority, photoId }) {
 	const [ready, setReady] = useState(false);
 	const imgRef = useRef(null);
 
-	// Картинка из HTTP-кэша часто уже complete до срабатывания onLoad — иначе шиммер не исчезает никогда.
-	// Важно: не использовать отдельный useEffect(() => setReady(false), [url]) — он шёл ПОСЛЕ этого и сбрасывал ready обратно в false.
 	useLayoutEffect(() => {
 		const el = imgRef.current;
 		if (el?.complete && el.naturalWidth > 0) {
@@ -124,13 +131,56 @@ function CardImage({ url, fetchPriority, photoId }) {
 	);
 }
 
+/** Штампы: «Мой стиль» (лайк), «Дальше» (пропуск жестом), «Не моё» (кнопка 👎). */
+function SwipeStamps({ overlay, likeOpacity, skipOpacity }) {
+	if (overlay === "like") {
+		return (
+			<div className="swipe-stamp swipe-stamp--like swipe-stamp--committed" aria-hidden>
+				Мой стиль
+			</div>
+		);
+	}
+	if (overlay === "skip") {
+		return (
+			<div className="swipe-stamp swipe-stamp--skip swipe-stamp--committed" aria-hidden>
+				Дальше
+			</div>
+		);
+	}
+	if (overlay === "nope") {
+		return (
+			<div className="swipe-stamp swipe-stamp--nope swipe-stamp--committed" aria-hidden>
+				Не моё
+			</div>
+		);
+	}
+
+	return (
+		<>
+			<motion.div
+				className="swipe-stamp swipe-stamp--like"
+				style={{ opacity: likeOpacity, scale: likeOpacity }}
+				aria-hidden
+			>
+				Мой стиль
+			</motion.div>
+			<motion.div
+				className="swipe-stamp swipe-stamp--skip"
+				style={{ opacity: skipOpacity, scale: skipOpacity }}
+				aria-hidden
+			>
+				Дальше
+			</motion.div>
+		</>
+	);
+}
+
 export default function Swipe() {
 	const { gender } = useParams();
 	const navigate = useNavigate();
-	const { isAuthenticated, loading: authLoading } = useAuth();
 	const reduceMotion = useReducedMotion();
 
-	const [coachDismissed, setCoachDismissed] = useState(readGuestCoachDismissed);
+	const [coachDismissed, setCoachDismissed] = useState(readCoachDismissed);
 
 	const [photos, setPhotos] = useState([]);
 	const [loadError, setLoadError] = useState(null);
@@ -146,12 +196,20 @@ export default function Swipe() {
 	const swipeHandledRef = useRef(false);
 	const cardShownAtRef = useRef(Date.now());
 
+	const dragX = useMotionValue(0);
+	const dragRotate = useTransform(dragX, [-280, 0, 280], [-16, 0, 16]);
+	const likeTintOpacity = useTransform(dragX, [0, DRAG_FEEDBACK_PX, 140], [0, 0.35, 0.55]);
+	const likeStampOpacity = useTransform(dragX, [0, DRAG_FEEDBACK_PX, 130], [0, 0.5, 1]);
+	const skipStampOpacity = useTransform(
+		dragX,
+		[-130, -DRAG_FEEDBACK_PX, 0],
+		[1, 0.5, 0],
+	);
+
 	useEffect(() => {
 		let cancelled = false;
 		setLoading(true);
 		setLoadError(null);
-		// Смена коллекции (male/female) не размонтирует страницу — иначе index остаётся от прошлой колоды
-		// и slice(index) подставляет «хвост одной / начало другой» ↔ симптом «5 карт не те».
 		setPhotos([]);
 		setIndex(0);
 		setLikes(0);
@@ -160,6 +218,7 @@ export default function Swipe() {
 		setShowInfo(false);
 		setIsExiting(false);
 		swipeHandledRef.current = false;
+		dragX.set(0);
 
 		loadFeed(gender, { limit: 40 })
 			.then((data) => {
@@ -179,13 +238,15 @@ export default function Swipe() {
 		return () => {
 			cancelled = true;
 		};
-	}, [gender]);
+	}, [gender, dragX]);
+
+	const currentPhoto = photos[index];
 
 	useEffect(() => {
 		cardShownAtRef.current = Date.now();
-	}, [index]);
+		dragX.set(0);
+	}, [index, dragX]);
 
-	const currentPhoto = photos[index];
 	const photoInfo = useMemo(() => {
 		if (!currentPhoto) return null;
 		const tags = Array.isArray(currentPhoto.tags) ? currentPhoto.tags : [];
@@ -205,11 +266,10 @@ export default function Swipe() {
 		};
 	}, [currentPhoto]);
 
-	const sendSwipe = useCallback(
-		async (direction) => {
+	const sendAction = useCallback(
+		async (action) => {
 			if (!currentPhoto) return;
 			const viewTimeMs = Math.round(Date.now() - cardShownAtRef.current);
-			const action = direction === "right" ? "like" : "dislike";
 			try {
 				await postInteraction({
 					photoId: currentPhoto.id,
@@ -223,76 +283,98 @@ export default function Swipe() {
 		[currentPhoto],
 	);
 
-	const handleSwipe = (direction) => {
-		if (swipeHandledRef.current) return;
-		swipeHandledRef.current = true;
+	const handleAction = useCallback(
+		(action) => {
+			if (swipeHandledRef.current) return;
+			swipeHandledRef.current = true;
 
-		void sendSwipe(direction);
+			void sendAction(action);
 
-		const newLikes = direction === "right" ? likes + 1 : likes;
-		if (direction === "right") setLikes(newLikes);
-		const nextLikedPhotoIds =
-			direction === "right"
-				? [...likedPhotoIds, currentPhoto.id]
-				: likedPhotoIds;
-		if (direction === "right") setLikedPhotoIds(nextLikedPhotoIds);
+			const newLikes = action === "like" ? likes + 1 : likes;
+			if (action === "like") setLikes(newLikes);
+			const nextLikedPhotoIds =
+				action === "like"
+					? [...likedPhotoIds, currentPhoto.id]
+					: likedPhotoIds;
+			if (action === "like") setLikedPhotoIds(nextLikedPhotoIds);
 
-		const nextIndex = index + 1;
-		if (nextIndex >= photos.length) {
-			navigate("/thank-you", {
-				state: {
-					likes: newLikes,
-					total: photos.length,
-					likedPhotoIds: nextLikedPhotoIds,
-				},
-			});
-			return;
-		}
+			const nextIndex = index + 1;
+			if (nextIndex >= photos.length) {
+				navigate("/thank-you", {
+					state: {
+						likes: newLikes,
+						total: photos.length,
+						likedPhotoIds: nextLikedPhotoIds,
+					},
+				});
+				return;
+			}
 
-		setIndex(nextIndex);
-		setOverlay(null);
-		setShowInfo(false);
-		setIsExiting(false);
+			setIndex(nextIndex);
+			setOverlay(null);
+			setShowInfo(false);
+			setIsExiting(false);
+			dragX.set(0);
 
-		setTimeout(() => {
+			setTimeout(() => {
+				swipeHandledRef.current = false;
+			}, 0);
+		},
+		[
+			sendAction,
+			likes,
+			likedPhotoIds,
+			currentPhoto,
+			index,
+			photos.length,
+			navigate,
+			dragX,
+		],
+	);
+
+	const commitExit = useCallback(
+		(action, overlayKind, exitX) => {
+			if (isExiting) return;
 			swipeHandledRef.current = false;
-		}, 0);
-	};
+			setOverlay(overlayKind);
+			setIsExiting(true);
 
-	const handleDragEnd = (e, info) => {
+			const duration = reduceMotion ? 0.15 : 0.38;
+			void animate(dragX, exitX, { duration }).then(() => {
+				handleAction(action);
+			});
+		},
+		[isExiting, dragX, handleAction, reduceMotion],
+	);
+
+	const handleDragEnd = (_e, info) => {
 		if (isExiting) return;
 		const offset = info.offset.x;
 		const velocity = info.velocity.x;
-		if (Math.abs(offset) > 80 || Math.abs(velocity) > 800) {
-			const dir = offset > 0 ? "right" : "left";
-			/* Как у кнопок: сначала штамп, улет карточки, затем handleSwipe — иначе setOverlay(null) в handleSwipe сразу снимает надпись */
-			swipeHandledRef.current = false;
-			setOverlay(dir === "right" ? "like" : "nope");
-			setIsExiting(true);
-			setTimeout(() => {
-				handleSwipe(dir);
-			}, 650);
+		if (
+			Math.abs(offset) > COMMIT_OFFSET_PX ||
+			Math.abs(velocity) > COMMIT_VELOCITY
+		) {
+			const dir = offset !== 0 ? offset : velocity;
+			if (dir > 0) {
+				commitExit("like", "like", 520);
+			} else {
+				commitExit("skip", "skip", -520);
+			}
 		} else {
 			setOverlay(null);
+			void animate(dragX, 0, {
+				type: "spring",
+				stiffness: 520,
+				damping: 36,
+			});
 		}
 	};
 
-	const handleButtonSwipe = (dir) => {
-		if (isExiting) return;
-		swipeHandledRef.current = false;
-		setOverlay(dir === "right" ? "like" : "nope");
-		setIsExiting(true);
-
-		setTimeout(() => {
-			handleSwipe(dir);
-		}, 650);
-	};
-
-	const handleDrag = (event, info) => {
-		const threshold = 120;
-		if (info.offset.x > threshold) setOverlay("like");
-		else if (info.offset.x < -threshold) setOverlay("nope");
-		else setOverlay(null);
+	const handleButtonAction = (action) => {
+		const overlayKind = action === "like" ? "like" : "nope";
+		const exitX = action === "like" ? 520 : -520;
+		commitExit(action, overlayKind, exitX);
 	};
 
 	const stack = useMemo(
@@ -315,15 +397,11 @@ export default function Swipe() {
 
 	if (!photos.length) return <div className="swipe-no-images">Нет фото в базе</div>;
 
-	const showGuestCoach =
-		!authLoading &&
-		!isAuthenticated &&
-		!coachDismissed &&
-		photos.length > 0;
+	const showCoach = !coachDismissed && photos.length > 0;
 
-	function dismissGuestCoach() {
+	function dismissCoach() {
 		try {
-			localStorage.setItem(SWIPE_GUEST_COACH_KEY, "1");
+			localStorage.setItem(SWIPE_COACH_KEY, "1");
 		} catch {
 			/* ignore */
 		}
@@ -332,7 +410,7 @@ export default function Swipe() {
 
 	return (
 		<div className="swipe-container">
-			{showGuestCoach && (
+			{showCoach && (
 				<div
 					className="swipe-coach"
 					role="dialog"
@@ -342,31 +420,31 @@ export default function Swipe() {
 					<div className="swipe-coach-scrim" aria-hidden />
 					<div className="swipe-coach-inner">
 						<h2 id="swipe-coach-title" className="swipe-coach-title">
-							Смахните карточку
+							Листайте образы
 						</h2>
 						<p className="swipe-coach-lead">
-							Влево — не нравится, вправо — нравится.
+							Влево — дальше, без оценки.
 							<br />
-							Тоже самое можно сделать кнопками внизу.
+							Вправо — нравится. Кнопка 👎 — явно «не моё».
 						</p>
 						<div
 							className={`swipe-coach-demo${reduceMotion ? " swipe-coach-demo--static" : ""}`}
 						>
-							<span className="swipe-coach-side swipe-coach-side--nope">
-								Нет
+							<span className="swipe-coach-side swipe-coach-side--skip">
+								Дальше
 							</span>
 							<div className="swipe-coach-track">
 								<div className="swipe-coach-track-line" aria-hidden />
 								<SwipeCoachHandOutline reduceMotion={reduceMotion} />
 							</div>
 							<span className="swipe-coach-side swipe-coach-side--like">
-								Да
+								Нравится
 							</span>
 						</div>
 						<button
 							type="button"
 							className="swipe-coach-cta"
-							onClick={dismissGuestCoach}
+							onClick={dismissCoach}
 						>
 							Понятно
 						</button>
@@ -377,7 +455,6 @@ export default function Swipe() {
 				<AnimatePresence>
 					{stack.map((photo, i) => {
 						const isTop = i === 0;
-						const isLeaving = isTop && isExiting;
 
 						return (
 							<motion.div
@@ -385,38 +462,46 @@ export default function Swipe() {
 								className="swipe-card"
 								drag={isTop && !isExiting ? "x" : false}
 								dragConstraints={{ left: 0, right: 0 }}
-								dragElastic={0.8}
-								dragMomentum={true}
-								onDrag={isTop ? handleDrag : undefined}
+								dragElastic={0.75}
+								dragMomentum={false}
 								onDragEnd={isTop ? handleDragEnd : undefined}
-								/* Только верхняя карта появляется с fade; нижние сразу opacity:1 — иначе стопка выглядела как «пустые дыры» */
+								style={
+									isTop
+										? { x: dragX, rotate: dragRotate, zIndex: 10 - i }
+										: { zIndex: 10 - i }
+								}
 								initial={
 									i === 0
 										? { scale: 0.96, y: 0, opacity: 0 }
 										: { scale: 1, y: i * -10, opacity: 1 }
 								}
 								animate={
-									isLeaving
-										? {
-												x: overlay === "like" ? 1000 : -1000,
-												opacity: 0,
-											}
+									isTop && isExiting
+										? { opacity: 0.6 }
 										: { scale: 1, y: i * -10, opacity: 1 }
 								}
 								exit={{ opacity: 0 }}
-								style={{ zIndex: 10 - i }}
 								transition={{ duration: i === 0 ? 0.35 : 0.2 }}
 							>
+								{isTop && (
+									<motion.div
+										className="swipe-card-tint swipe-card-tint--like"
+										style={{ opacity: likeTintOpacity }}
+										aria-hidden
+									/>
+								)}
 								<CardImage
 									key={photo.id}
 									url={photo.url}
 									photoId={photo.id}
 									fetchPriority={isTop ? "high" : "low"}
 								/>
-								{isTop && overlay && (
-									<div className={`overlay ${overlay}`}>
-										{overlay === "like" ? "Нравится" : "Пропуск"}
-									</div>
+								{isTop && (
+									<SwipeStamps
+										overlay={isExiting ? overlay : null}
+										likeOpacity={isExiting ? undefined : likeStampOpacity}
+										skipOpacity={isExiting ? undefined : skipStampOpacity}
+									/>
 								)}
 								{isTop && showInfo && photoInfo ? (
 									<div className="swipe-photo-info" role="status" aria-live="polite">
@@ -434,8 +519,9 @@ export default function Swipe() {
 				<div className="swipe-buttons">
 					<button
 						type="button"
-						onClick={() => handleButtonSwipe("left")}
+						onClick={() => handleButtonAction("dislike")}
 						className="swipe-btn swipe-btn--left nope"
+						aria-label="Не моё"
 					>
 						👎
 					</button>
@@ -449,8 +535,9 @@ export default function Swipe() {
 					</button>
 					<button
 						type="button"
-						onClick={() => handleButtonSwipe("right")}
+						onClick={() => handleButtonAction("like")}
 						className="swipe-btn swipe-btn--right like"
+						aria-label="Нравится"
 					>
 						👍
 					</button>

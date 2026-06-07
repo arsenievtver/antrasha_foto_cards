@@ -95,33 +95,69 @@
     opacity: 1;
 }
 
-.overlay {
+/* Зелёный оттенок при свайпе «нравится» */
+.swipe-card-tint {
     position: absolute;
-    top: 20px;
-    left: 50%;
+    inset: 0;
+    z-index: 4;
+    pointer-events: none;
+    border-radius: inherit;
+}
+
+.swipe-card-tint--like {
+    background: linear-gradient(
+        135deg,
+        rgba(76, 175, 80, 0.08) 0%,
+        rgba(76, 175, 80, 0.42) 100%
+    );
+}
+
+/* Штампы как в Tinder: угол, наклон, крупный текст */
+.swipe-stamp {
+    position: absolute;
     z-index: 5;
-    transform: translateX(-50%);
-    padding: 10px 18px;
-    font-size: clamp(1.15rem, 4.2vw, 1.65rem);
-    font-weight: bold;
-    color: white;
-    border: 3px solid white;
+    padding: 8px 14px;
+    font-size: clamp(1.35rem, 5vw, 1.85rem);
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    border: 4px solid;
     border-radius: 10px;
     pointer-events: none;
     user-select: none;
-    white-space: nowrap;
-    text-align: center;
+    line-height: 1;
     box-sizing: border-box;
 }
 
-.overlay.like {
-    border-color: #4caf50;
-    color: #4caf50;
+.swipe-stamp--like {
+    top: 44px;
+    right: 18px;
+    transform: rotate(14deg);
+    color: #6fdc6a;
+    border-color: #6fdc6a;
+    transform-origin: center center;
 }
 
-.overlay.nope {
-    border-color: #f44336;
-    color: #f44336;
+.swipe-stamp--skip {
+    top: 44px;
+    left: 18px;
+    transform: rotate(-14deg);
+    color: rgba(255, 255, 255, 0.92);
+    border-color: rgba(255, 255, 255, 0.88);
+    transform-origin: center center;
+}
+
+.swipe-stamp--nope {
+    top: 44px;
+    left: 18px;
+    transform: rotate(-14deg);
+    color: #ff6b6b;
+    border-color: #ff6b6b;
+    transform-origin: center center;
+}
+
+.swipe-stamp--committed {
+    opacity: 1;
 }
 
 .swipe-no-images {
@@ -235,7 +271,7 @@
     margin-top: 4px;
 }
 
-/* Подсказка свайпа для гостя (не зарегистрирован) */
+/* Онбординг свайпа (первая сессия у всех) */
 .swipe-coach {
     position: fixed;
     inset: 0;
@@ -300,10 +336,9 @@
     transform-origin: center 80%;
 }
 
-.swipe-coach-side--nope {
-    color: #f44336;
-    /* linear + те же %, что у кисти — один общий «фазовый» ритм */
-    animation: swipe-coach-label-nope 2.4s linear infinite;
+.swipe-coach-side--skip {
+    color: rgba(255, 255, 255, 0.78);
+    animation: swipe-coach-label-skip 2.4s linear infinite;
 }
 
 .swipe-coach-side--like {
@@ -337,7 +372,7 @@
     }
 }
 
-@keyframes swipe-coach-label-nope {
+@keyframes swipe-coach-label-skip {
     0%,
     100% {
         transform: scale(1);
@@ -354,8 +389,8 @@
     }
     73%,
     77% {
-        transform: scale(1.2);
-        opacity: 1;
+        transform: scale(1.12);
+        opacity: 0.95;
     }
 }
 
@@ -375,7 +410,7 @@
     border-radius: 3px;
     background: linear-gradient(
         90deg,
-        rgba(244, 67, 54, 0.35),
+        rgba(255, 255, 255, 0.28),
         rgba(255, 255, 255, 0.2),
         rgba(76, 175, 80, 0.35)
     );
@@ -482,7 +517,7 @@
 }
 
 .swipe-coach-demo--static .swipe-coach-side--like,
-.swipe-coach-demo--static .swipe-coach-side--nope {
+.swipe-coach-demo--static .swipe-coach-side--skip {
     animation: none;
     transform: none;
     opacity: 0.85;
@@ -499,7 +534,7 @@
     }
 
     .swipe-coach-side--like,
-    .swipe-coach-side--nope {
+    .swipe-coach-side--skip {
         animation: none;
         transform: none;
         opacity: 0.85;

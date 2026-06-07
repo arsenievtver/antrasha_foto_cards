@@ -116,6 +116,7 @@ def create_interaction(
     )
     db.add(inter)
 
+    # skip — только «видел» (лента, seen); в публичный рейтинг и веса не идёт.
     if body.action in ("like", "dislike"):
         apply_swipe_to_weights(
             db,
