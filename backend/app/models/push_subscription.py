@@ -30,7 +30,7 @@ class PushSubscription(Base):
     )
     session_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("user_sessions.id", ondelete="CASCADE"),
+        ForeignKey("sessions.id", ondelete="CASCADE"),
         nullable=True,
         index=True,
     )
