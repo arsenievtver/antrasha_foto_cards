@@ -5,8 +5,8 @@ import PromoBannerModal from "../components/PromoBannerModal.jsx";
 import { ensureSessionId, fetchActivePromoBanner } from "../api/client.js";
 import logo from "../assets/image/лого А на черном-cropped.svg";
 import "./Home.css"
-import menImage from "../assets/image/2m.jpeg";
-import womenImage from "../assets/image/1w.jpeg";
+import menImage from "../assets/image/2m.webp";
+import womenImage from "../assets/image/1w.webp";
 
 
 export default function Home() {
