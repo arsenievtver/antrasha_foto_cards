@@ -257,6 +257,14 @@ def run_sync_job_commit(
             m.keys_in_bucket, m.rows_added, m.rows_deactivated, m.rows_purged, m.safety_skip,
             f.keys_in_bucket, f.rows_added, f.rows_deactivated, f.rows_purged, f.safety_skip,
         )
+        if m.rows_added + f.rows_added > 0:
+            from app.services.web_push import maybe_notify_after_photo_sync
+
+            maybe_notify_after_photo_sync(
+                settings,
+                rows_added_male=m.rows_added,
+                rows_added_female=f.rows_added,
+            )
         return out
     except Exception:
         db.rollback()

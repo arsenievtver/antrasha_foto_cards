@@ -245,4 +245,8 @@ def merge_session_into_user(
             )
         db.delete(sp)
 
+    from app.services.web_push import merge_session_push_subscriptions
+
+    merge_session_push_subscriptions(db, session_id=session_id, user_id=user.id)
+
     # Сессию не удаляем: клиент продолжает слать X-Session-Id после регистрации.

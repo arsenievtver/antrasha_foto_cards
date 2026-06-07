@@ -16,6 +16,7 @@ import {
 	animate,
 } from "framer-motion";
 import { loadFeed, postInteraction } from "../api/client";
+import PushNotifyPrompt from "../components/PushNotifyPrompt";
 import swipeHandAsset from "../assets/swipe.svg";
 import "./Swipe.css";
 
@@ -398,6 +399,8 @@ export default function Swipe() {
 	if (!photos.length) return <div className="swipe-no-images">Нет фото в базе</div>;
 
 	const showCoach = !coachDismissed && photos.length > 0;
+	const showPushPrompt =
+		coachDismissed && photos.length > 0 && index >= 3 && index < photos.length;
 
 	function dismissCoach() {
 		try {
@@ -514,6 +517,8 @@ export default function Swipe() {
 					})}
 				</AnimatePresence>
 			</div>
+
+			<PushNotifyPrompt visible={showPushPrompt} gender={gender} />
 
 			{index < photos.length && (
 				<div className="swipe-buttons">

@@ -82,6 +82,20 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("MAX_NOTIFY_USER_ID", "max_notify_user_id"),
     )
 
+    # Web Push (PWA): VAPID-ключи — scripts/generate_vapid_keys.py
+    vapid_public_key: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("VAPID_PUBLIC_KEY", "vapid_public_key"),
+    )
+    vapid_private_key: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("VAPID_PRIVATE_KEY", "vapid_private_key"),
+    )
+    vapid_claims_sub: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("VAPID_CLAIMS_SUB", "vapid_claims_sub"),
+    )
+
     # Fashn AI (product-to-model) — в .env: FASHN_API_KEY
     fashn_api_key: str | None = None
     # Если api.fashn.ai недоступен с IP сервера (например РФ), задайте HTTPS-прокси только для Fashn.
@@ -133,6 +147,17 @@ class Settings(BaseSettings):
         if self.promo_banner_media_dir and str(self.promo_banner_media_dir).strip():
             return Path(self.promo_banner_media_dir).expanduser().resolve()
         return (_BACKEND_DIR / "data" / "promo-banners").resolve()
+
+    @property
+    def web_push_configured(self) -> bool:
+        return bool(
+            self.vapid_public_key
+            and str(self.vapid_public_key).strip()
+            and self.vapid_private_key
+            and str(self.vapid_private_key).strip()
+            and self.vapid_claims_sub
+            and str(self.vapid_claims_sub).strip()
+        )
 
     @property
     def max_notify_configured(self) -> bool:

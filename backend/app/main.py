@@ -21,6 +21,7 @@ from app.routers import (
     interactions,
     internal_sync,
     promo_banners,
+    push,
     sessions,
     try_on_experiment,
     ximilar,
@@ -108,6 +109,7 @@ app.include_router(admin.router)
 app.include_router(admin_promo_banners.router)
 app.include_router(admin_ai_ingest.router)
 app.include_router(promo_banners.router)
+app.include_router(push.router)
 app.include_router(internal_sync.router)
 app.include_router(ximilar.router)
 app.include_router(try_on_experiment.router)
