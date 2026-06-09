@@ -320,10 +320,18 @@
     text-align: center;
     color: #fff;
     overflow: visible;
+    /* место под текст, чекбокс и кнопку — для пропорционального ужатия карточек */
+    --coach-reserved-y: 252px;
+}
+
+@media not ((display-mode: standalone) or (display-mode: fullscreen)) {
+    .swipe-coach-inner {
+        --coach-reserved-y: 324px;
+    }
 }
 
 .swipe-coach-title {
-    margin: 0 0 10px;
+    margin: 0 0 8px;
     flex-shrink: 0;
     font-size: 22px;
     font-weight: 700;
@@ -332,7 +340,7 @@
 }
 
 .swipe-coach-lead {
-    margin: 0 0 16px;
+    margin: 0 0 12px;
     flex-shrink: 0;
     font-size: 15px;
     line-height: 1.45;
@@ -340,13 +348,11 @@
 }
 
 .swipe-coach-demo {
-    flex: 1 1 auto;
-    min-height: 0;
+    flex: 0 0 auto;
     display: flex;
     align-items: center;
     justify-content: center;
     width: 100%;
-    margin-bottom: 0;
     overflow: visible;
 }
 
@@ -355,8 +361,18 @@
     width: 100vw;
     margin-left: calc(50% - 50vw);
     margin-right: calc(50% - 50vw);
-    --coach-card-w: min(72vw, 320px);
-    --coach-card-h: min(calc(var(--coach-card-w) * 1.75), 560px, 42dvh);
+    /* 80% от .swipe-card, 4∶7; при нехватке высоты ужимаем ширину и высоту вместе */
+    --coach-card-w: min(
+        72vw,
+        320px,
+        calc(
+            (
+                    100dvh - var(--coach-reserved-y) - env(safe-area-inset-top, 0px) -
+                        env(safe-area-inset-bottom, 0px)
+                ) / 1.75
+        )
+    );
+    --coach-card-h: min(calc(var(--coach-card-w) * 1.75), 560px);
     --coach-edge-inset: max(16px, env(safe-area-inset-left, 0px));
     flex-shrink: 0;
     overflow: visible;
@@ -436,11 +452,11 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 14px;
+    gap: 12px;
     flex-shrink: 0;
     width: 100%;
-    margin-top: 12px;
-    padding-top: 4px;
+    margin-top: auto;
+    padding-top: 14px;
 }
 
 .swipe-coach-dont-remind {

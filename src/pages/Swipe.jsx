@@ -185,33 +185,68 @@ function SwipeCoachStackDemo({ reduceMotion }) {
 	);
 }
 
-/** Старт загрузок строго в порядке массива (0 → 1 → …); браузер может закончить в другом порядке, но очередь одна). */
-function preloadImageUrls(urls) {
-	for (const url of urls) {
-		if (!url) continue;
+/** URL → Promise; Set готовых — общий кеш для preload и CardImage. */
+const imageReadyUrls = new Set();
+const imageLoadPromises = new Map();
+
+function preloadImageUrl(url) {
+	if (!url || typeof url !== "string") return Promise.resolve(false);
+	if (imageReadyUrls.has(url)) return Promise.resolve(true);
+	const pending = imageLoadPromises.get(url);
+	if (pending) return pending;
+
+	const promise = new Promise((resolve) => {
 		const img = new Image();
 		img.decoding = "async";
+		const finish = (ok) => {
+			if (ok) imageReadyUrls.add(url);
+			imageLoadPromises.delete(url);
+			resolve(ok);
+		};
+		img.onload = () => finish(true);
+		img.onerror = () => finish(false);
 		img.src = url;
-	}
+	});
+	imageLoadPromises.set(url, promise);
+	return promise;
 }
 
-const PRELOAD_SYNC_HEAD = 20;
-const PRELOAD_RAF_BATCH = 8;
+/** Ограниченная параллельность — не забиваем канал, порядок в массиве сохраняем. */
+async function preloadManyOrdered(urls, maxConcurrent = 3) {
+	const queue = [...new Set(urls.filter((u) => typeof u === "string" && u.trim()))];
+	if (!queue.length) return;
 
-/** Одна цепочка: синхронно первые N URL, остальное — только через rAF волнами (без второго useEffect и без microtask — не пересекается с предзагрузкой при смене index). */
-function schedulePreloadInOrder(urls) {
-	const clean = urls.filter((u) => typeof u === "string" && u.trim().length > 0);
+	let cursor = 0;
+	async function worker() {
+		while (cursor < queue.length) {
+			const url = queue[cursor];
+			cursor += 1;
+			await preloadImageUrl(url);
+		}
+	}
+	const workers = Math.min(maxConcurrent, queue.length);
+	await Promise.all(Array.from({ length: workers }, () => worker()));
+}
+
+let backgroundPreloadGen = 0;
+
+/** Сначала окно от currentIndex, остальное — фоном по одному. */
+function scheduleFeedPreload(urls, currentIndex = 0) {
+	const clean = urls.filter((u) => typeof u === "string" && u.trim());
 	if (!clean.length) return;
-	preloadImageUrls(clean.slice(0, PRELOAD_SYNC_HEAD));
-	const rest = clean.slice(PRELOAD_SYNC_HEAD);
-	if (!rest.length) return;
-	let offset = 0;
-	const step = () => {
-		preloadImageUrls(rest.slice(offset, offset + PRELOAD_RAF_BATCH));
-		offset += PRELOAD_RAF_BATCH;
-		if (offset < rest.length) requestAnimationFrame(step);
-	};
-	requestAnimationFrame(step);
+
+	const gen = ++backgroundPreloadGen;
+	const windowEnd = Math.min(clean.length, currentIndex + 8);
+	const ahead = clean.slice(currentIndex, windowEnd);
+	const tail = clean.slice(windowEnd);
+
+	void (async () => {
+		await preloadManyOrdered(ahead, 4);
+		for (const url of tail) {
+			if (gen !== backgroundPreloadGen) return;
+			await preloadImageUrl(url);
+		}
+	})();
 }
 
 /** Только валидные для карточки; дубликаты id убираем (порядок первого вхождения). */
@@ -227,15 +262,29 @@ function normalizeFeedPhotos(raw) {
 	return Array.from(byId.values());
 }
 
-function CardImage({ url, fetchPriority, photoId }) {
-	const [ready, setReady] = useState(false);
+function CardImage({ url, fetchPriority, photoId, eager }) {
+	const [ready, setReady] = useState(() => imageReadyUrls.has(url));
 	const imgRef = useRef(null);
 
 	useLayoutEffect(() => {
+		if (imageReadyUrls.has(url)) {
+			setReady(true);
+			return;
+		}
 		const el = imgRef.current;
 		if (el?.complete && el.naturalWidth > 0) {
+			imageReadyUrls.add(url);
 			setReady(true);
+			return;
 		}
+
+		let cancelled = false;
+		void preloadImageUrl(url).then((ok) => {
+			if (!cancelled && ok) setReady(true);
+		});
+		return () => {
+			cancelled = true;
+		};
 	}, [url, photoId]);
 
 	return (
@@ -248,8 +297,12 @@ function CardImage({ url, fetchPriority, photoId }) {
 				className={`swipe-image ${ready ? "swipe-image--ready" : ""}`}
 				draggable={false}
 				decoding="async"
+				loading={eager ? "eager" : "lazy"}
 				fetchPriority={fetchPriority}
-				onLoad={() => setReady(true)}
+				onLoad={() => {
+					imageReadyUrls.add(url);
+					setReady(true);
+				}}
 				onError={() => setReady(true)}
 			/>
 		</div>
@@ -336,6 +389,7 @@ export default function Swipe() {
 
 	useEffect(() => {
 		let cancelled = false;
+		backgroundPreloadGen += 1;
 		setLoading(true);
 		setLoadError(null);
 		setPhotos([]);
@@ -349,13 +403,14 @@ export default function Swipe() {
 		dragX.set(0);
 
 		loadFeed(gender, { limit: 40 })
-			.then((data) => {
-				if (!cancelled) {
-					const list = normalizeFeedPhotos(data.photos ?? []);
-					const urls = list.map((p) => p.url);
-					setPhotos(list);
-					schedulePreloadInOrder(urls);
-				}
+			.then(async (data) => {
+				if (cancelled) return;
+				const list = normalizeFeedPhotos(data.photos ?? []);
+				const urls = list.map((p) => p.url);
+				setPhotos(list);
+				/* Первые карточки — до «Загрузка…», остальное — фоном от текущего окна */
+				await preloadManyOrdered(urls.slice(0, 4), 3);
+				if (!cancelled) scheduleFeedPreload(urls, 0);
 			})
 			.catch((e) => {
 				if (!cancelled) setLoadError(e.message || String(e));
@@ -374,6 +429,12 @@ export default function Swipe() {
 		cardShownAtRef.current = Date.now();
 		dragX.set(0);
 	}, [index, dragX]);
+
+	useEffect(() => {
+		if (!photos.length) return;
+		const urls = photos.map((p) => p.url);
+		scheduleFeedPreload(urls, index);
+	}, [index, photos]);
 
 	const photoInfo = useMemo(() => {
 		if (!currentPhoto) return null;
@@ -625,7 +686,8 @@ export default function Swipe() {
 									key={photo.id}
 									url={photo.url}
 									photoId={photo.id}
-									fetchPriority={isTop ? "high" : "low"}
+									fetchPriority={isTop ? "high" : i === 1 ? "auto" : "low"}
+									eager={i <= 1}
 								/>
 								{isTop && (
 									<SwipeStamps
