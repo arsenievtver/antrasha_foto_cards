@@ -284,6 +284,7 @@
     padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
     box-sizing: border-box;
     pointer-events: auto;
+    overflow-x: clip;
 }
 
 .swipe-coach-scrim {
@@ -300,6 +301,7 @@
     max-width: 320px;
     text-align: center;
     color: #fff;
+    overflow: visible;
 }
 
 .swipe-coach-title {
@@ -319,181 +321,134 @@
 
 .swipe-coach-demo {
     display: flex;
-    align-items: flex-end;
+    align-items: center;
     justify-content: center;
-    gap: 10px;
     margin-bottom: 22px;
+    overflow: visible;
 }
 
-.swipe-coach-side {
-    font-size: 12px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    padding-bottom: 28px;
-    opacity: 0.85;
-    display: inline-block;
-    transform-origin: center 80%;
-}
-
-.swipe-coach-side--skip {
-    color: rgba(255, 255, 255, 0.78);
-    animation: swipe-coach-label-skip 2.4s linear infinite;
-}
-
-.swipe-coach-side--like {
-    color: #7dde7a;
-    animation: swipe-coach-label-like 2.4s linear infinite;
-}
-
-/*
- * Пик подписи совпадает с краем кисти: короткое плато (23–27% и 73–77%) и linear между точками,
- * чтобы ease-in-out не сдвигал фазу scale относительно translate.
- */
-@keyframes swipe-coach-label-like {
-    0%,
-    100% {
-        transform: scale(1);
-        opacity: 0.82;
-    }
-    23%,
-    27% {
-        transform: scale(1.2);
-        opacity: 1;
-    }
-    50% {
-        transform: scale(1);
-        opacity: 0.82;
-    }
-    73%,
-    77% {
-        transform: scale(0.94);
-        opacity: 0.65;
-    }
-}
-
-@keyframes swipe-coach-label-skip {
-    0%,
-    100% {
-        transform: scale(1);
-        opacity: 0.82;
-    }
-    23%,
-    27% {
-        transform: scale(0.94);
-        opacity: 0.65;
-    }
-    50% {
-        transform: scale(1);
-        opacity: 0.82;
-    }
-    73%,
-    77% {
-        transform: scale(1.12);
-        opacity: 0.95;
-    }
-}
-
-.swipe-coach-track {
-    position: relative;
-    width: min(200px, 46vw);
-    height: 96px;
+.swipe-coach-stack-demo {
+    /* На всю ширину экрана — подписи от края viewport, не от карточки */
+    width: 100vw;
+    margin-left: calc(50% - 50vw);
+    margin-right: calc(50% - 50vw);
+    --coach-card-w: min(72vw, 320px);
+    --coach-card-h: min(calc(var(--coach-card-w) * 1.75), 560px);
+    --coach-edge-inset: max(16px, env(safe-area-inset-left, 0px));
     flex-shrink: 0;
+    overflow: visible;
 }
 
-.swipe-coach-track-line {
-    position: absolute;
-    left: 8%;
-    right: 8%;
-    bottom: 22px;
-    height: 3px;
-    border-radius: 3px;
-    background: linear-gradient(
-        90deg,
-        rgba(255, 255, 255, 0.28),
-        rgba(255, 255, 255, 0.2),
-        rgba(76, 175, 80, 0.35)
-    );
+.swipe-coach-stack {
+    position: relative;
+    width: 100%;
+    height: var(--coach-card-h);
+    overflow: visible;
 }
 
-/* Кисть: верх к линии Да–Нет. Анимация и тень на разных узлах. Подписи — scale в той же фазе, что кисть */
-.swipe-coach-hand {
-    --swipe-coach-hand-h: 70px;
+.swipe-coach-side-label-wrap {
     position: absolute;
-    left: calc(50% - 63px);
-    /* Верх линии ≈ 25px от низа трека; смещения вверх суммарно +10px → 35px */
-    bottom: calc(35px - var(--swipe-coach-hand-h));
-    width: 126px;
-    height: var(--swipe-coach-hand-h);
+    top: 50%;
+    z-index: 20;
     pointer-events: none;
+    transform: translateY(-50%);
 }
 
-.swipe-coach-hand-motion {
-    width: 100%;
-    height: 100%;
-    will-change: transform;
-    animation: swipe-coach-hand-x 2.4s linear infinite;
+.swipe-coach-side-label-wrap--skip {
+    left: var(--coach-edge-inset);
 }
 
-.swipe-coach-hand-motion--off {
-    animation: none;
+.swipe-coach-side-label-wrap--like {
+    right: max(16px, env(safe-area-inset-right, 0px));
+    left: auto;
 }
 
-.swipe-coach-hand-visual {
-    width: 100%;
-    height: 100%;
-    position: relative;
-    filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.45));
+.swipe-coach-side-label {
+    display: inline-block;
+    padding: 11px 18px;
+    font-size: clamp(1.08rem, 4.65vw, 1.38rem);
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border: 1.5px solid;
+    border-radius: 12px;
+    line-height: 1;
+    white-space: nowrap;
+    box-sizing: border-box;
 }
 
-@keyframes swipe-coach-hand-x {
-    0%,
-    100% {
-        transform: translateX(0);
-    }
-    23%,
-    27% {
-        transform: translateX(52px);
-    }
-    50% {
-        transform: translateX(0);
-    }
-    73%,
-    77% {
-        transform: translateX(-52px);
-    }
+.swipe-coach-side-label--skip {
+    color: rgba(255, 255, 255, 0.58);
+    border-color: rgba(255, 255, 255, 0.42);
 }
 
-.swipe-coach-hand-svg {
-    display: block;
-    position: relative;
-    z-index: 1;
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-    object-position: center top;
+.swipe-coach-side-label--like {
+    color: rgba(111, 220, 106, 0.62);
+    border-color: rgba(111, 220, 106, 0.45);
 }
 
-.swipe-coach-hand-glow {
+.swipe-coach-card {
     position: absolute;
-    left: 50%;
+    left: 0;
+    right: 0;
     top: 0;
-    width: 40px;
-    height: 40px;
-    margin-left: -20px;
-    margin-top: -8px;
-    border-radius: 50%;
-    background: radial-gradient(
-        circle,
-        rgba(255, 255, 255, 0.22) 0%,
-        transparent 72%
-    );
-    pointer-events: none;
-    z-index: 0;
+    margin-left: auto;
+    margin-right: auto;
+    width: var(--coach-card-w);
+    height: var(--coach-card-h);
+    border-radius: 16px;
+    overflow: hidden;
+    border: 4px solid rgba(255, 255, 255, 0.42);
+    background: rgba(43, 43, 42, 0.62);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+.swipe-coach-card--back {
+    border-color: rgba(255, 255, 255, 0.28);
+    background: rgba(35, 35, 34, 0.72);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.38);
+}
+
+.swipe-coach-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    margin-top: 20px;
+}
+
+.swipe-coach-dont-remind {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1.3;
+    color: rgba(255, 255, 255, 0.72);
+    user-select: none;
+}
+
+.swipe-coach-dont-remind input {
+    width: 18px;
+    height: 18px;
+    margin: 0;
+    flex-shrink: 0;
+    accent-color: rgba(255, 255, 255, 0.85);
+    cursor: pointer;
+}
+
+.swipe-coach-dont-remind:focus-within {
+    outline: none;
+}
+
+.swipe-coach-dont-remind:has(input:focus-visible) {
+    outline: 2px solid rgba(255, 255, 255, 0.45);
+    outline-offset: 4px;
+    border-radius: 6px;
 }
 
 .swipe-coach-cta {
-    margin-top: 20px;
+    margin-top: 0;
     appearance: none;
     border: 1px solid rgba(255, 255, 255, 0.35);
     border-radius: 999px;
@@ -516,27 +471,9 @@
     outline-offset: 3px;
 }
 
-.swipe-coach-demo--static .swipe-coach-side--like,
-.swipe-coach-demo--static .swipe-coach-side--skip {
-    animation: none;
-    transform: none;
-    opacity: 0.85;
-}
-
 @media (prefers-reduced-motion: reduce) {
     .swipe-coach-scrim {
         backdrop-filter: none;
         -webkit-backdrop-filter: none;
-    }
-
-    .swipe-coach-hand-motion {
-        animation: none;
-    }
-
-    .swipe-coach-side--like,
-    .swipe-coach-side--skip {
-        animation: none;
-        transform: none;
-        opacity: 0.85;
     }
 }

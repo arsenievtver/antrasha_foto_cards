@@ -17,7 +17,6 @@ import {
 } from "framer-motion";
 import { loadFeed, postInteraction } from "../api/client";
 import PushNotifyPrompt from "../components/PushNotifyPrompt";
-import swipeHandAsset from "../assets/swipe.svg";
 import "./Swipe.css";
 
 const SWIPE_COACH_KEY = "swipe_coach_v2_dismissed";
@@ -25,7 +24,7 @@ const SWIPE_COACH_KEY = "swipe_coach_v2_dismissed";
 const DRAG_FEEDBACK_PX = 50;
 const COMMIT_OFFSET_PX = 80;
 const COMMIT_VELOCITY = 800;
-function readCoachDismissed() {
+function readCoachPermanentlyDismissed() {
 	try {
 		return (
 			typeof localStorage !== "undefined" &&
@@ -36,26 +35,151 @@ function readCoachDismissed() {
 	}
 }
 
-/** Кисть из `src/assets/swipe.svg`. Движение в CSS (`@keyframes`) — filter и transform на разных узлах, иначе анимация часто не видна. */
-function SwipeCoachHandOutline({ reduceMotion }) {
+const COACH_LABEL_LEAD_MS = 200;
+const COACH_EXIT_MS = 920;
+const COACH_PAUSE_MS = 1300;
+const COACH_EXIT_DURATION = 0.92;
+const COACH_PROMOTE_DURATION = 0.52;
+const COACH_LABEL_DURATION = 0.58;
+const COACH_SLOT_COUNT = 3;
+const COACH_EASE = [0.22, 0.03, 0.26, 1];
+const COACH_EASE_OUT = [0.16, 1, 0.3, 1];
+
+/** Имитация стека карточек без фото — те же жесты и «опускание», что в ленте. */
+function SwipeCoachStackDemo({ reduceMotion }) {
+	const [order, setOrder] = useState(() =>
+		Array.from({ length: COACH_SLOT_COUNT }, (_, i) => i),
+	);
+	const [labelDir, setLabelDir] = useState(null);
+	const [exitDir, setExitDir] = useState(null);
+
+	useEffect(() => {
+		if (reduceMotion) return;
+
+		let cancelled = false;
+		let nextDir = "right";
+
+		const wait = (ms) =>
+			new Promise((resolve) => {
+				window.setTimeout(resolve, ms);
+			});
+
+		const run = async () => {
+			while (!cancelled) {
+				const dir = nextDir;
+				nextDir = dir === "right" ? "left" : "right";
+
+				setLabelDir(dir);
+				await wait(COACH_LABEL_LEAD_MS);
+				if (cancelled) break;
+
+				setExitDir(dir);
+				await wait(COACH_EXIT_MS);
+				if (cancelled) break;
+
+				setOrder((prev) => [...prev.slice(1), prev[0]]);
+				setExitDir(null);
+				setLabelDir(null);
+				await wait(COACH_PAUSE_MS);
+			}
+		};
+
+		void run();
+		return () => {
+			cancelled = true;
+		};
+	}, [reduceMotion]);
+
 	return (
-		<div className="swipe-coach-hand" aria-hidden>
-			<div
-				className={
-					reduceMotion
-						? "swipe-coach-hand-motion swipe-coach-hand-motion--off"
-						: "swipe-coach-hand-motion"
-				}
-			>
-				<div className="swipe-coach-hand-visual">
-					<img
-						src={swipeHandAsset}
-						alt=""
-						className="swipe-coach-hand-svg"
-						draggable={false}
-					/>
-					<span className="swipe-coach-hand-glow" aria-hidden />
+		<div
+			className={`swipe-coach-stack-demo${reduceMotion ? " swipe-coach-stack-demo--static" : ""}`}
+			aria-hidden
+		>
+			<div className="swipe-coach-stack">
+				<div className="swipe-coach-side-label-wrap swipe-coach-side-label-wrap--skip">
+					<motion.span
+						className="swipe-coach-side-label swipe-coach-side-label--skip"
+						initial={false}
+						animate={{
+							opacity: labelDir === "left" ? 1 : 0,
+						}}
+						transition={{
+							duration: COACH_LABEL_DURATION,
+							ease: COACH_EASE_OUT,
+						}}
+					>
+						Дальше
+					</motion.span>
 				</div>
+				<div className="swipe-coach-side-label-wrap swipe-coach-side-label-wrap--like">
+					<motion.span
+						className="swipe-coach-side-label swipe-coach-side-label--like"
+						initial={false}
+						animate={{
+							opacity: labelDir === "right" ? 1 : 0,
+						}}
+						transition={{
+							duration: COACH_LABEL_DURATION,
+							ease: COACH_EASE_OUT,
+						}}
+					>
+						Нравится
+					</motion.span>
+				</div>
+				{[...order].reverse().map((slotIdx) => {
+					const stackPos = order.indexOf(slotIdx);
+					const isTop = stackPos === 0;
+					const exiting = isTop && exitDir;
+
+					return (
+						<motion.div
+							key={`coach-slot-${slotIdx}`}
+							className={`swipe-coach-card${isTop ? "" : " swipe-coach-card--back"}`}
+							initial={false}
+							animate={{
+								y: stackPos * -10,
+								x: exiting
+									? exitDir === "right"
+										? "120%"
+										: "-120%"
+									: 0,
+								rotate: exiting
+									? exitDir === "right"
+										? 14
+										: -14
+									: 0,
+								opacity: exiting ? 0.72 : 1,
+								zIndex: 10 - stackPos,
+							}}
+							transition={{
+								y: {
+									duration: COACH_PROMOTE_DURATION,
+									ease: COACH_EASE,
+								},
+								x: {
+									duration: exiting ? COACH_EXIT_DURATION : 0,
+									ease: COACH_EASE,
+								},
+								rotate: {
+									duration: exiting ? COACH_EXIT_DURATION : 0,
+									ease: COACH_EASE,
+								},
+								opacity: {
+									duration: exiting ? COACH_EXIT_DURATION : 0.28,
+									ease: COACH_EASE_OUT,
+								},
+							}}
+						>
+							{exiting && exitDir === "right" ? (
+								<div
+									className="swipe-card-tint swipe-card-tint--like"
+									style={{ opacity: 0.4 }}
+									aria-hidden
+								/>
+							) : null}
+						</motion.div>
+					);
+				})}
 			</div>
 		</div>
 	);
@@ -132,12 +256,12 @@ function CardImage({ url, fetchPriority, photoId }) {
 	);
 }
 
-/** Штампы: «Мой стиль» (лайк), «Дальше» (пропуск жестом), «Не моё» (кнопка 👎). */
+/** Штампы: «Нравится» (лайк), «Дальше» (пропуск жестом), «Не моё» (кнопка 👎). */
 function SwipeStamps({ overlay, likeOpacity, skipOpacity }) {
 	if (overlay === "like") {
 		return (
 			<div className="swipe-stamp swipe-stamp--like swipe-stamp--committed" aria-hidden>
-				Мой стиль
+				Нравится
 			</div>
 		);
 	}
@@ -163,7 +287,7 @@ function SwipeStamps({ overlay, likeOpacity, skipOpacity }) {
 				style={{ opacity: likeOpacity, scale: likeOpacity }}
 				aria-hidden
 			>
-				Мой стиль
+				Нравится
 			</motion.div>
 			<motion.div
 				className="swipe-stamp swipe-stamp--skip"
@@ -181,7 +305,10 @@ export default function Swipe() {
 	const navigate = useNavigate();
 	const reduceMotion = useReducedMotion();
 
-	const [coachDismissed, setCoachDismissed] = useState(readCoachDismissed);
+	const [coachDismissed, setCoachDismissed] = useState(
+		readCoachPermanentlyDismissed,
+	);
+	const [coachDontRemind, setCoachDontRemind] = useState(false);
 
 	const [photos, setPhotos] = useState([]);
 	const [loadError, setLoadError] = useState(null);
@@ -403,10 +530,12 @@ export default function Swipe() {
 		coachDismissed && photos.length > 0 && index >= 3 && index < photos.length;
 
 	function dismissCoach() {
-		try {
-			localStorage.setItem(SWIPE_COACH_KEY, "1");
-		} catch {
-			/* ignore */
+		if (coachDontRemind) {
+			try {
+				localStorage.setItem(SWIPE_COACH_KEY, "1");
+			} catch {
+				/* ignore */
+			}
 		}
 		setCoachDismissed(true);
 	}
@@ -430,27 +559,26 @@ export default function Swipe() {
 							<br />
 							Вправо — нравится. Кнопка 👎 — явно «не моё».
 						</p>
-						<div
-							className={`swipe-coach-demo${reduceMotion ? " swipe-coach-demo--static" : ""}`}
-						>
-							<span className="swipe-coach-side swipe-coach-side--skip">
-								Дальше
-							</span>
-							<div className="swipe-coach-track">
-								<div className="swipe-coach-track-line" aria-hidden />
-								<SwipeCoachHandOutline reduceMotion={reduceMotion} />
-							</div>
-							<span className="swipe-coach-side swipe-coach-side--like">
-								Нравится
-							</span>
+						<div className="swipe-coach-demo">
+							<SwipeCoachStackDemo reduceMotion={reduceMotion} />
 						</div>
-						<button
-							type="button"
-							className="swipe-coach-cta"
-							onClick={dismissCoach}
-						>
-							Понятно
-						</button>
+						<div className="swipe-coach-actions">
+							<label className="swipe-coach-dont-remind">
+								<input
+									type="checkbox"
+									checked={coachDontRemind}
+									onChange={(e) => setCoachDontRemind(e.target.checked)}
+								/>
+								<span>Больше не напоминать</span>
+							</label>
+							<button
+								type="button"
+								className="swipe-coach-cta"
+								onClick={dismissCoach}
+							>
+								Понятно
+							</button>
+						</div>
 					</div>
 				</div>
 			)}
