@@ -277,18 +277,30 @@
     inset: 0;
     z-index: 160;
     display: flex;
+    flex-direction: column;
     align-items: center;
-    justify-content: center;
-    padding: 24px 20px;
-    padding-top: calc(24px + env(safe-area-inset-top, 0px));
-    padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
     box-sizing: border-box;
     pointer-events: auto;
     overflow-x: clip;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    height: 100dvh;
+    max-height: 100dvh;
+    padding-top: calc(12px + env(safe-area-inset-top, 0px));
+    padding-left: max(20px, env(safe-area-inset-left, 0px));
+    padding-right: max(20px, env(safe-area-inset-right, 0px));
+    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+}
+
+/* Safari в браузере: safe-area снизу часто 0, но есть панель URL/поиска */
+@media not ((display-mode: standalone) or (display-mode: fullscreen)) {
+    .swipe-coach {
+        padding-bottom: calc(12px + max(env(safe-area-inset-bottom, 0px), 72px));
+    }
 }
 
 .swipe-coach-scrim {
-    position: absolute;
+    position: fixed;
     inset: 0;
     background: rgba(0, 0, 0, 0.52);
     backdrop-filter: blur(2px);
@@ -298,7 +310,13 @@
 .swipe-coach-inner {
     position: relative;
     z-index: 1;
+    flex: 1 1 auto;
+    width: 100%;
     max-width: 320px;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
     text-align: center;
     color: #fff;
     overflow: visible;
@@ -306,6 +324,7 @@
 
 .swipe-coach-title {
     margin: 0 0 10px;
+    flex-shrink: 0;
     font-size: 22px;
     font-weight: 700;
     letter-spacing: -0.02em;
@@ -313,17 +332,21 @@
 }
 
 .swipe-coach-lead {
-    margin: 0 0 22px;
+    margin: 0 0 16px;
+    flex-shrink: 0;
     font-size: 15px;
     line-height: 1.45;
     color: rgba(255, 255, 255, 0.82);
 }
 
 .swipe-coach-demo {
+    flex: 1 1 auto;
+    min-height: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-bottom: 22px;
+    width: 100%;
+    margin-bottom: 0;
     overflow: visible;
 }
 
@@ -333,7 +356,7 @@
     margin-left: calc(50% - 50vw);
     margin-right: calc(50% - 50vw);
     --coach-card-w: min(72vw, 320px);
-    --coach-card-h: min(calc(var(--coach-card-w) * 1.75), 560px);
+    --coach-card-h: min(calc(var(--coach-card-w) * 1.75), 560px, 42dvh);
     --coach-edge-inset: max(16px, env(safe-area-inset-left, 0px));
     flex-shrink: 0;
     overflow: visible;
@@ -414,7 +437,10 @@
     flex-direction: column;
     align-items: center;
     gap: 14px;
-    margin-top: 20px;
+    flex-shrink: 0;
+    width: 100%;
+    margin-top: 12px;
+    padding-top: 4px;
 }
 
 .swipe-coach-dont-remind {

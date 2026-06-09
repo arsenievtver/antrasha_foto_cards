@@ -648,7 +648,7 @@ export default function Swipe() {
 
 			<PushNotifyPrompt visible={showPushPrompt} gender={gender} />
 
-			{index < photos.length && (
+			{index < photos.length && !showCoach && (
 				<div className="swipe-buttons">
 					<button
 						type="button"
