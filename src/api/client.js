@@ -396,6 +396,32 @@ export async function runTryOnExperiment({ photoId, personFile }) {
 	}
 }
 
+export async function runTryOnExperimentAsync({ photoId, personFile, category }) {
+	const headers = await sessionAuthHeaders();
+	const fd = new FormData();
+	fd.append("photo_id", photoId);
+	fd.append("person_image", personFile);
+	fd.append("category", category);
+	const res = await fetch(apiUrl("/try-on-experiment/run-async"), {
+		method: "POST",
+		headers,
+		body: fd,
+	});
+	let data = {};
+	try { data = await res.json(); } catch { /* empty */ }
+	if (!res.ok) throw new Error(parseErrorPayload(data, `Примерка ${res.status}`));
+	return data; // { job_id, status }
+}
+
+export async function fetchTryOnJob(jobId) {
+	const headers = await sessionAuthHeaders();
+	const res = await fetch(apiUrl(`/try-on-experiment/jobs/${jobId}`), { headers });
+	let data = {};
+	try { data = await res.json(); } catch { /* empty */ }
+	if (!res.ok) throw new Error(parseErrorPayload(data, `Статус задачи ${res.status}`));
+	return data; // { job_id, status, result_url, error }
+}
+
 export async function postInteraction({ photoId, action, viewTimeMs }) {
 	await ensureSessionId();
 	const headers = {

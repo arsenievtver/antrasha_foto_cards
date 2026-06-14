@@ -53,6 +53,7 @@ class Settings(BaseSettings):
     yc_s3_secret_access_key: str | None = None
     yc_bucket_men: str = "antrasha-men-foto"
     yc_bucket_women: str = "antrasha-women-foto"
+    try_on_tmp_dir: str = "/app/var/try_on_tmp"
     # Если файлы лежат под префиксом внутри бакета (не ID каталога в консоли — свой префикс ключей)
     yc_s3_prefix_men: str = ""
     yc_s3_prefix_women: str = ""
