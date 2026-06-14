@@ -1,4 +1,5 @@
 from app.models.ai_ingest_job import AiIngestJob
+from app.models.try_on_job import TryOnJob
 from app.models.brand import Brand
 from app.models.feed_settings import FeedSettings
 from app.models.fitting_request import FittingRequest, FittingRequestLikedPhoto
@@ -15,6 +16,7 @@ from app.models.user_tag_weight import UserTagWeight
 __all__ = [
     "Brand",
     "AiIngestJob",
+    "TryOnJob",
     "FeedSettings",
     "FittingRequest",
     "FittingRequestLikedPhoto",

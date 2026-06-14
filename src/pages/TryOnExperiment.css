@@ -371,3 +371,15 @@
 .tryon-block--result {
 	border-bottom: none;
 }
+
+.tryon-select {
+	width: 100%;
+	padding: 10px 12px;
+	border: 1px solid var(--tryon-line);
+	border-radius: 6px;
+	background: transparent;
+	color: var(--tryon-text);
+	font: inherit;
+	font-size: 0.85rem;
+	cursor: pointer;
+}

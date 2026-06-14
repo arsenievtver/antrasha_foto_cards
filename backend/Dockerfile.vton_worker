@@ -1,0 +1,38 @@
+FROM pytorch/pytorch:2.5.1-cuda12.1-cudnn9-runtime
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    DEBIAN_FRONTEND=noninteractive
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    curl \
+    libgl1 \
+    libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN git clone https://github.com/fashn-AI/fashn-vton-1.5.git /opt/fashn-vton \
+    && sed -i 's/onnxruntime-gpu/onnxruntime/' /opt/fashn-vton/pyproject.toml \
+    && pip install --no-cache-dir /opt/fashn-vton
+
+RUN pip install --no-cache-dir \
+    sqlalchemy>=2.0.36 \
+    "psycopg[binary]>=3.2.0" \
+    pydantic-settings>=2.7.0 \
+    alembic>=1.14.0 \
+    boto3>=1.35.0 \
+    requests>=2.32.0 \
+    Pillow>=10.4.0 \
+    pillow-heif>=0.21.0
+
+COPY . /app
+
+ENV PYTHONPATH=/app
+
+COPY docker-entrypoint-vton.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["python", "-m", "jobs.try_on_worker"]

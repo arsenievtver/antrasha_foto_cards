@@ -16,10 +16,13 @@ from app.database import get_db
 from app.deps import get_session_or_404, parse_session_id
 from app.externals.http.fashn import FashnClient
 from app.models import Photo
+from app.models.try_on_job import TRY_ON_STATUS_PENDING, TryOnJob
 from app.schemas.try_on_experiment import (
+    TryOnAsyncRunResponse,
     TryOnCatalogPhotoOut,
     TryOnCatalogResponse,
     TryOnExperimentStatusOut,
+    TryOnJobStatusOut,
     TryOnRunResponse,
 )
 from app.services.image_prepare import (
@@ -219,4 +222,93 @@ async def run_try_on(
         result_url=result_url,
         photo_id=photo_id,
         elapsed_seconds=round(elapsed, 1),
+    )
+
+
+_VALID_CATEGORIES = {"tops", "bottoms", "one-pieces"}
+
+
+@router.post("/run-async", response_model=TryOnAsyncRunResponse)
+async def run_try_on_async(
+    db: Session = Depends(get_db),
+    session_id: uuid.UUID = Depends(parse_session_id),
+    photo_id: uuid.UUID = Form(...),
+    category: str = Form(...),
+    person_image: UploadFile = File(...),
+) -> TryOnAsyncRunResponse:
+    get_session_or_404(db, session_id)
+    touch_session(db, session_id)
+    db.commit()
+
+    if category not in _VALID_CATEGORIES:
+        raise HTTPException(status_code=400, detail=f"category должен быть одним из: {', '.join(sorted(_VALID_CATEGORIES))}")
+
+    photo = db.get(Photo, photo_id)
+    if not photo or not photo.is_active:
+        raise HTTPException(status_code=404, detail="Фото образа не найдено")
+    if not photo.url or not photo.url.strip():
+        raise HTTPException(status_code=400, detail="У образа нет URL")
+
+    ct = (person_image.content_type or "").strip().lower()
+    if ct and not ct.startswith(_ALLOWED_CONTENT_PREFIX):
+        raise HTTPException(status_code=400, detail="Нужен файл изображения (JPEG, PNG, HEIC…)")
+
+    raw = await person_image.read()
+    if not raw:
+        raise HTTPException(status_code=400, detail="Пустой файл")
+    if len(raw) > _MAX_PERSON_BYTES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Фото слишком большое (макс. {_MAX_PERSON_BYTES // (1024 * 1024)} МБ)",
+        )
+
+    import os
+    tmp_dir = settings.try_on_tmp_dir
+    os.makedirs(tmp_dir, exist_ok=True)
+    person_image_path = os.path.join(tmp_dir, f"{uuid.uuid4()}.jpg")
+    try:
+        with open(person_image_path, "wb") as f:
+            f.write(raw)
+    except Exception as e:
+        log.exception("try_on_async: не удалось сохранить фото человека на диск")
+        raise HTTPException(status_code=500, detail="Не удалось сохранить фото") from e
+
+    job = TryOnJob(
+        session_id=session_id,
+        person_image_path=person_image_path,
+        garment_photo_id=photo_id,
+        garment_url=photo.url.strip(),
+        category=category,
+        status=TRY_ON_STATUS_PENDING,
+    )
+    db.add(job)
+    db.commit()
+    db.refresh(job)
+
+    log.info(
+        "try_on_async job created job_id=%s session=%s category=%s",
+        job.id, session_id, category,
+    )
+    return TryOnAsyncRunResponse(job_id=job.id, status=job.status)
+
+
+@router.get("/jobs/{job_id}", response_model=TryOnJobStatusOut)
+def get_try_on_job(
+    job_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    session_id: uuid.UUID = Depends(parse_session_id),
+) -> TryOnJobStatusOut:
+    get_session_or_404(db, session_id)
+
+    job = db.get(TryOnJob, job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Задача не найдена")
+    if job.session_id != session_id:
+        raise HTTPException(status_code=403, detail="Нет доступа к этой задаче")
+
+    return TryOnJobStatusOut(
+        job_id=job.id,
+        status=job.status,
+        result_url=job.result_url,
+        error=job.error,
     )
