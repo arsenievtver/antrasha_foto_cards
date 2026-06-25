@@ -3,9 +3,12 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import {
 	ensureSessionId,
 	fetchTryOnCatalog,
+	fetchTryOnJob,
 	fetchTryOnStatus,
 	runTryOnExperiment,
+	runTryOnExperimentAsync,
 } from "../api/client";
+
 import TryOnPhotoGuide, {
 	dismissPhotoGuideForever,
 	isPhotoGuideDismissed,
@@ -46,6 +49,8 @@ export default function TryOnExperiment() {
 	const [elapsed, setElapsed] = useState(null);
 	const [saveBusy, setSaveBusy] = useState(false);
 	const [saveHint, setSaveHint] = useState("");
+	const [category, setCategory] = useState("tops");
+	const [useAsyncTryon, setUseAsyncTryon] = useState(false);
 	const galleryInputRef = useRef(null);
 	const cameraInputRef = useRef(null);
 	const [guideOpen, setGuideOpen] = useState(false);
@@ -147,12 +152,30 @@ export default function TryOnExperiment() {
 		setElapsed(null);
 		setSaveHint("");
 		try {
-			const data = await runTryOnExperiment({
-				photoId: selectedId,
-				personFile,
-			});
-			setResultUrl(data.result_url);
-			setElapsed(data.elapsed_seconds);
+			if (useAsyncTryon) {
+				const { job_id } = await runTryOnExperimentAsync({
+					photoId: selectedId,
+					personFile,
+					category,
+				});
+				const t0 = Date.now();
+				while (true) {
+					await new Promise((r) => setTimeout(r, 3000));
+					const job = await fetchTryOnJob(job_id);
+					if (job.status === "done") {
+						setResultUrl(job.result_url);
+						setElapsed(Math.round((Date.now() - t0) / 100) / 10);
+						break;
+					}
+					if (job.status === "failed") {
+						throw new Error(job.error || "Примерка не удалась");
+					}
+				}
+			} else {
+				const data = await runTryOnExperiment({ photoId: selectedId, personFile });
+				setResultUrl(data.result_url);
+				setElapsed(data.elapsed_seconds);
+			}
 		} catch (ex) {
 			setErr(ex.message || "Не удалось выполнить примерку");
 		} finally {
@@ -248,6 +271,7 @@ export default function TryOnExperiment() {
 					) : null}
 
 					{enabled ? (
+						<>
 						<section className="tryon-block tryon-block--gender">
 							<h2 className="tryon-block__title">Кто примеряет?</h2>
 							<p className="tryon-hint">
@@ -287,6 +311,19 @@ export default function TryOnExperiment() {
 								</p>
 							) : null}
 						</section>
+
+						<section className="tryon-block">
+							<h2 className="tryon-block__title">Движок примерки</h2>
+							<select
+								className="tryon-select"
+								value={useAsyncTryon ? "async" : "sync"}
+								onChange={(e) => setUseAsyncTryon(e.target.value === "async")}
+							>
+								<option value="sync">Fashn API (синхронный)</option>
+								<option value="async">VTON 1.5 (асинхронный)</option>
+							</select>
+						</section>
+						</>
 					) : null}
 				</div>
 			</div>
@@ -375,9 +412,35 @@ export default function TryOnExperiment() {
 							</div>
 						</section>
 
+						{useAsyncTryon ? (
+							<section className="tryon-block">
+								<h2 className="tryon-block__title">2. Что примеряем?</h2>
+								<div className="tryon-gender-tabs" role="group">
+									{[
+										{ value: "tops", label: "Верх" },
+										{ value: "bottoms", label: "Низ" },
+										{ value: "one-pieces", label: "Целый образ" },
+									].map(({ value, label }) => (
+										<button
+											key={value}
+											type="button"
+											className={
+												category === value
+													? "tryon-gender-tab tryon-gender-tab--active"
+													: "tryon-gender-tab"
+											}
+											onClick={() => setCategory(value)}
+										>
+											{label}
+										</button>
+									))}
+								</div>
+							</section>
+						) : null}
+
 						<section className="tryon-block">
 							<h2 className="tryon-block__title">
-								2. Образ из каталога
+								{useAsyncTryon ? "3." : "2."} Образ из каталога
 								<span className="tryon-block__subtitle">
 									{gender === "male" ? "мужской" : "женский"}
 								</span>
