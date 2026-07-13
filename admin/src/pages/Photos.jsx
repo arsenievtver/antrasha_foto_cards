@@ -118,6 +118,12 @@ export default function Photos() {
     };
   }, [loadList]);
 
+  useEffect(() => {
+    if (total > 0 && skip >= total) {
+      setSkip(Math.max(0, Math.floor((total - 1) / limit) * limit));
+    }
+  }, [total, skip, limit]);
+
   const selectedCount = useMemo(
     () => Object.values(selected).filter(Boolean).length,
     [selected],
@@ -344,6 +350,15 @@ export default function Photos() {
         allResults.push(...(data.results || []));
       }
       const failed = allResults.filter((r) => !r.ok);
+      const succeeded = allResults.filter((r) => r.ok);
+      const storageWarnings = succeeded.filter((r) =>
+        String(r.detail || "").startsWith("object_storage:"),
+      );
+      const deletedIds = new Set(succeeded.map((r) => r.id));
+      if (deletedIds.size) {
+        setItems((prev) => prev.filter((p) => !deletedIds.has(p.id)));
+        setTotal((t) => Math.max(0, t - deletedIds.size));
+      }
       setSelected((s) => {
         const n = { ...s };
         for (const r of allResults) {
@@ -354,6 +369,11 @@ export default function Photos() {
       if (failed.length) {
         setErr(
           failed.map((f) => `${f.id}: ${f.detail || "ошибка"}`).join("\n"),
+        );
+      } else if (storageWarnings.length) {
+        setErr(
+          `Удалено из базы: ${succeeded.length}. ` +
+            `Файлы в Object Storage не удалились у ${storageWarnings.length} — проверьте ключи S3.`,
         );
       }
     } catch (e) {

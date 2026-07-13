@@ -189,6 +189,12 @@ function SwipeCoachStackDemo({ reduceMotion }) {
 const imageReadyUrls = new Set();
 const imageLoadPromises = new Map();
 
+function evictImageUrl(url) {
+	if (!url) return;
+	imageReadyUrls.delete(url);
+	imageLoadPromises.delete(url);
+}
+
 function preloadImageUrl(url) {
 	if (!url || typeof url !== "string") return Promise.resolve(false);
 	if (imageReadyUrls.has(url)) return Promise.resolve(true);
@@ -200,6 +206,7 @@ function preloadImageUrl(url) {
 		img.decoding = "async";
 		const finish = (ok) => {
 			if (ok) imageReadyUrls.add(url);
+			else evictImageUrl(url);
 			imageLoadPromises.delete(url);
 			resolve(ok);
 		};
@@ -262,11 +269,24 @@ function normalizeFeedPhotos(raw) {
 	return Array.from(byId.values());
 }
 
-function CardImage({ url, fetchPriority, photoId, eager }) {
+function CardImage({ url, fetchPriority, photoId, eager, onBroken }) {
 	const [ready, setReady] = useState(() => imageReadyUrls.has(url));
+	const [broken, setBroken] = useState(false);
+	const brokenReportedRef = useRef(false);
 	const imgRef = useRef(null);
 
+	const reportBroken = useCallback(() => {
+		if (brokenReportedRef.current) return;
+		brokenReportedRef.current = true;
+		evictImageUrl(url);
+		setBroken(true);
+		setReady(false);
+		onBroken?.();
+	}, [url, onBroken]);
+
 	useLayoutEffect(() => {
+		brokenReportedRef.current = false;
+		setBroken(false);
 		if (imageReadyUrls.has(url)) {
 			setReady(true);
 			return;
@@ -280,12 +300,22 @@ function CardImage({ url, fetchPriority, photoId, eager }) {
 
 		let cancelled = false;
 		void preloadImageUrl(url).then((ok) => {
-			if (!cancelled && ok) setReady(true);
+			if (cancelled) return;
+			if (ok) setReady(true);
+			else reportBroken();
 		});
 		return () => {
 			cancelled = true;
 		};
-	}, [url, photoId]);
+	}, [url, photoId, reportBroken]);
+
+	if (broken) {
+		return (
+			<div className="swipe-card-media swipe-card-media--broken" role="status">
+				<span className="swipe-card-broken-label">Фото недоступно</span>
+			</div>
+		);
+	}
 
 	return (
 		<div className="swipe-card-media">
@@ -303,7 +333,7 @@ function CardImage({ url, fetchPriority, photoId, eager }) {
 					imageReadyUrls.add(url);
 					setReady(true);
 				}}
-				onError={() => setReady(true)}
+				onError={reportBroken}
 			/>
 		</div>
 	);
@@ -454,6 +484,24 @@ export default function Swipe() {
 			productType: productTypeTag?.name || "не указан",
 		};
 	}, [currentPhoto]);
+
+	const removeBrokenPhoto = useCallback((photoId) => {
+		setPhotos((prev) => {
+			const removeIdx = prev.findIndex((p) => p.id === photoId);
+			if (removeIdx < 0) return prev;
+			const removed = prev[removeIdx];
+			if (removed?.url) evictImageUrl(removed.url);
+			const next = prev.filter((p) => p.id !== photoId);
+			setIndex((i) => {
+				if (removeIdx < i) return Math.max(0, i - 1);
+				if (removeIdx === i && i >= next.length) {
+					return Math.max(0, next.length - 1);
+				}
+				return i;
+			});
+			return next;
+		});
+	}, []);
 
 	const sendAction = useCallback(
 		async (action) => {
@@ -688,6 +736,7 @@ export default function Swipe() {
 									photoId={photo.id}
 									fetchPriority={isTop ? "high" : i === 1 ? "auto" : "low"}
 									eager={i <= 1}
+									onBroken={() => removeBrokenPhoto(photo.id)}
 								/>
 								{isTop && (
 									<SwipeStamps

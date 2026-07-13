@@ -737,6 +737,10 @@ def bulk_delete_photos(
     """
     Пакетное удаление фото: один S3 `delete_objects` на бакет + удаления в БД.
 
+    Запись в БД удаляется всегда (если фото найдено), даже если S3 вернул ошибку —
+    иначе админка показывает HTTP 200, но список не меняется. Ошибки стораджа
+  логируются и возвращаются в `detail` при `ok: true`.
+
     Старая реализация делала отдельный `boto3.session` + `delete_object` на каждое
     фото и отдельный `db.commit()` — на 50+ фото это выходило за 60 c nginx
     `proxy_read_timeout`, фронт получал 504, хотя бэкенд продолжал удалять.
@@ -761,19 +765,16 @@ def bulk_delete_photos(
             continue
         s_err = storage_errors_by_url.get(photo.url)
         if s_err:
-            log.warning("bulk_delete photo_id=%s storage failed: %s", pid, s_err)
-            results.append(
-                AdminPhotoBulkDeleteItem(
-                    id=pid,
-                    ok=False,
-                    detail=f"object_storage: {s_err}",
-                ),
+            log.warning(
+                "bulk_delete photo_id=%s storage failed (DB row will still be removed): %s",
+                pid,
+                s_err,
             )
-            continue
         try:
             db.delete(photo)
             db.commit()
-            results.append(AdminPhotoBulkDeleteItem(id=pid, ok=True, detail=None))
+            detail = f"object_storage: {s_err}" if s_err else None
+            results.append(AdminPhotoBulkDeleteItem(id=pid, ok=True, detail=detail))
         except Exception as e:
             db.rollback()
             log.exception("bulk_delete photo_id=%s db failed", pid)
