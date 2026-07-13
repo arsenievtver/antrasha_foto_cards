@@ -4,6 +4,7 @@ import {
   fetchAllPhotoIds,
   fetchBrands,
   fetchPhotos,
+  syncPhotosFromObjectStorage,
 } from "../api.js";
 import { useHoverPreview } from "../utils/usePhotoHover.jsx";
 
@@ -43,6 +44,8 @@ export default function PhotoRatings() {
   const [previewPhoto, setPreviewPhoto] = useState(null);
   const [selected, setSelected] = useState({});
   const [deleting, setDeleting] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncSummary, setSyncSummary] = useState(null);
   const [selectingAll, setSelectingAll] = useState(false);
   const photoHover = useHoverPreview();
 
@@ -63,7 +66,39 @@ export default function PhotoRatings() {
     const data = await fetchPhotos({ skip, limit, ...listFilters });
     setItems(data.items || []);
     setTotal(data.total ?? 0);
-  }, [skip, listFilters]);
+    return data;
+  }, [skip, limit, listFilters]);
+
+  function buildSyncSummary(stats) {
+    const m = stats?.male || {};
+    const f = stats?.female || {};
+    return {
+      added: (m.rows_added || 0) + (f.rows_added || 0),
+      purged: (m.rows_purged || 0) + (f.rows_purged || 0),
+      deactivated: (m.rows_deactivated || 0) + (f.rows_deactivated || 0),
+      safetySkip: Boolean(m.safety_skip || f.safety_skip),
+    };
+  }
+
+  /** Синк с бакетом (purge) + перезагрузка списка — убирает «осиротевшие» записи без файла. */
+  const refreshFromBucket = useCallback(
+    async ({ resetSkip = false, showSummary = false } = {}) => {
+      const stats = await syncPhotosFromObjectStorage({ purge: true });
+      const effectiveSkip = resetSkip ? 0 : skip;
+      if (resetSkip) setSkip(0);
+      setErr("");
+      const data = await fetchPhotos({
+        skip: effectiveSkip,
+        limit,
+        ...listFilters,
+      });
+      setItems(data.items || []);
+      setTotal(data.total ?? 0);
+      if (showSummary) setSyncSummary(buildSyncSummary(stats));
+      return stats;
+    },
+    [skip, limit, listFilters],
+  );
 
   useEffect(() => {
     let c = false;
@@ -140,8 +175,22 @@ export default function PhotoRatings() {
     setSelected({});
   }
 
+  async function handleSync() {
+    if (syncing || deleting || loading) return;
+    setSyncing(true);
+    setErr("");
+    setSyncSummary(null);
+    try {
+      await refreshFromBucket({ resetSkip: true, showSummary: true });
+    } catch (e) {
+      setErr(e.message || String(e));
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   async function selectAllByFilter() {
-    if (selectingAll || deleting || loading || total === 0) return;
+    if (selectingAll || deleting || syncing || loading || total === 0) return;
     if (
       !confirm(
         `Выбрать все ${total} фото по текущим фильтрам? Можно листать страницы — выделение сохранится.`,
@@ -230,7 +279,7 @@ export default function PhotoRatings() {
       );
     } finally {
       try {
-        await loadList();
+        await refreshFromBucket();
       } catch (e2) {
         setErr((prev) => prev || e2.message || String(e2));
       }
@@ -346,8 +395,16 @@ export default function PhotoRatings() {
         <button
           type="button"
           className="secondary"
+          disabled={syncing || deleting || loading}
+          onClick={handleSync}
+        >
+          {syncing ? "Обновление…" : "Обновить"}
+        </button>
+        <button
+          type="button"
+          className="secondary"
           disabled={
-            items.length === 0 || deleting || loading || selectingAll
+            items.length === 0 || deleting || loading || selectingAll || syncing
           }
           onClick={toggleSelectAllPage}
         >
@@ -356,7 +413,7 @@ export default function PhotoRatings() {
         <button
           type="button"
           className="secondary"
-          disabled={total === 0 || deleting || loading || selectingAll}
+          disabled={total === 0 || deleting || loading || selectingAll || syncing}
           onClick={selectAllByFilter}
         >
           {selectingAll
@@ -366,7 +423,7 @@ export default function PhotoRatings() {
         <button
           type="button"
           className="secondary"
-          disabled={selectedCount === 0 || deleting || loading || selectingAll}
+          disabled={selectedCount === 0 || deleting || loading || selectingAll || syncing}
           onClick={clearSelection}
         >
           Снять выделение
@@ -375,7 +432,7 @@ export default function PhotoRatings() {
           type="button"
           className="danger"
           disabled={
-            selectedCount === 0 || deleting || loading || selectingAll
+            selectedCount === 0 || deleting || loading || selectingAll || syncing
           }
           onClick={doBulkDelete}
         >
@@ -385,6 +442,32 @@ export default function PhotoRatings() {
         </button>
       </div>
       {err && <p className="error">{err}</p>}
+      {syncSummary && (
+        <p
+          style={{
+            color: syncSummary.safetySkip ? "#cc3a3a" : "var(--muted)",
+            fontSize: "0.9rem",
+            margin: "0.25rem 0 0",
+          }}
+        >
+          {syncSummary.safetySkip ? (
+            <>
+              Sync с бакетом: один из бакетов вернул 0 ключей при наличии записей
+              в БД — БД не меняли (предохранитель). Проверь ключи/префиксы YC и
+              нажми «Обновить» ещё раз.
+            </>
+          ) : (
+            <>
+              Sync с бакетом: добавлено {syncSummary.added}
+              {", удалено осиротевших "}{syncSummary.purged}
+              {syncSummary.deactivated > 0
+                ? `, деактивировано ${syncSummary.deactivated}`
+                : ""}
+              .
+            </>
+          )}
+        </p>
+      )}
       {loading ? (
         <p style={{ color: "var(--muted)" }}>Загрузка…</p>
       ) : (

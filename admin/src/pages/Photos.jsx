@@ -391,6 +391,7 @@ export default function Photos() {
       );
     } finally {
       try {
+        await syncPhotosFromObjectStorage({ purge: true });
         await loadList();
       } catch (e2) {
         setErr((prev) => prev || e2.message || String(e2));
@@ -410,7 +411,17 @@ export default function Photos() {
       // в списке после ручного удаления объекта из Object Storage.
       const stats = await syncPhotosFromObjectStorage({ purge: true });
       setSkip(0);
-      await loadList();
+      setErr("");
+      const data = await fetchPhotos({
+        skip: 0,
+        limit,
+        gender: gender || undefined,
+        activeOnly,
+        taggingDoneOnly,
+        brandId: brandFilter || undefined,
+      });
+      setItems(data.items || []);
+      setTotal(data.total ?? 0);
       const m = stats?.male || {};
       const f = stats?.female || {};
       setSyncSummary({
