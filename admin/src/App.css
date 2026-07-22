@@ -1102,6 +1102,47 @@ button.switch-toggle:not(:disabled):hover {
   font-size: 0.82rem;
 }
 
+.tagging-badge-check-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  cursor: pointer;
+}
+
+.feed-policy-row--badge {
+  margin-top: 0.85rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.feed-badge-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.feed-badge-form input {
+  max-width: 140px;
+  width: 100%;
+  padding: 0.4rem 0.5rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--background);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9rem;
+}
+
+.feed-badge-form .secondary {
+  padding: 0.3rem 0.55rem;
+  font-size: 0.82rem;
+}
+
 .tagging-claim-hint {
   margin: 0 0 0.75rem;
   padding: 0.5rem 0.65rem;

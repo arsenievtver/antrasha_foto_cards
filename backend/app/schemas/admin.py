@@ -113,6 +113,8 @@ class AdminPhotoOut(BaseModel):
     brand: str | None = None
     price_segment: str | None = None
     moy_sklad_id: str | None = None
+    # Показать центральный бейдж (текст задаётся в feed_settings.card_badge_label).
+    show_badge: bool = False
     # Инкремент при сохранении тегов (optimistic locking).
     tags_version: int = 0
     # Очередь разметки: активная бронь другим сотрудником / своя
@@ -173,6 +175,10 @@ class AdminPhotoTagsPutBody(BaseModel):
     apply_brand: bool = False
     brand_id: uuid.UUID | None = None
     moy_sklad_id: str | None = Field(default=None, max_length=128)
+    # Включить/выключить центральный бейдж на карточке.
+    show_badge: bool | None = None
+    # Явно завершить / снять «размечено». Если не передано — флаг в БД не меняем.
+    tagging_review_done: bool | None = None
     # Если передано — должно совпадать с Photo.tags_version, иначе 409 (данные устарели).
     expected_tags_version: int | None = None
 
@@ -288,13 +294,16 @@ class AdminAttributionDebugOut(BaseModel):
 
 
 class FeedSettingsOut(BaseModel):
-    """Политика /feed: требовать ли завершённую разметку перед показом карточки."""
+    """Политика /feed и единый текст бейджа на карточках."""
 
     require_tagging_review_for_feed: bool
+    card_badge_label: str | None = None
 
 
 class FeedSettingsPatch(BaseModel):
-    require_tagging_review_for_feed: bool
+    require_tagging_review_for_feed: bool | None = None
+    # Пустая строка / null — снять текст бейджа (чекбоксы на фото перестанут что-либо показывать).
+    card_badge_label: str | None = Field(default=None, max_length=40)
 
 
 class AdminUserOut(BaseModel):

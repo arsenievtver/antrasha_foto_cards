@@ -49,7 +49,7 @@
 	position: relative;
 	z-index: 1;
 	width: min(92vw, 400px);
-	max-height: min(88dvh, 640px);
+	max-height: min(88dvh, 680px);
 	display: flex;
 	flex-direction: column;
 	background: #1e1e1e;
@@ -60,7 +60,6 @@
 	color: #f9f9f9;
 }
 
-/* Отступы и фон карточки; скругление и бордер — только у <img>. */
 .promo-banner-media {
 	flex-shrink: 0;
 	display: flex;
@@ -71,15 +70,32 @@
 	background: #1e1e1e;
 }
 
-.promo-banner-media img {
+.promo-banner-media--fit img {
 	display: block;
 	max-width: 100%;
-	max-height: clamp(140px, 40vh, 280px);
+	max-height: clamp(140px, 42vh, 320px);
 	width: auto;
 	height: auto;
+	object-fit: contain;
 	border-radius: 12px;
 	border: 1px solid rgba(255, 255, 255, 0.12);
 	box-sizing: border-box;
+}
+
+/* Full-bleed: квадрат / портрет / альбом — заполняет блок */
+.promo-banner-media--cover {
+	padding: 0;
+	height: clamp(160px, 38vh, 300px);
+	background: #121211;
+}
+
+.promo-banner-media--cover img {
+	display: block;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	border: none;
+	border-radius: 0;
 }
 
 .promo-banner-body {
@@ -102,18 +118,60 @@
 	letter-spacing: -0.02em;
 }
 
+.promo-banner-title strong {
+	font-weight: 800;
+}
+
 .promo-banner-text {
 	margin: 0 0 18px;
 	font-size: 0.9375rem;
 	line-height: 1.5;
 	color: rgba(249, 249, 249, 0.88);
-	white-space: pre-wrap;
+}
+
+.promo-banner-text strong {
+	font-weight: 700;
+	color: #fff;
 }
 
 .promo-banner-actions {
 	display: flex;
 	flex-direction: column;
 	gap: 10px;
+}
+
+.promo-banner-gender-row {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 10px;
+}
+
+.promo-banner-cta {
+	box-sizing: border-box;
+	font-family: inherit;
+	font-size: 0.8125rem;
+	font-weight: 600;
+	letter-spacing: 0.03em;
+	border-radius: 10px;
+	padding: 12px 10px;
+	cursor: pointer;
+	border: none;
+	-webkit-tap-highlight-color: transparent;
+}
+
+.promo-banner-cta--male {
+	color: #f9f9f9;
+	background: #3a3a38;
+	border: 1px solid rgba(255, 255, 255, 0.22);
+}
+
+.promo-banner-cta--female {
+	color: #1e1e1e;
+	background: #c4a484;
+}
+
+.promo-banner-cta:active {
+	opacity: 0.9;
 }
 
 .promo-banner-link {

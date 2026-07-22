@@ -77,6 +77,8 @@ class Photo(Base):
     price_segment: Mapped[str | None] = mapped_column(String(50), nullable=True)
     # Внешний идентификатор для связи с «МойСклад» / товарным учётом (товар, модификация и т.д.).
     moy_sklad_id: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
+    # Показать централизованный бейдж (текст — feed_settings.card_badge_label).
+    show_badge: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     # Инкремент при каждом сохранении тегов — optimistic locking в админке.
     tags_version: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     # Денормализация: уникальные «идентичности» (user_id или session_id),

@@ -201,6 +201,7 @@ def run_single_ingest_job(cfg: Settings, job_id: uuid.UUID) -> None:
                 bucket=bucket,
                 key=key,
                 brand_id=job.brand_id,
+                show_badge=bool(job.show_badge),
             )
             _success_job(db, job, bucket=bucket, key=key)
             log.info("ai_ingest job_id=%s завершён (completed)", job_id)

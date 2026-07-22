@@ -80,6 +80,7 @@ def _job_out(j: AiIngestJob) -> AiIngestJobOut:
         gender=j.gender,
         brand_id=j.brand_id,
         brand_name=brand_name,
+        show_badge=bool(j.show_badge),
         original_filename=j.original_filename,
         status=j.status,
         error_message=j.error_message,
@@ -182,11 +183,21 @@ async def _save_upload_limited(upload: UploadFile, dest: Path, max_bytes: int) -
         raise
 
 
+def _form_bool(raw: str | None) -> bool:
+    if raw is None:
+        return False
+    return str(raw).strip().lower() in ("1", "true", "yes", "on")
+
+
 @router.post("/upload", response_model=AiIngestUploadResponse)
 async def upload_batch(
     _p: AdminPrincipal = Depends(get_admin_principal),
     gender: str = Form(..., description="male | female"),
     brand_id: uuid.UUID = Form(..., description="ID бренда, см. GET /admin/brands"),
+    show_badge: str = Form(
+        "false",
+        description="true/false — поставить центральный бейдж (Sale) на готовые фото",
+    ),
     files: list[UploadFile] = File(...),
 ) -> AiIngestUploadResponse:
     """
@@ -198,6 +209,7 @@ async def upload_batch(
     g = gender.strip().lower()
     if g not in ("male", "female"):
         raise HTTPException(status_code=400, detail="gender: укажите male или female")
+    badge_on = _form_bool(show_badge)
 
     db_brand = SessionLocal()
     try:
@@ -249,10 +261,11 @@ async def upload_batch(
     planned: list[tuple[uuid.UUID, Path, str]] = []
     written_paths: list[Path] = []
     log.info(
-        "ai_ingest upload: принимаем %s файл(ов) gender=%s brand_id=%s во временный каталог %s",
+        "ai_ingest upload: принимаем %s файл(ов) gender=%s brand_id=%s show_badge=%s во временный каталог %s",
         len(files),
         g,
         brand_id,
+        badge_on,
         tmp_root,
     )
     try:
@@ -287,6 +300,7 @@ async def upload_batch(
                 id=jid,
                 gender=g,
                 brand_id=brand_id,
+                show_badge=badge_on,
                 original_filename=raw_name,
                 temp_path=str(dest_resolved),
                 status="pending",

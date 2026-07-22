@@ -18,6 +18,9 @@ class FeedPhoto(BaseModel):
     source_type: str
     # Денормализация из brands.name; не путать с тегами каталога (photo_tags).
     brand: str | None = None
+    # Свободный бейдж на карточке (Sale, −30%…); только отображение.
+    # Резолвится на бэке: show_badge + feed_settings.card_badge_label.
+    badge_label: str | None = None
     tags: list[TagOut]
 
 

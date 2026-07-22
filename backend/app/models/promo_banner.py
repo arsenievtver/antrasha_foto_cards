@@ -24,8 +24,14 @@ class PromoBanner(Base):
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     body: Mapped[str | None] = mapped_column(Text, nullable=True)
     image_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    # fit | cover — как показывать картинку в модалке
+    image_fit: Mapped[str] = mapped_column(String(16), nullable=False, default="fit")
     link_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     link_label: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    # Кнопки перехода в мужскую / женскую коллекцию (поверх «Закрыть»).
+    show_gender_ctas: Mapped[bool] = mapped_column(nullable=False, default=False)
+    cta_male_label: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    cta_female_label: Mapped[str | None] = mapped_column(String(80), nullable=True)
     starts_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     display_mode: Mapped[PromoBannerDisplayMode] = mapped_column(

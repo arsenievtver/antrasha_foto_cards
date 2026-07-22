@@ -148,6 +148,7 @@ def _photo_out(p: Photo, *, viewer_user_id: uuid.UUID | None = None) -> AdminPho
         brand=p.brand,
         price_segment=p.price_segment,
         moy_sklad_id=p.moy_sklad_id,
+        show_badge=bool(p.show_badge),
         tags_version=p.tags_version,
         claim_expires_at=claim_expires_at,
         claim_is_mine=claim_is_mine,
@@ -386,8 +387,11 @@ def get_feed_settings(
 ) -> FeedSettingsOut:
     row = db.get(FeedSettings, 1)
     if row is None:
-        return FeedSettingsOut(require_tagging_review_for_feed=False)
-    return FeedSettingsOut(require_tagging_review_for_feed=row.require_tagging_review_for_feed)
+        return FeedSettingsOut(require_tagging_review_for_feed=False, card_badge_label=None)
+    return FeedSettingsOut(
+        require_tagging_review_for_feed=row.require_tagging_review_for_feed,
+        card_badge_label=row.card_badge_label,
+    )
 
 
 @router.patch("/feed-settings", response_model=FeedSettingsOut)
@@ -397,18 +401,32 @@ def patch_feed_settings(
     _su: AdminPrincipal = Depends(require_superuser),
 ) -> FeedSettingsOut:
     _ = _su
+    patch = body.model_dump(exclude_unset=True)
+    if not patch:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Нет полей для обновления",
+        )
     row = db.get(FeedSettings, 1)
     if row is None:
-        row = FeedSettings(
-            id=1,
-            require_tagging_review_for_feed=body.require_tagging_review_for_feed,
-        )
+        row = FeedSettings(id=1, require_tagging_review_for_feed=False, card_badge_label=None)
         db.add(row)
-    else:
-        row.require_tagging_review_for_feed = body.require_tagging_review_for_feed
+        db.flush()
+    if "require_tagging_review_for_feed" in patch:
+        row.require_tagging_review_for_feed = bool(patch["require_tagging_review_for_feed"])
+    if "card_badge_label" in patch:
+        raw = patch.get("card_badge_label")
+        if raw is None or (isinstance(raw, str) and not raw.strip()):
+            row.card_badge_label = None
+        else:
+            s = raw.strip() if isinstance(raw, str) else str(raw)
+            row.card_badge_label = s[:40] if s else None
     db.commit()
     db.refresh(row)
-    return FeedSettingsOut(require_tagging_review_for_feed=row.require_tagging_review_for_feed)
+    return FeedSettingsOut(
+        require_tagging_review_for_feed=row.require_tagging_review_for_feed,
+        card_badge_label=row.card_badge_label,
+    )
 
 
 # Поддерживаемые сортировки в /admin/photos. Значения сохраняйте синхронно с фронтом (admin/src/pages/Photos.jsx).
@@ -831,7 +849,6 @@ def put_photo_tags(
     photo.worker_signal_love = body.worker_signal_love
     photo.worker_signal_hit = body.worker_signal_hit
     photo.worker_signal_hard = body.worker_signal_hard
-    photo.tagging_review_done = True
 
     if body.apply_brand:
         if body.brand_id is not None:
@@ -848,6 +865,8 @@ def put_photo_tags(
             photo.brand = None
 
     _body_patch = body.model_dump(exclude_unset=True)
+    if "tagging_review_done" in _body_patch and _body_patch.get("tagging_review_done") is not None:
+        photo.tagging_review_done = bool(_body_patch["tagging_review_done"])
     if "moy_sklad_id" in _body_patch:
         raw = _body_patch.get("moy_sklad_id")
         if raw is None or (isinstance(raw, str) and not raw.strip()):
@@ -855,6 +874,8 @@ def put_photo_tags(
         else:
             s = raw.strip() if isinstance(raw, str) else str(raw)
             photo.moy_sklad_id = s[:128] if s else None
+    if "show_badge" in _body_patch:
+        photo.show_badge = bool(_body_patch.get("show_badge"))
 
     for pt in list(photo.photo_tags):
         db.delete(pt)

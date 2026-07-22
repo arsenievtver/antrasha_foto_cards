@@ -8,6 +8,7 @@ from app.database import get_db
 from app.deps import get_optional_user, get_session_or_404, parse_session_id
 from app.schemas.feed import FeedPhoto, FeedResponse, TagOut
 from app.services.feed import fetch_feed_photos
+from app.services.feed_policy import feed_card_badge_label
 from app.services.weights import touch_session
 
 log = logging.getLogger("app.api.feed")
@@ -41,6 +42,7 @@ def get_feed(
         user_id=uid,
         session_id=session_id,
     )
+    badge_text = feed_card_badge_label(db)
     out: list[FeedPhoto] = []
     for p in photos:
         tags = [
@@ -59,6 +61,7 @@ def get_feed(
                 gender=p.gender,
                 source_type=p.source_type,
                 brand=p.brand,
+                badge_label=badge_text if p.show_badge and badge_text else None,
                 tags=tags,
             )
         )

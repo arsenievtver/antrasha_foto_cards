@@ -66,8 +66,12 @@ def create_promo_banner(
         title=body.title.strip(),
         body=body.body.strip() if body.body else None,
         image_url=body.image_url,
+        image_fit=body.image_fit or "fit",
         link_url=body.link_url.strip() if body.link_url else None,
         link_label=body.link_label.strip() if body.link_label else None,
+        show_gender_ctas=bool(body.show_gender_ctas),
+        cta_male_label=body.cta_male_label.strip() if body.cta_male_label else None,
+        cta_female_label=body.cta_female_label.strip() if body.cta_female_label else None,
         starts_at=body.starts_at,
         ends_at=body.ends_at,
         display_mode=body.display_mode,
@@ -103,10 +107,18 @@ def update_promo_banner(
     if body.clear_image and row.image_url:
         delete_promo_banner_image(row.image_url)
         row.image_url = None
+    if body.image_fit is not None:
+        row.image_fit = body.image_fit
     if body.link_url is not None:
         row.link_url = body.link_url.strip() if body.link_url else None
     if body.link_label is not None:
         row.link_label = body.link_label.strip() if body.link_label else None
+    if body.show_gender_ctas is not None:
+        row.show_gender_ctas = bool(body.show_gender_ctas)
+    if body.cta_male_label is not None:
+        row.cta_male_label = body.cta_male_label.strip() if body.cta_male_label else None
+    if body.cta_female_label is not None:
+        row.cta_female_label = body.cta_female_label.strip() if body.cta_female_label else None
     if body.starts_at is not None:
         row.starts_at = body.starts_at
     if body.ends_at is not None:

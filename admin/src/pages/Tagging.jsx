@@ -6,6 +6,7 @@ import {
   createTagInGroup,
   fetchAdminPhoto,
   fetchBrands,
+  fetchFeedSettings,
   fetchTagCatalog,
   fetchTaggingQueue,
   getRole,
@@ -71,6 +72,8 @@ export default function Tagging() {
   const [quickBrandName, setQuickBrandName] = useState("");
   const [quickBrandBusy, setQuickBrandBusy] = useState(false);
   const [editorMoySkladId, setEditorMoySkladId] = useState("");
+  const [editorShowBadge, setEditorShowBadge] = useState(false);
+  const [centralBadgeText, setCentralBadgeText] = useState("");
   const [clock, setClock] = useState(Date.now());
 
   const canSave = useMemo(
@@ -126,6 +129,27 @@ export default function Tagging() {
         if (!c) setBrands(data.items || []);
       } catch (e) {
         if (!c) setErr(e.message);
+      }
+    })();
+    return () => {
+      c = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let c = false;
+    (async () => {
+      try {
+        const fs = await fetchFeedSettings();
+        if (!c) {
+          const t =
+            fs?.card_badge_label != null && String(fs.card_badge_label).trim()
+              ? String(fs.card_badge_label).trim()
+              : "";
+          setCentralBadgeText(t);
+        }
+      } catch {
+        if (!c) setCentralBadgeText("");
       }
     })();
     return () => {
@@ -195,6 +219,7 @@ export default function Tagging() {
         ? String(photo.moy_sklad_id)
         : "",
     );
+    setEditorShowBadge(!!photo.show_badge);
     setQuickBrandName("");
   }
 
@@ -283,6 +308,8 @@ export default function Tagging() {
         apply_brand: true,
         brand_id: editorBrandId || null,
         moy_sklad_id: editorMoySkladId.trim() || null,
+        show_badge: editorShowBadge,
+        tagging_review_done: true,
         expected_tags_version: editorPhoto.tags_version ?? 0,
       });
       setEditorPhoto(null);
@@ -487,6 +514,27 @@ export default function Tagging() {
                 autoComplete="off"
                 disabled={busy}
               />
+            </label>
+            <label className="tagging-moysklad-label tagging-badge-check">
+              <span className="tagging-badge-check-row">
+                <input
+                  type="checkbox"
+                  checked={editorShowBadge}
+                  onChange={(e) => setEditorShowBadge(e.target.checked)}
+                  disabled={busy}
+                />
+                <span>
+                  Бейдж на карточке
+                  {centralBadgeText ? (
+                    <span className="muted tagging-moysklad-hint"> («{centralBadgeText}»)</span>
+                  ) : (
+                    <span className="muted tagging-moysklad-hint">
+                      {" "}
+                      (текст задаётся на странице «Фото и теги»)
+                    </span>
+                  )}
+                </span>
+              </span>
             </label>
             {displaySeconds != null && (
               <p className="tagging-timer">

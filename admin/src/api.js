@@ -408,6 +408,15 @@ export async function putPhotoTags(photoId, tagsOrBody) {
   if (!Array.isArray(tagsOrBody) && Object.prototype.hasOwnProperty.call(tagsOrBody, "moy_sklad_id")) {
     body.moy_sklad_id = tagsOrBody.moy_sklad_id;
   }
+  if (!Array.isArray(tagsOrBody) && Object.prototype.hasOwnProperty.call(tagsOrBody, "show_badge")) {
+    body.show_badge = !!tagsOrBody.show_badge;
+  }
+  if (
+    !Array.isArray(tagsOrBody) &&
+    Object.prototype.hasOwnProperty.call(tagsOrBody, "tagging_review_done")
+  ) {
+    body.tagging_review_done = !!tagsOrBody.tagging_review_done;
+  }
   if (
     !Array.isArray(tagsOrBody) &&
     Object.prototype.hasOwnProperty.call(tagsOrBody, "expected_tags_version")
@@ -610,10 +619,11 @@ export async function fetchAiIngestJobs({ skip = 0, limit = 50 } = {}) {
   return data;
 }
 
-export async function uploadAiIngestBatch(gender, brandId, fileList) {
+export async function uploadAiIngestBatch(gender, brandId, fileList, { showBadge = false } = {}) {
   const fd = new FormData();
   fd.append("gender", gender);
   fd.append("brand_id", brandId);
+  fd.append("show_badge", showBadge ? "true" : "false");
   for (const f of fileList) {
     fd.append("files", f);
   }

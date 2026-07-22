@@ -738,6 +738,12 @@ export default function Swipe() {
 									eager={i <= 1}
 									onBroken={() => removeBrokenPhoto(photo.id)}
 								/>
+								{typeof photo.badge_label === "string" &&
+								photo.badge_label.trim() ? (
+									<span className="swipe-card-badge" aria-label={photo.badge_label.trim()}>
+										{photo.badge_label.trim()}
+									</span>
+								) : null}
 								{isTop && (
 									<SwipeStamps
 										overlay={isExiting ? overlay : null}

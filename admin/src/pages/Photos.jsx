@@ -35,6 +35,7 @@ export default function Photos() {
   const [quickBrandName, setQuickBrandName] = useState("");
   const [quickBrandBusy, setQuickBrandBusy] = useState(false);
   const [modalMoySkladId, setModalMoySkladId] = useState("");
+  const [modalShowBadge, setModalShowBadge] = useState(false);
   const [tagChecked, setTagChecked] = useState({});
   /** Версия тегов на момент открытия модалки — optimistic locking при сохранении. */
   const [modalTagsVersion, setModalTagsVersion] = useState(0);
@@ -47,6 +48,8 @@ export default function Photos() {
   const [syncSummary, setSyncSummary] = useState(null);
   const [feedSettings, setFeedSettings] = useState(null);
   const [feedSettingsLoading, setFeedSettingsLoading] = useState(true);
+  const [badgeLabelDraft, setBadgeLabelDraft] = useState("");
+  const [badgeLabelSaving, setBadgeLabelSaving] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
   const [aiMessage, setAiMessage] = useState("");
   const [aiDebug, setAiDebug] = useState(null);
@@ -89,9 +92,19 @@ export default function Photos() {
       }
       try {
         const fs = await fetchFeedSettings();
-        if (!c) setFeedSettings(fs);
+        if (!c) {
+          setFeedSettings(fs);
+          setBadgeLabelDraft(
+            fs?.card_badge_label != null && fs.card_badge_label !== ""
+              ? String(fs.card_badge_label)
+              : "",
+          );
+        }
       } catch {
-        if (!c) setFeedSettings({ require_tagging_review_for_feed: false });
+        if (!c) {
+          setFeedSettings({ require_tagging_review_for_feed: false, card_badge_label: null });
+          setBadgeLabelDraft("");
+        }
       } finally {
         if (!c) setFeedSettingsLoading(false);
       }
@@ -165,6 +178,7 @@ export default function Photos() {
     setTagChecked(m);
     setModalBrandId(p.brand_id || "");
     setModalMoySkladId(p.moy_sklad_id != null && p.moy_sklad_id !== "" ? String(p.moy_sklad_id) : "");
+    setModalShowBadge(!!p.show_badge);
     setQuickBrandName("");
     setModalPhoto(p);
     setModalTagsVersion(p.tags_version ?? 0);
@@ -289,6 +303,9 @@ export default function Photos() {
         apply_brand: true,
         brand_id: modalBrandId || null,
         moy_sklad_id: modalMoySkladId.trim() || null,
+        show_badge: modalShowBadge,
+        // «Размечено» только если реально выбраны каталожные теги; один бейдж Sale — не разметка.
+        tagging_review_done: tags.length > 0,
         expected_tags_version: modalTagsVersion,
       });
       setItems((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
@@ -310,6 +327,7 @@ export default function Photos() {
               ? String(fresh.moy_sklad_id)
               : "",
           );
+          setModalShowBadge(!!fresh.show_badge);
           setModalErr(
             "На сервере уже другая версия разметки — форма обновлена актуальными данными. Проверьте теги и сохраните снова.",
           );
@@ -450,7 +468,33 @@ export default function Photos() {
     }
   }
 
+  async function onSaveBadgeLabel(e) {
+    e?.preventDefault?.();
+    if (getRole() !== "superuser" || badgeLabelSaving) return;
+    setBadgeLabelSaving(true);
+    setErr("");
+    try {
+      const data = await patchFeedSettings({
+        card_badge_label: badgeLabelDraft.trim() || null,
+      });
+      setFeedSettings(data);
+      setBadgeLabelDraft(
+        data?.card_badge_label != null && data.card_badge_label !== ""
+          ? String(data.card_badge_label)
+          : "",
+      );
+    } catch (ex) {
+      setErr(ex.message || String(ex));
+    } finally {
+      setBadgeLabelSaving(false);
+    }
+  }
+
   const canMore = skip + items.length < total;
+  const centralBadgeText =
+    feedSettings?.card_badge_label != null && String(feedSettings.card_badge_label).trim()
+      ? String(feedSettings.card_badge_label).trim()
+      : "";
 
   return (
     <div>
@@ -482,6 +526,46 @@ export default function Photos() {
           >
             <span className="switch-thumb" aria-hidden />
           </button>
+        </div>
+        <div className="feed-policy-row feed-policy-row--badge">
+          <div className="feed-policy-text">
+            <strong style={{ color: "var(--text)" }}>Текст бейджа на карточках.</strong> Один на все
+            фото — например Sale или −50%. На каждом фото отдельно ставите чекбокс «Бейдж» и
+            сохраняете.
+            {getRole() !== "superuser" && (
+              <span style={{ display: "block", marginTop: "0.25rem" }}>
+                Текст меняет только суперпользователь.
+              </span>
+            )}
+          </div>
+          <form className="feed-badge-form" onSubmit={onSaveBadgeLabel}>
+            <input
+              type="text"
+              value={badgeLabelDraft}
+              onChange={(e) => setBadgeLabelDraft(e.target.value)}
+              placeholder="Sale"
+              maxLength={40}
+              disabled={feedSettingsLoading || getRole() !== "superuser" || badgeLabelSaving}
+              aria-label="Текст бейджа"
+            />
+            {["Sale", "−50%", "%"].map((preset) => (
+              <button
+                key={preset}
+                type="button"
+                className="secondary"
+                disabled={feedSettingsLoading || getRole() !== "superuser" || badgeLabelSaving}
+                onClick={() => setBadgeLabelDraft(preset)}
+              >
+                {preset}
+              </button>
+            ))}
+            <button
+              type="submit"
+              disabled={feedSettingsLoading || getRole() !== "superuser" || badgeLabelSaving}
+            >
+              {badgeLabelSaving ? "…" : "Сохранить"}
+            </button>
+          </form>
         </div>
       </div>
       <div className="toolbar">
@@ -608,6 +692,39 @@ export default function Photos() {
                 style={{ position: "relative" }}
                 {...photoHover.hoverProps(p.url)}
               >
+                {p.show_badge ? (
+                  <span
+                    style={{
+                      position: "absolute",
+                      right: 6,
+                      top: 6,
+                      zIndex: 2,
+                      width: 22,
+                      height: 22,
+                      borderRadius: "50%",
+                      background: "#c62828",
+                      color: "#fff",
+                      fontSize: "0.72rem",
+                      fontWeight: 800,
+                      lineHeight: "22px",
+                      textAlign: "center",
+                      boxShadow: "0 1px 4px rgba(0,0,0,0.35)",
+                      pointerEvents: "none",
+                    }}
+                    title={
+                      centralBadgeText
+                        ? `Бейдж: ${centralBadgeText}`
+                        : "Бейдж включён"
+                    }
+                    aria-label={
+                      centralBadgeText
+                        ? `Бейдж: ${centralBadgeText}`
+                        : "Бейдж включён"
+                    }
+                  >
+                    %
+                  </span>
+                ) : null}
                 <span
                   style={{
                     position: "absolute",
@@ -886,6 +1003,37 @@ export default function Photos() {
                     color: "var(--text)",
                   }}
                 />
+              </label>
+            </div>
+            <div style={{ marginBottom: "0.75rem" }}>
+              <label
+                style={{
+                  display: "flex",
+                  gap: "0.5rem",
+                  alignItems: "center",
+                  fontSize: "0.9rem",
+                  cursor: "pointer",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={modalShowBadge}
+                  onChange={(e) => setModalShowBadge(e.target.checked)}
+                />
+                <span>
+                  Бейдж на карточке
+                  {centralBadgeText ? (
+                    <span style={{ color: "var(--muted)", fontWeight: 400, fontSize: "0.82rem" }}>
+                      {" "}
+                      («{centralBadgeText}»)
+                    </span>
+                  ) : (
+                    <span style={{ color: "var(--muted)", fontWeight: 400, fontSize: "0.82rem" }}>
+                      {" "}
+                      (сначала задайте текст бейджа выше на странице)
+                    </span>
+                  )}
+                </span>
               </label>
             </div>
             <div

@@ -29,6 +29,7 @@ class AiIngestJobOut(BaseModel):
     gender: str
     brand_id: uuid.UUID | None = None
     brand_name: str | None = None
+    show_badge: bool = False
     original_filename: str
     status: str
     error_message: str | None

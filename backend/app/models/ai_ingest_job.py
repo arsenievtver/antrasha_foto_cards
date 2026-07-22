@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, String, Text, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -25,6 +25,8 @@ class AiIngestJob(Base):
         nullable=True,
         index=True,
     )
+    # Переносится на Photo.show_badge после успешной загрузки в каталог.
+    show_badge: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     original_filename: Mapped[str] = mapped_column(Text, nullable=False)
     temp_path: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(

@@ -141,6 +141,7 @@ def ensure_photo_row_for_yc_key(
     bucket: str,
     key: str,
     brand_id: uuid.UUID | None = None,
+    show_badge: bool | None = None,
 ) -> None:
     """
     Одна запись `photos` для загруженного в бакет ключа (без полного list бакета).
@@ -166,6 +167,8 @@ def ensure_photo_row_for_yc_key(
         if brand_id is not None and brand_name is not None:
             row.brand_id = brand_id
             row.brand = brand_name
+        if show_badge is not None:
+            row.show_badge = bool(show_badge)
         return
     db.add(
         Photo(
@@ -176,6 +179,7 @@ def ensure_photo_row_for_yc_key(
             is_active=True,
             brand_id=brand_id,
             brand=brand_name,
+            show_badge=bool(show_badge) if show_badge is not None else False,
         )
     )
 

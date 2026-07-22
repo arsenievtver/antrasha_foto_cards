@@ -6,6 +6,7 @@ import {
   fetchAiIngestLimits,
   fetchAiIngestStats,
   fetchBrands,
+  fetchFeedSettings,
   retryAiIngestJob,
   uploadAiIngestBatch,
 } from "../api.js";
@@ -37,6 +38,8 @@ export default function AiIngest() {
   const [gender, setGender] = useState("male");
   const [brands, setBrands] = useState([]);
   const [brandId, setBrandId] = useState("");
+  const [showBadge, setShowBadge] = useState(false);
+  const [badgeLabel, setBadgeLabel] = useState("");
   const [quickBrandName, setQuickBrandName] = useState("");
   const [quickBrandBusy, setQuickBrandBusy] = useState(false);
   const [files, setFiles] = useState([]);
@@ -106,6 +109,27 @@ export default function AiIngest() {
   }, [loadBrands, loadJobs, refreshMeta, skip]);
 
   useEffect(() => {
+    let c = false;
+    (async () => {
+      try {
+        const fs = await fetchFeedSettings();
+        if (!c) {
+          const t =
+            fs?.card_badge_label != null && String(fs.card_badge_label).trim()
+              ? String(fs.card_badge_label).trim()
+              : "";
+          setBadgeLabel(t);
+        }
+      } catch {
+        if (!c) setBadgeLabel("");
+      }
+    })();
+    return () => {
+      c = true;
+    };
+  }, []);
+
+  useEffect(() => {
     const t = setInterval(() => {
       void pollQueue();
     }, 3000);
@@ -142,7 +166,7 @@ export default function AiIngest() {
     setUploading(true);
     setErr("");
     try {
-      await uploadAiIngestBatch(gender, brandId, toSend);
+      await uploadAiIngestBatch(gender, brandId, toSend, { showBadge });
       if (fileInputRef.current) fileInputRef.current.value = "";
       setFiles([]);
       await Promise.all([refreshMeta(), loadJobs()]);
@@ -304,6 +328,32 @@ export default function AiIngest() {
           <button type="button" className="secondary" disabled={quickBrandBusy} onClick={onQuickAddBrand}>
             {quickBrandBusy ? "…" : "+ В базу"}
           </button>
+          <label
+            style={{
+              display: "flex",
+              gap: "0.45rem",
+              alignItems: "center",
+              cursor: "pointer",
+              userSelect: "none",
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={showBadge}
+              onChange={(e) => setShowBadge(e.target.checked)}
+            />
+            <span>
+              Бейдж
+              {badgeLabel ? (
+                <span style={{ color: "var(--muted)", fontSize: "0.85rem" }}> («{badgeLabel}»)</span>
+              ) : (
+                <span style={{ color: "var(--muted)", fontSize: "0.85rem" }}>
+                  {" "}
+                  (текст на «Фото и теги»)
+                </span>
+              )}
+            </span>
+          </label>
           <span style={{ color: "var(--muted)", fontSize: "0.85rem" }}>
             JPG, PNG, WEBP, HEIC — конвертация на сервере
           </span>
@@ -349,6 +399,7 @@ export default function AiIngest() {
               <th style={{ padding: "0.5rem 0.35rem" }}>Файл</th>
               <th style={{ padding: "0.5rem 0.35rem" }}>Пол</th>
               <th style={{ padding: "0.5rem 0.35rem" }}>Бренд</th>
+              <th style={{ padding: "0.5rem 0.35rem" }}>Бейдж</th>
               <th style={{ padding: "0.5rem 0.35rem" }}>Статус</th>
               <th style={{ padding: "0.5rem 0.35rem" }}>Создано</th>
               <th style={{ padding: "0.5rem 0.35rem" }}>Результат / ошибка</th>
@@ -361,6 +412,7 @@ export default function AiIngest() {
                 <td style={{ padding: "0.45rem 0.35rem", maxWidth: 200 }}>{j.original_filename}</td>
                 <td style={{ padding: "0.45rem 0.35rem" }}>{j.gender}</td>
                 <td style={{ padding: "0.45rem 0.35rem" }}>{j.brand_name || "—"}</td>
+                <td style={{ padding: "0.45rem 0.35rem" }}>{j.show_badge ? "да" : "—"}</td>
                 <td style={{ padding: "0.45rem 0.35rem" }}>{statusLabel(j.status)}</td>
                 <td style={{ padding: "0.45rem 0.35rem", color: "var(--muted)", whiteSpace: "nowrap" }}>
                   {fmtDate(j.created_at)}
