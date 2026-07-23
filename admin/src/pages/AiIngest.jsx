@@ -298,7 +298,7 @@ export default function AiIngest() {
       <form onSubmit={onUpload} style={{ marginBottom: "2rem" }}>
         <div
           style={{
-            marginBottom: "0.75rem",
+            marginBottom: "0.65rem",
             display: "flex",
             gap: "1rem",
             flexWrap: "wrap",
@@ -319,6 +319,17 @@ export default function AiIngest() {
               <option value="on_model">Готовый образ на человеке</option>
             </select>
           </label>
+        </div>
+
+        <div
+          style={{
+            marginBottom: "0.75rem",
+            display: "flex",
+            gap: "1rem",
+            flexWrap: "wrap",
+            alignItems: "center",
+          }}
+        >
           <label style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
             <span>Бренд</span>
             <select value={brandId} onChange={(e) => setBrandId(e.target.value)}>
@@ -368,9 +379,6 @@ export default function AiIngest() {
               )}
             </span>
           </label>
-          <span style={{ color: "var(--muted)", fontSize: "0.85rem" }}>
-            JPG, PNG, WEBP, HEIC — конвертация на сервере
-          </span>
         </div>
 
         <div
