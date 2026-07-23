@@ -250,21 +250,13 @@ export default function AiIngest() {
           {limits.max_pending_jobs} задач в статусе «В очереди», параллельно воркеров:{" "}
           {limits.worker_concurrency}.
           <div style={{ marginTop: "0.5rem" }}>
-            Ключи Fashn + YC на API:{" "}
+            Ключи:{" "}
             <strong style={{ color: limits.pipeline_ready ? "var(--accent)" : "var(--danger)" }}>
               {limits.pipeline_ready ? "заданы" : "не заданы"}
             </strong>
             {limits.pipeline_ready
               ? ""
               : " — upload вернёт 503, пока не настроите env на бэкенде"}
-            {" · "}
-            Fashn …{limits.fashn_key_last4 ?? "????"}, YC …{limits.yc_access_key_id_last4 ?? "????"}
-          </div>
-          <div style={{ marginTop: "0.35rem", color: "var(--muted)" }}>
-            Очередь обрабатывает <strong style={{ color: "var(--text)" }}>отдельный процесс</strong>{" "}
-            <code style={{ fontSize: "0.82em" }}>python -m jobs.ai_ingest_worker</code> (не uvicorn).
-            На dev: <code style={{ fontSize: "0.82em" }}>scripts/dev-up.sh</code> поднимает его вместе с API.
-            В Docker prod — сервис <code style={{ fontSize: "0.82em" }}>ai-ingest-worker</code>.
           </div>
         </div>
       )}
