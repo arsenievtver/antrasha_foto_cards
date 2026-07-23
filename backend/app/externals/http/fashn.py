@@ -21,22 +21,40 @@ RESOLUTION = "1k"
 NUM_IMAGES = 1
 SEED = 42
 
+SOURCE_MODE_FLATLAY = "flatlay"
+SOURCE_MODE_ON_MODEL = "on_model"
+VALID_SOURCE_MODES = frozenset({SOURCE_MODE_FLATLAY, SOURCE_MODE_ON_MODEL})
+
+# on_model: tighter garment fidelity; costs more credits / slower.
+GENERATION_MODE_BY_SOURCE = {
+    SOURCE_MODE_FLATLAY: "balanced",
+    SOURCE_MODE_ON_MODEL: "quality",
+}
+
 _PROMPTS_DIR = Path(__file__).resolve().parent.parent.parent / "prompts"
 _PROMPT_CACHE: dict[str, str] = {}
 
 
-def load_prompt_for_gender(gender: str) -> str:
-    key = gender.strip().lower()
-    if key in _PROMPT_CACHE:
-        return _PROMPT_CACHE[key]
-    names = {"male": "promt_male.txt", "female": "promt_female.txt"}
-    if key not in names:
+def normalize_source_mode(source_mode: str | None) -> str:
+    mode = (source_mode or SOURCE_MODE_FLATLAY).strip().lower()
+    if mode not in VALID_SOURCE_MODES:
+        raise ValueError("source_mode must be flatlay or on_model")
+    return mode
+
+
+def load_prompt_for_gender(gender: str, source_mode: str = SOURCE_MODE_FLATLAY) -> str:
+    g = gender.strip().lower()
+    if g not in ("male", "female"):
         raise ValueError("gender must be male or female")
-    path = _PROMPTS_DIR / names[key]
+    mode = normalize_source_mode(source_mode)
+    cache_key = f"{g}:{mode}"
+    if cache_key in _PROMPT_CACHE:
+        return _PROMPT_CACHE[cache_key]
+    path = _PROMPTS_DIR / f"promt_{g}_{mode}.txt"
     if not path.is_file():
         raise FileNotFoundError(f"Prompt file missing: {path}")
-    _PROMPT_CACHE[key] = path.read_text(encoding="utf-8")
-    return _PROMPT_CACHE[key]
+    _PROMPT_CACHE[cache_key] = path.read_text(encoding="utf-8")
+    return _PROMPT_CACHE[cache_key]
 
 
 class FashnClient(BaseApiClient):
@@ -74,7 +92,13 @@ class FashnClient(BaseApiClient):
     def _proxy_kwargs(self) -> dict:
         return {"proxy": self._proxy} if self._proxy else {}
 
-    async def submit(self, *, product_image_data_url: str, prompt: str) -> str:
+    async def submit(
+        self,
+        *,
+        product_image_data_url: str,
+        prompt: str,
+        generation_mode: str = "balanced",
+    ) -> str:
         """Submits a job to the Fashn API, returns job_id."""
         payload = {
             "model_name": "product-to-model",
@@ -83,6 +107,7 @@ class FashnClient(BaseApiClient):
                 "prompt": prompt,
                 "aspect_ratio": ASPECT_RATIO,
                 "resolution": RESOLUTION,
+                "generation_mode": generation_mode,
                 "num_images": NUM_IMAGES,
                 "output_format": "png",
                 "return_base64": False,
@@ -224,18 +249,32 @@ class FashnClient(BaseApiClient):
             await self.close()
 
     async def run_product_to_model(
-        self, *, gender: str, product_image_data_url: str
+        self,
+        *,
+        gender: str,
+        product_image_data_url: str,
+        source_mode: str = SOURCE_MODE_FLATLAY,
     ) -> bytes:
         """Full submit → poll → download cycle with MAX_RETRIES attempts."""
-        prompt = load_prompt_for_gender(gender)
+        mode = normalize_source_mode(source_mode)
+        prompt = load_prompt_for_gender(gender, mode)
+        generation_mode = GENERATION_MODE_BY_SOURCE[mode]
         last_err: Exception = RuntimeError("Unknown error")
         try:
             for attempt in range(MAX_RETRIES):
-                log.info("fashn product-to-model attempt %s/%s gender=%s", attempt + 1, MAX_RETRIES, gender)
+                log.info(
+                    "fashn product-to-model attempt %s/%s gender=%s source_mode=%s generation_mode=%s",
+                    attempt + 1,
+                    MAX_RETRIES,
+                    gender,
+                    mode,
+                    generation_mode,
+                )
                 try:
                     job_id = await self.submit(
                         product_image_data_url=product_image_data_url,
                         prompt=prompt,
+                        generation_mode=generation_mode,
                     )
                     urls = await self.poll_status(job_id)
                     if not urls:

@@ -619,10 +619,16 @@ export async function fetchAiIngestJobs({ skip = 0, limit = 50 } = {}) {
   return data;
 }
 
-export async function uploadAiIngestBatch(gender, brandId, fileList, { showBadge = false } = {}) {
+export async function uploadAiIngestBatch(
+  gender,
+  brandId,
+  fileList,
+  { showBadge = false, sourceMode = "flatlay" } = {},
+) {
   const fd = new FormData();
   fd.append("gender", gender);
   fd.append("brand_id", brandId);
+  fd.append("source_mode", sourceMode);
   fd.append("show_badge", showBadge ? "true" : "false");
   for (const f of fileList) {
     fd.append("files", f);

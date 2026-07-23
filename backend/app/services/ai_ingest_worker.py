@@ -125,10 +125,12 @@ def run_single_ingest_job(cfg: Settings, job_id: uuid.UUID) -> None:
         if job.status != "processing":
             return
         path = Path(job.temp_path)
+        source_mode = (job.source_mode or "flatlay").strip().lower()
         log.info(
-            "ai_ingest job_id=%s gender=%s temp_path=%s exists=%s",
+            "ai_ingest job_id=%s gender=%s source_mode=%s temp_path=%s exists=%s",
             job_id,
             job.gender,
+            source_mode,
             path,
             path.is_file(),
         )
@@ -144,8 +146,9 @@ def run_single_ingest_job(cfg: Settings, job_id: uuid.UUID) -> None:
             return
 
         log.info(
-            "ai_ingest job_id=%s → Fashn product-to-model (data_url ~%s символов)",
+            "ai_ingest job_id=%s → Fashn product-to-model source_mode=%s (data_url ~%s символов)",
             job_id,
+            source_mode,
             len(data_url),
         )
         t0 = time.monotonic()
@@ -162,6 +165,7 @@ def run_single_ingest_job(cfg: Settings, job_id: uuid.UUID) -> None:
                 client.run_product_to_model(
                     gender=job.gender,
                     product_image_data_url=data_url,
+                    source_mode=source_mode,
                 )
             )
         except Exception as e:

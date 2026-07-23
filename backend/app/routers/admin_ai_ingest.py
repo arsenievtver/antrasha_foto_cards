@@ -23,6 +23,7 @@ from app.schemas.ai_ingest import (
     AiIngestQueueStatsOut,
     AiIngestUploadResponse,
 )
+from app.externals.http.fashn import VALID_SOURCE_MODES, normalize_source_mode
 from app.services.ai_ingest_worker import count_pending_jobs
 from app.services.yc_storage import public_object_url
 
@@ -78,6 +79,7 @@ def _job_out(j: AiIngestJob) -> AiIngestJobOut:
     return AiIngestJobOut(
         id=j.id,
         gender=j.gender,
+        source_mode=j.source_mode or "flatlay",
         brand_id=j.brand_id,
         brand_name=brand_name,
         show_badge=bool(j.show_badge),
@@ -193,6 +195,10 @@ def _form_bool(raw: str | None) -> bool:
 async def upload_batch(
     _p: AdminPrincipal = Depends(get_admin_principal),
     gender: str = Form(..., description="male | female"),
+    source_mode: str = Form(
+        "flatlay",
+        description="flatlay | on_model — тип исходника для промпта Fashn",
+    ),
     brand_id: uuid.UUID = Form(..., description="ID бренда, см. GET /admin/brands"),
     show_badge: str = Form(
         "false",
@@ -209,6 +215,13 @@ async def upload_batch(
     g = gender.strip().lower()
     if g not in ("male", "female"):
         raise HTTPException(status_code=400, detail="gender: укажите male или female")
+    try:
+        mode = normalize_source_mode(source_mode)
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail=f"source_mode: укажите {' или '.join(sorted(VALID_SOURCE_MODES))}",
+        ) from None
     badge_on = _form_bool(show_badge)
 
     db_brand = SessionLocal()
@@ -261,9 +274,10 @@ async def upload_batch(
     planned: list[tuple[uuid.UUID, Path, str]] = []
     written_paths: list[Path] = []
     log.info(
-        "ai_ingest upload: принимаем %s файл(ов) gender=%s brand_id=%s show_badge=%s во временный каталог %s",
+        "ai_ingest upload: принимаем %s файл(ов) gender=%s source_mode=%s brand_id=%s show_badge=%s во временный каталог %s",
         len(files),
         g,
+        mode,
         brand_id,
         badge_on,
         tmp_root,
@@ -299,6 +313,7 @@ async def upload_batch(
             job = AiIngestJob(
                 id=jid,
                 gender=g,
+                source_mode=mode,
                 brand_id=brand_id,
                 show_badge=badge_on,
                 original_filename=raw_name,

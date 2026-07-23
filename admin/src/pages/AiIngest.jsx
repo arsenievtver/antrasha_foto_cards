@@ -28,6 +28,12 @@ const statusLabel = (s) => {
   return s;
 };
 
+const sourceModeLabel = (m) => {
+  if (m === "on_model") return "На модели";
+  if (m === "flatlay") return "Вешалка / 1 вещь";
+  return m || "—";
+};
+
 export default function AiIngest() {
   const [limits, setLimits] = useState(null);
   const [stats, setStats] = useState(null);
@@ -36,6 +42,7 @@ export default function AiIngest() {
   const [skip, setSkip] = useState(0);
   const limit = 40;
   const [gender, setGender] = useState("male");
+  const [sourceMode, setSourceMode] = useState("flatlay");
   const [brands, setBrands] = useState([]);
   const [brandId, setBrandId] = useState("");
   const [showBadge, setShowBadge] = useState(false);
@@ -166,7 +173,7 @@ export default function AiIngest() {
     setUploading(true);
     setErr("");
     try {
-      await uploadAiIngestBatch(gender, brandId, toSend, { showBadge });
+      await uploadAiIngestBatch(gender, brandId, toSend, { showBadge, sourceMode });
       if (fileInputRef.current) fileInputRef.current.value = "";
       setFiles([]);
       await Promise.all([refreshMeta(), loadJobs()]);
@@ -306,6 +313,13 @@ export default function AiIngest() {
             </select>
           </label>
           <label style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+            <span>Тип исходника</span>
+            <select value={sourceMode} onChange={(e) => setSourceMode(e.target.value)}>
+              <option value="flatlay">Вешалка / одна вещь</option>
+              <option value="on_model">Готовый образ на человеке</option>
+            </select>
+          </label>
+          <label style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
             <span>Бренд</span>
             <select value={brandId} onChange={(e) => setBrandId(e.target.value)}>
               <option value="">— выберите —</option>
@@ -386,6 +400,12 @@ export default function AiIngest() {
           </div>
         </div>
 
+        <p style={{ margin: "0 0 0.75rem", color: "var(--muted)", fontSize: "0.85rem" }}>
+          Тип исходника выбирает промпт Fashn: «вешалка» — сохранить вещь и дорисовать образ;
+          «на человеке» — максимально точно перенести весь готовый look. В обоих режимах модель
+          всегда в обуви на full-body.
+        </p>
+
         <button type="submit" disabled={uploading || !files.length || !brandId}>
           {uploading ? "Загрузка…" : "Поставить в очередь"}
         </button>
@@ -398,6 +418,7 @@ export default function AiIngest() {
             <tr style={{ textAlign: "left", borderBottom: "1px solid var(--border)" }}>
               <th style={{ padding: "0.5rem 0.35rem" }}>Файл</th>
               <th style={{ padding: "0.5rem 0.35rem" }}>Пол</th>
+              <th style={{ padding: "0.5rem 0.35rem" }}>Исходник</th>
               <th style={{ padding: "0.5rem 0.35rem" }}>Бренд</th>
               <th style={{ padding: "0.5rem 0.35rem" }}>Бейдж</th>
               <th style={{ padding: "0.5rem 0.35rem" }}>Статус</th>
@@ -411,6 +432,7 @@ export default function AiIngest() {
               <tr key={j.id} style={{ borderBottom: "1px solid var(--border)" }}>
                 <td style={{ padding: "0.45rem 0.35rem", maxWidth: 200 }}>{j.original_filename}</td>
                 <td style={{ padding: "0.45rem 0.35rem" }}>{j.gender}</td>
+                <td style={{ padding: "0.45rem 0.35rem" }}>{sourceModeLabel(j.source_mode)}</td>
                 <td style={{ padding: "0.45rem 0.35rem" }}>{j.brand_name || "—"}</td>
                 <td style={{ padding: "0.45rem 0.35rem" }}>{j.show_badge ? "да" : "—"}</td>
                 <td style={{ padding: "0.45rem 0.35rem" }}>{statusLabel(j.status)}</td>

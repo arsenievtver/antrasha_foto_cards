@@ -19,6 +19,12 @@ class AiIngestJob(Base):
         default=uuid.uuid4,
     )
     gender: Mapped[str] = mapped_column(String(10), nullable=False, index=True)
+    # flatlay | on_model — какой промпт Fashn product-to-model использовать.
+    source_mode: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="flatlay",
+    )
     brand_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("brands.id", ondelete="SET NULL"),
