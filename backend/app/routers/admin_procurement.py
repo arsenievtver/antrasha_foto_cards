@@ -2,7 +2,7 @@
 
 Суммы ведём в евро; рубли считаем по курсу документа (у оплат и поставок он
 фиксируется на дату документа, чтобы правка справочника курсов не меняла историю).
-Доступ только у суперпользователя.
+Доступ: суперпользователь или сотрудник с правом product.
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.database import get_db
-from app.deps import AdminPrincipal, require_superuser
+from app.deps import AdminPrincipal, require_permission
 from app.models import (
     Brand,
     BrandOrder,
@@ -185,7 +185,7 @@ def _assert_order_matches(order: BrandOrder, season_id: uuid.UUID, brand_id: uui
 @router.get("/seasons", response_model=SeasonListResponse)
 def list_seasons(
     db: Session = Depends(get_db),
-    _su: AdminPrincipal = Depends(require_superuser),
+    _su: AdminPrincipal = Depends(require_permission("product")),
 ) -> SeasonListResponse:
     _ = _su
     rows = db.scalars(
@@ -198,7 +198,7 @@ def list_seasons(
 def create_season(
     body: SeasonCreateRequest,
     db: Session = Depends(get_db),
-    _su: AdminPrincipal = Depends(require_superuser),
+    _su: AdminPrincipal = Depends(require_permission("product")),
 ) -> SeasonOut:
     _ = _su
     row = Season(
@@ -225,7 +225,7 @@ def update_season(
     season_id: uuid.UUID,
     body: SeasonUpdateRequest,
     db: Session = Depends(get_db),
-    _su: AdminPrincipal = Depends(require_superuser),
+    _su: AdminPrincipal = Depends(require_permission("product")),
 ) -> SeasonOut:
     _ = _su
     row = _get_season(db, season_id)
@@ -253,7 +253,7 @@ def update_season(
 def delete_season(
     season_id: uuid.UUID,
     db: Session = Depends(get_db),
-    _su: AdminPrincipal = Depends(require_superuser),
+    _su: AdminPrincipal = Depends(require_permission("product")),
 ) -> None:
     _ = _su
     row = _get_season(db, season_id)
@@ -285,7 +285,7 @@ def list_categories(
     gender: str | None = Query(default=None),
     active_only: bool = Query(default=False),
     db: Session = Depends(get_db),
-    _su: AdminPrincipal = Depends(require_superuser),
+    _su: AdminPrincipal = Depends(require_permission("product")),
 ) -> CategoryListResponse:
     _ = _su
     stmt = select(Category)
@@ -302,7 +302,7 @@ def update_category(
     category_id: uuid.UUID,
     body: CategoryUpdateRequest,
     db: Session = Depends(get_db),
-    _su: AdminPrincipal = Depends(require_superuser),
+    _su: AdminPrincipal = Depends(require_permission("product")),
 ) -> CategoryOut:
     _ = _su
     row = db.get(Category, category_id)
@@ -326,7 +326,7 @@ def update_category(
 def list_fx_rates(
     limit: int = Query(default=100, ge=1, le=500),
     db: Session = Depends(get_db),
-    _su: AdminPrincipal = Depends(require_superuser),
+    _su: AdminPrincipal = Depends(require_permission("product")),
 ) -> FxRateListResponse:
     _ = _su
     rows = db.scalars(
@@ -339,7 +339,7 @@ def list_fx_rates(
 def create_fx_rate(
     body: FxRateCreateRequest,
     db: Session = Depends(get_db),
-    _su: AdminPrincipal = Depends(require_superuser),
+    _su: AdminPrincipal = Depends(require_permission("product")),
 ) -> FxRateOut:
     """Новый курс на период. Пересечения с уже заданными периодами запрещены."""
     _ = _su
@@ -362,7 +362,7 @@ def update_fx_rate(
     rate_id: uuid.UUID,
     body: FxRateUpdateRequest,
     db: Session = Depends(get_db),
-    _su: AdminPrincipal = Depends(require_superuser),
+    _su: AdminPrincipal = Depends(require_permission("product")),
 ) -> FxRateOut:
     _ = _su
     row = db.get(FxRate, rate_id)
@@ -395,7 +395,7 @@ def update_fx_rate(
 def delete_fx_rate(
     rate_id: uuid.UUID,
     db: Session = Depends(get_db),
-    _su: AdminPrincipal = Depends(require_superuser),
+    _su: AdminPrincipal = Depends(require_permission("product")),
 ) -> None:
     _ = _su
     row = db.get(FxRate, rate_id)
@@ -516,7 +516,7 @@ def list_brand_orders(
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=50, ge=1, le=200),
     db: Session = Depends(get_db),
-    _su: AdminPrincipal = Depends(require_superuser),
+    _su: AdminPrincipal = Depends(require_permission("product")),
 ) -> OrderListResponse:
     _ = _su
     filters = []
@@ -565,7 +565,7 @@ def list_brand_orders(
 def get_brand_order(
     order_id: uuid.UUID,
     db: Session = Depends(get_db),
-    _su: AdminPrincipal = Depends(require_superuser),
+    _su: AdminPrincipal = Depends(require_permission("product")),
 ) -> OrderOut:
     _ = _su
     row = db.scalars(
@@ -610,7 +610,7 @@ def _validate_prepayment(
 def create_brand_order(
     body: OrderCreateRequest,
     db: Session = Depends(get_db),
-    _su: AdminPrincipal = Depends(require_superuser),
+    _su: AdminPrincipal = Depends(require_permission("product")),
 ) -> OrderOut:
     _ = _su
     _get_season(db, body.season_id)
@@ -654,7 +654,7 @@ def update_brand_order(
     order_id: uuid.UUID,
     body: OrderUpdateRequest,
     db: Session = Depends(get_db),
-    _su: AdminPrincipal = Depends(require_superuser),
+    _su: AdminPrincipal = Depends(require_permission("product")),
 ) -> OrderOut:
     _ = _su
     order = _get_order(db, order_id)
@@ -711,7 +711,7 @@ def update_brand_order(
 def delete_brand_order(
     order_id: uuid.UUID,
     db: Session = Depends(get_db),
-    _su: AdminPrincipal = Depends(require_superuser),
+    _su: AdminPrincipal = Depends(require_permission("product")),
 ) -> None:
     _ = _su
     order = _get_order(db, order_id)
@@ -763,7 +763,7 @@ def list_payments(
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=50, ge=1, le=200),
     db: Session = Depends(get_db),
-    _su: AdminPrincipal = Depends(require_superuser),
+    _su: AdminPrincipal = Depends(require_permission("product")),
 ) -> PaymentListResponse:
     _ = _su
     filters = []
@@ -797,7 +797,7 @@ def list_payments(
 def create_payment(
     body: PaymentCreateRequest,
     db: Session = Depends(get_db),
-    _su: AdminPrincipal = Depends(require_superuser),
+    _su: AdminPrincipal = Depends(require_permission("product")),
 ) -> PaymentOut:
     _ = _su
     _get_season(db, body.season_id)
@@ -830,7 +830,7 @@ def update_payment(
     payment_id: uuid.UUID,
     body: PaymentUpdateRequest,
     db: Session = Depends(get_db),
-    _su: AdminPrincipal = Depends(require_superuser),
+    _su: AdminPrincipal = Depends(require_permission("product")),
 ) -> PaymentOut:
     _ = _su
     row = db.get(Payment, payment_id)
@@ -872,7 +872,7 @@ def update_payment(
 def delete_payment(
     payment_id: uuid.UUID,
     db: Session = Depends(get_db),
-    _su: AdminPrincipal = Depends(require_superuser),
+    _su: AdminPrincipal = Depends(require_permission("product")),
 ) -> None:
     _ = _su
     row = db.get(Payment, payment_id)
@@ -926,7 +926,7 @@ def list_shipments(
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=50, ge=1, le=200),
     db: Session = Depends(get_db),
-    _su: AdminPrincipal = Depends(require_superuser),
+    _su: AdminPrincipal = Depends(require_permission("product")),
 ) -> ShipmentListResponse:
     _ = _su
     filters = []
@@ -958,7 +958,7 @@ def list_shipments(
 def create_shipment(
     body: ShipmentCreateRequest,
     db: Session = Depends(get_db),
-    _su: AdminPrincipal = Depends(require_superuser),
+    _su: AdminPrincipal = Depends(require_permission("product")),
 ) -> ShipmentOut:
     _ = _su
     _get_season(db, body.season_id)
@@ -991,7 +991,7 @@ def update_shipment(
     shipment_id: uuid.UUID,
     body: ShipmentUpdateRequest,
     db: Session = Depends(get_db),
-    _su: AdminPrincipal = Depends(require_superuser),
+    _su: AdminPrincipal = Depends(require_permission("product")),
 ) -> ShipmentOut:
     _ = _su
     row = db.get(Shipment, shipment_id)
@@ -1033,7 +1033,7 @@ def update_shipment(
 def delete_shipment(
     shipment_id: uuid.UUID,
     db: Session = Depends(get_db),
-    _su: AdminPrincipal = Depends(require_superuser),
+    _su: AdminPrincipal = Depends(require_permission("product")),
 ) -> None:
     _ = _su
     row = db.get(Shipment, shipment_id)
@@ -1059,7 +1059,7 @@ def _sum_by_brand(db: Session, column, model, *conditions) -> dict[uuid.UUID, De
 def list_brand_stats(
     season_id: uuid.UUID | None = Query(default=None),
     db: Session = Depends(get_db),
-    _su: AdminPrincipal = Depends(require_superuser),
+    _su: AdminPrincipal = Depends(require_permission("product")),
 ) -> BrandStatsListResponse:
     """Сводка по всем брендам, у которых есть заказы, оплаты или поставки."""
     _ = _su
@@ -1118,7 +1118,7 @@ def list_brand_stats(
 def get_brand_procurement_stats(
     brand_id: uuid.UUID,
     db: Session = Depends(get_db),
-    _su: AdminPrincipal = Depends(require_superuser),
+    _su: AdminPrincipal = Depends(require_permission("product")),
 ) -> BrandStatsOut:
     """Заказы, оплаты и поставки бренда: итоги, разбивка по сезонам и категориям."""
     _ = _su
@@ -1285,7 +1285,7 @@ def get_brand_procurement_stats(
 @router.get("/procurement/refs", response_model=ProcurementRefsOut)
 def get_procurement_refs(
     db: Session = Depends(get_db),
-    _su: AdminPrincipal = Depends(require_superuser),
+    _su: AdminPrincipal = Depends(require_permission("product")),
 ) -> ProcurementRefsOut:
     """Справочники для форм: сезоны, категории, бренды и последний курс."""
     _ = _su

@@ -29,7 +29,7 @@ export default function Login() {
     try {
       if (mode === "superuser") {
         const data = await loginSuperuser(username.trim(), password);
-        setSession(data.access_token, data.role);
+        setSession(data.access_token, data.role, data.permissions);
       } else {
         const norm = normalizePhoneRu(phone);
         const p = pinDigits(pin);
@@ -44,7 +44,7 @@ export default function Login() {
           return;
         }
         const data = await loginWorker(norm, p);
-        setSession(data.access_token, data.role);
+        setSession(data.access_token, data.role, data.permissions);
       }
       nav("/", { replace: true });
     } catch (err) {

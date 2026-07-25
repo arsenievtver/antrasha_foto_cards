@@ -1,5 +1,17 @@
 const TOKEN_KEY = "antrasha_admin_token";
 const ROLE_KEY = "antrasha_admin_role";
+const PERMS_KEY = "antrasha_admin_permissions";
+
+/** Права сотрудника (совпадают с группами меню). Суперпользователь имеет все. */
+export const ADMIN_PERMISSIONS = [
+  { key: "stats", label: "Обзор" },
+  { key: "clients", label: "Клиенты" },
+  { key: "photos", label: "Фото" },
+  { key: "ads", label: "Реклама" },
+  { key: "product", label: "Товар" },
+];
+
+export const DEFAULT_WORKER_PERMISSIONS = ["photos"];
 
 /** Пусто = dev через Vite proxy `/api` → бэкенд. Иначе прямой URL API, например http://127.0.0.1:8000 */
 const BACKEND_ORIGIN = (import.meta.env.VITE_BACKEND_ORIGIN || "").replace(/\/$/, "");
@@ -84,20 +96,50 @@ function redirectToLogin() {
   }
 }
 
-export function setSession(token, role) {
+export function setSession(token, role, permissions = []) {
   if (token) localStorage.setItem(TOKEN_KEY, token);
   else localStorage.removeItem(TOKEN_KEY);
   if (role) localStorage.setItem(ROLE_KEY, role);
   else localStorage.removeItem(ROLE_KEY);
+  if (permissions?.length) {
+    localStorage.setItem(PERMS_KEY, JSON.stringify(permissions));
+  } else if (role === "superuser") {
+    localStorage.setItem(
+      PERMS_KEY,
+      JSON.stringify(ADMIN_PERMISSIONS.map((p) => p.key)),
+    );
+  } else {
+    localStorage.removeItem(PERMS_KEY);
+  }
 }
 
 export function clearSession() {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(ROLE_KEY);
+  localStorage.removeItem(PERMS_KEY);
 }
 
 export function getRole() {
   return localStorage.getItem(ROLE_KEY);
+}
+
+export function getPermissions() {
+  if (getRole() === "superuser") {
+    return ADMIN_PERMISSIONS.map((p) => p.key);
+  }
+  try {
+    const raw = localStorage.getItem(PERMS_KEY);
+    if (!raw) return getRole() === "worker" ? [...DEFAULT_WORKER_PERMISSIONS] : [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.map(String) : [...DEFAULT_WORKER_PERMISSIONS];
+  } catch {
+    return [...DEFAULT_WORKER_PERMISSIONS];
+  }
+}
+
+export function hasPermission(key) {
+  if (getRole() === "superuser") return true;
+  return getPermissions().includes(key);
 }
 
 function detail(data, fallback) {
@@ -143,6 +185,13 @@ export async function loginWorker(phone, pin) {
   if (data.role !== "worker") {
     throw new Error("Этот вход только для сотрудников (роль worker).");
   }
+  return data;
+}
+
+export async function fetchAdminMe() {
+  const res = await fetch(apiUrl("/admin/me"), { headers: headersJson() });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
   return data;
 }
 
@@ -496,8 +545,9 @@ export async function releaseTaggingPhoto(photoId) {
   }
 }
 
-export async function fetchUsers({ skip = 0, limit = 50 } = {}) {
+export async function fetchUsers({ skip = 0, limit = 50, role } = {}) {
   const q = new URLSearchParams({ skip: String(skip), limit: String(limit) });
+  if (role) q.set("role", role);
   const res = await fetch(`${apiUrl("/admin/users")}?${q}`, { headers: headersJson() });
   const data = await parseResponseJson(res);
   if (!res.ok) throw new Error(detail(data, res.statusText));
@@ -513,11 +563,13 @@ export async function fetchUserDetail(userId) {
   return data;
 }
 
-export async function createUser({ phone, pin, role }) {
+export async function createUser({ phone, pin, role, admin_permissions }) {
+  const body = { phone, pin, role };
+  if (admin_permissions) body.admin_permissions = admin_permissions;
   const res = await fetch(apiUrl("/admin/users"), {
     method: "POST",
     headers: headersJson(),
-    body: JSON.stringify({ phone, pin, role }),
+    body: JSON.stringify(body),
   });
   const data = await parseResponseJson(res);
   if (!res.ok) throw new Error(detail(data, res.statusText));

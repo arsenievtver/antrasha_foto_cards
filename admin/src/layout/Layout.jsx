@@ -1,6 +1,14 @@
-import { Children } from "react";
+import { Children, useEffect, useState } from "react";
 import { NavLink, Navigate, Outlet, useNavigate } from "react-router-dom";
-import { clearSession, getRole, hasValidSession } from "../api.js";
+import {
+  clearSession,
+  fetchAdminMe,
+  getRole,
+  getToken,
+  hasPermission,
+  hasValidSession,
+  setSession,
+} from "../api.js";
 
 function NavItem({ to, end, children }) {
   return (
@@ -27,10 +35,31 @@ export default function Layout() {
   const isSuperuser = role === "superuser";
   const isWorker = role === "worker";
   const hasAdminAccess = isSuperuser || isWorker;
+  const [, setPermTick] = useState(0);
+
+  useEffect(() => {
+    if (!hasValidSession() || !hasAdminAccess) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const me = await fetchAdminMe();
+        if (cancelled) return;
+        setSession(getToken(), me.role, me.permissions || []);
+        setPermTick((n) => n + 1);
+      } catch {
+        /* оставляем права из логина */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [hasAdminAccess]);
 
   if (!hasValidSession() || !hasAdminAccess) {
     return <Navigate to="/login" replace />;
   }
+
+  const can = (perm) => isSuperuser || hasPermission(perm);
 
   return (
     <div className="layout">
@@ -38,46 +67,44 @@ export default function Layout() {
         <div className="sidebar__brand">Админка</div>
 
         <nav className="sidebar__nav">
-          {isSuperuser && (
-            <NavGroup title="Обзор">
+          <NavGroup title="Обзор">
+            {can("stats") && (
               <NavItem end to="/">
                 Статистика
               </NavItem>
-            </NavGroup>
-          )}
-
-          <NavGroup title="Клиенты">
-            {isSuperuser && <NavItem to="/users">Пользователи</NavItem>}
-            {isSuperuser && <NavItem to="/fitting-requests">Заявки на примерку</NavItem>}
-          </NavGroup>
-
-          <NavGroup title="Фото">
-            <NavItem to="/photos">Фото и теги</NavItem>
-            <NavItem to="/photo-ratings">Рейтинг фото</NavItem>
-            <NavItem to="/tags">Справочник тегов</NavItem>
-            <NavItem to="/tagging">Разметка тегов</NavItem>
-            {(isSuperuser || isWorker) && (
-              <NavItem to="/ai-ingest">ИИ: телефон → каталог</NavItem>
             )}
           </NavGroup>
 
+          <NavGroup title="Клиенты">
+            {isSuperuser && <NavItem to="/users">Клиенты и сотрудники</NavItem>}
+            {can("clients") && <NavItem to="/fitting-requests">Заявки на примерку</NavItem>}
+          </NavGroup>
+
+          <NavGroup title="Фото">
+            {can("photos") && <NavItem to="/photos">Фото и теги</NavItem>}
+            {can("photos") && <NavItem to="/photo-ratings">Рейтинг фото</NavItem>}
+            {can("photos") && <NavItem to="/tags">Справочник тегов</NavItem>}
+            {can("photos") && <NavItem to="/tagging">Разметка тегов</NavItem>}
+            {can("photos") && <NavItem to="/ai-ingest">ИИ: телефон → каталог</NavItem>}
+          </NavGroup>
+
           <NavGroup title="Реклама">
-            {isSuperuser && <NavItem to="/campaigns">Рекламные ссылки</NavItem>}
-            {isSuperuser && <NavItem to="/promo-banners">Баннеры на главной</NavItem>}
+            {can("ads") && <NavItem to="/campaigns">Рекламные ссылки</NavItem>}
+            {can("ads") && <NavItem to="/promo-banners">Баннеры на главной</NavItem>}
           </NavGroup>
 
           <NavGroup title="Товар">
-            {isSuperuser && <NavItem to="/seasons">Сезоны</NavItem>}
-            {isSuperuser && <NavItem to="/brands">Бренды</NavItem>}
-            {isSuperuser && <NavItem to="/brand-orders">Заказы брендам</NavItem>}
-            {isSuperuser && <NavItem to="/payments">Оплаты</NavItem>}
-            {isSuperuser && <NavItem to="/shipments">Поставки</NavItem>}
-            {isSuperuser && <NavItem to="/fx-rates">Курс EUR</NavItem>}
+            {can("product") && <NavItem to="/seasons">Сезоны</NavItem>}
+            {can("product") && <NavItem to="/brands">Бренды</NavItem>}
+            {can("product") && <NavItem to="/brand-orders">Заказы брендам</NavItem>}
+            {can("product") && <NavItem to="/payments">Оплаты</NavItem>}
+            {can("product") && <NavItem to="/shipments">Поставки</NavItem>}
+            {can("product") && <NavItem to="/fx-rates">Курс EUR</NavItem>}
           </NavGroup>
         </nav>
 
         <div className="meta">
-          <div>Роль: {role || "—"}</div>
+          <div>Роль: {isSuperuser ? "суперпользователь" : isWorker ? "сотрудник" : role || "—"}</div>
           <button
             type="button"
             className="secondary"

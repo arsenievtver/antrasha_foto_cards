@@ -7,14 +7,14 @@ from pydantic import BaseModel, Field, model_validator
 
 
 def assert_pin_for_role(role: str, pin: str) -> None:
-    """Правила: worker — 6 цифр; обычный user — 4–12 символов."""
+    """Правила: worker — 6 цифр; обычный user (клиент) — 4–12 символов."""
     p = pin.strip()
     if role == "worker":
         if not re.fullmatch(r"\d{6}", p):
             raise ValueError("Для сотрудника PIN должен быть ровно из 6 цифр")
     else:
         if len(p) < 4 or len(p) > 12:
-            raise ValueError("PIN пользователя: от 4 до 12 символов")
+            raise ValueError("PIN клиента: от 4 до 12 символов")
 
 
 class AdminTagOut(BaseModel):
@@ -311,6 +311,7 @@ class AdminUserOut(BaseModel):
     phone: str
     display_name: str | None = None
     role: str
+    admin_permissions: list[str] = Field(default_factory=list)
     created_at: datetime
     last_login_at: datetime | None
 
@@ -327,6 +328,7 @@ class AdminUserCreateRequest(BaseModel):
     pin: str = Field(min_length=1)
     role: str = Field(pattern="^(user|worker)$")
     display_name: str | None = Field(default=None, max_length=120)
+    admin_permissions: list[str] | None = None
 
     @model_validator(mode="after")
     def validate_pin(self) -> Self:
@@ -341,6 +343,7 @@ class AdminUserUpdateRequest(BaseModel):
     pin: str | None = Field(default=None)
     role: str | None = Field(default=None, pattern="^(user|worker)$")
     display_name: str | None = Field(default=None, max_length=120)
+    admin_permissions: list[str] | None = None
 
     @model_validator(mode="after")
     def normalize_and_require_one(self) -> Self:
@@ -351,8 +354,11 @@ class AdminUserUpdateRequest(BaseModel):
             and self.pin is None
             and self.role is None
             and self.display_name is None
+            and self.admin_permissions is None
         ):
-            raise ValueError("Укажите хотя бы одно поле: phone, pin, role или display_name")
+            raise ValueError(
+                "Укажите хотя бы одно поле: phone, pin, role, display_name или admin_permissions"
+            )
         return self
 
 

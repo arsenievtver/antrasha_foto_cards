@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import get_db
-from app.deps import AdminPrincipal, require_superuser
+from app.deps import AdminPrincipal, require_permission
 from app.models.promo_banner import PromoBanner
 from app.schemas.promo_banner import (
     AdminPromoBannerCreateRequest,
@@ -36,7 +36,7 @@ _ALLOWED_EXT = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".avif"}
 @router.get("", response_model=AdminPromoBannerListResponse)
 def list_promo_banners(
     db: Session = Depends(get_db),
-    _su: AdminPrincipal = Depends(require_superuser),
+    _su: AdminPrincipal = Depends(require_permission("ads")),
 ) -> AdminPromoBannerListResponse:
     _ = _su
     rows = db.scalars(
@@ -54,7 +54,7 @@ def list_promo_banners(
 def create_promo_banner(
     body: AdminPromoBannerCreateRequest,
     db: Session = Depends(get_db),
-    _su: AdminPrincipal = Depends(require_superuser),
+    _su: AdminPrincipal = Depends(require_permission("ads")),
 ) -> AdminPromoBannerOut:
     _ = _su
     if body.starts_at and body.ends_at and body.ends_at < body.starts_at:
@@ -89,7 +89,7 @@ def update_promo_banner(
     banner_id: uuid.UUID,
     body: AdminPromoBannerUpdateRequest,
     db: Session = Depends(get_db),
-    _su: AdminPrincipal = Depends(require_superuser),
+    _su: AdminPrincipal = Depends(require_permission("ads")),
 ) -> AdminPromoBannerOut:
     _ = _su
     row = db.get(PromoBanner, banner_id)
@@ -145,7 +145,7 @@ def update_promo_banner(
 def delete_promo_banner(
     banner_id: uuid.UUID,
     db: Session = Depends(get_db),
-    _su: AdminPrincipal = Depends(require_superuser),
+    _su: AdminPrincipal = Depends(require_permission("ads")),
 ) -> None:
     _ = _su
     row = db.get(PromoBanner, banner_id)
@@ -162,7 +162,7 @@ async def upload_promo_banner_image(
     banner_id: uuid.UUID,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    _su: AdminPrincipal = Depends(require_superuser),
+    _su: AdminPrincipal = Depends(require_permission("ads")),
 ) -> AdminPromoBannerImageUploadResponse:
     _ = _su
     row = db.get(PromoBanner, banner_id)

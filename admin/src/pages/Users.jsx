@@ -1,19 +1,26 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { createUser, deleteUser, fetchUsers, updateUser } from "../api.js";
 import {
-	digitsOnly,
-	formatPhoneMask,
-	formatPinMask,
-	formatPinMaskUpTo12,
-	normalizePhoneRu,
-	pinDigits,
-	pinDigitsUpTo12,
+  ADMIN_PERMISSIONS,
+  DEFAULT_WORKER_PERMISSIONS,
+  createUser,
+  deleteUser,
+  fetchUsers,
+  updateUser,
+} from "../api.js";
+import {
+  digitsOnly,
+  formatPhoneMask,
+  formatPinMask,
+  formatPinMaskUpTo12,
+  normalizePhoneRu,
+  pinDigits,
+  pinDigitsUpTo12,
 } from "../utils/masks.js";
 
 function phoneToMasked(phone) {
-	if (!phone) return "";
-	return formatPhoneMask(digitsOnly(phone));
+  if (!phone) return "";
+  return formatPhoneMask(digitsOnly(phone));
 }
 
 function fmtDate(iso) {
@@ -25,7 +32,16 @@ function fmtDate(iso) {
   }
 }
 
+function togglePerm(list, key) {
+  const set = new Set(list || []);
+  if (set.has(key)) set.delete(key);
+  else set.add(key);
+  const next = ADMIN_PERMISSIONS.map((p) => p.key).filter((k) => set.has(k));
+  return next.length ? next : [...DEFAULT_WORKER_PERMISSIONS];
+}
+
 export default function Users() {
+  const [tab, setTab] = useState("clients"); // clients | workers
   const [items, setItems] = useState([]);
   const [total, setTotal] = useState(0);
   const [skip, setSkip] = useState(0);
@@ -36,17 +52,19 @@ export default function Users() {
   const [createOpen, setCreateOpen] = useState(false);
   const [createPhone, setCreatePhone] = useState("");
   const [createPin, setCreatePin] = useState("");
-  const [createRole, setCreateRole] = useState("user");
+  const [createPerms, setCreatePerms] = useState([...DEFAULT_WORKER_PERMISSIONS]);
 
   const [editUser, setEditUser] = useState(null);
   const [editPhone, setEditPhone] = useState("");
   const [editPin, setEditPin] = useState("");
-  const [editRole, setEditRole] = useState("user");
   const [saving, setSaving] = useState(false);
+  const [permBusyId, setPermBusyId] = useState(null);
+
+  const roleFilter = tab === "workers" ? "worker" : "user";
 
   async function load() {
     setErr("");
-    const data = await fetchUsers({ skip, limit });
+    const data = await fetchUsers({ skip, limit, role: roleFilter });
     setItems(data.items || []);
     setTotal(data.total ?? 0);
   }
@@ -66,13 +84,27 @@ export default function Users() {
     return () => {
       c = true;
     };
-  }, [skip]);
+  }, [skip, tab]);
+
+  function switchTab(next) {
+    if (next === tab) return;
+    setTab(next);
+    setSkip(0);
+    setErr("");
+  }
 
   function openEdit(u) {
     setEditUser(u);
     setEditPhone(phoneToMasked(u.phone));
     setEditPin("");
-    setEditRole(u.role);
+    setErr("");
+  }
+
+  function openCreate() {
+    setCreatePhone("");
+    setCreatePin("");
+    setCreatePerms([...DEFAULT_WORKER_PERMISSIONS]);
+    setCreateOpen(true);
     setErr("");
   }
 
@@ -87,29 +119,25 @@ export default function Users() {
         setSaving(false);
         return;
       }
-      const p =
-        createRole === "worker"
-          ? pinDigits(createPin)
-          : pinDigitsUpTo12(createPin);
-      if (createRole === "worker" && p.length !== 6) {
+      const isWorker = tab === "workers";
+      const p = isWorker ? pinDigits(createPin) : pinDigitsUpTo12(createPin);
+      if (isWorker && p.length !== 6) {
         setErr("Для сотрудника PIN — ровно 6 цифр (•••-•••)");
         setSaving(false);
         return;
       }
-      if (createRole === "user" && (p.length < 4 || p.length > 12)) {
-        setErr("PIN пользователя: от 4 до 12 цифр");
+      if (!isWorker && (p.length < 4 || p.length > 12)) {
+        setErr("PIN клиента: от 4 до 12 цифр");
         setSaving(false);
         return;
       }
       await createUser({
         phone: norm,
         pin: p,
-        role: createRole,
+        role: isWorker ? "worker" : "user",
+        admin_permissions: isWorker ? createPerms : undefined,
       });
       setCreateOpen(false);
-      setCreatePhone("");
-      setCreatePin("");
-      setCreateRole("user");
       await load();
     } catch (ex) {
       setErr(ex.message);
@@ -130,32 +158,17 @@ export default function Users() {
         setSaving(false);
         return;
       }
-      const body = {
-        phone: norm,
-        role: editRole,
-      };
-      const newPin =
-        editRole === "worker"
-          ? pinDigits(editPin)
-          : pinDigitsUpTo12(editPin);
-      const promoting =
-        editRole === "worker" && editUser.role !== "worker";
-      if (promoting && newPin.length !== 6) {
-        setErr("При назначении роли «Сотрудник» укажите новый PIN (6 цифр).");
-        setSaving(false);
-        return;
-      }
+      const body = { phone: norm };
+      const isWorker = editUser.role === "worker";
+      const newPin = isWorker ? pinDigits(editPin) : pinDigitsUpTo12(editPin);
       if (newPin.length > 0) {
-        if (editRole === "worker" && newPin.length !== 6) {
+        if (isWorker && newPin.length !== 6) {
           setErr("PIN сотрудника — ровно 6 цифр (•••-•••)");
           setSaving(false);
           return;
         }
-        if (
-          editRole === "user" &&
-          (newPin.length < 4 || newPin.length > 12)
-        ) {
-          setErr("PIN пользователя: от 4 до 12 цифр");
+        if (!isWorker && (newPin.length < 4 || newPin.length > 12)) {
+          setErr("PIN клиента: от 4 до 12 цифр");
           setSaving(false);
           return;
         }
@@ -171,10 +184,27 @@ export default function Users() {
     }
   }
 
+  async function onTogglePerm(u, key) {
+    const next = togglePerm(u.admin_permissions, key);
+    setPermBusyId(u.id);
+    setErr("");
+    try {
+      const updated = await updateUser(u.id, { admin_permissions: next });
+      setItems((prev) =>
+        prev.map((row) => (row.id === u.id ? { ...row, ...updated } : row)),
+      );
+    } catch (ex) {
+      setErr(ex.message);
+    } finally {
+      setPermBusyId(null);
+    }
+  }
+
   async function onDelete(u) {
+    const label = u.role === "worker" ? "сотрудника" : "клиента";
     if (
       !confirm(
-        `Удалить пользователя ${u.phone}? Связанные данные (лайки, веса тегов) будут удалены.`,
+        `Удалить ${label} ${u.phone}? Связанные данные (лайки, веса тегов) будут удалены.`,
       )
     ) {
       return;
@@ -193,40 +223,93 @@ export default function Users() {
   }
 
   const canMore = skip + items.length < total;
+  const isWorkers = tab === "workers";
 
   return (
     <div>
-      <h2 style={{ marginTop: 0 }}>Пользователи и сотрудники</h2>
+      <h2 style={{ marginTop: 0 }}>Клиенты и сотрудники</h2>
       <p style={{ color: "var(--muted)", fontSize: "0.9rem" }}>
-        Сотрудник (worker) входит в админку по телефону и 6-значному PIN. Обычный пользователь — по телефону и PIN (4–12 цифр) в приложении.
+        Клиенты — приложение (телефон + PIN 4–12 цифр). Сотрудники — админка (PIN 6 цифр) с
+        правами по разделам.
       </p>
+
+      <div className="tabs" style={{ maxWidth: 420, marginBottom: "1rem" }}>
+        <button
+          type="button"
+          className={!isWorkers ? "active" : ""}
+          onClick={() => switchTab("clients")}
+        >
+          Клиенты
+        </button>
+        <button
+          type="button"
+          className={isWorkers ? "active" : ""}
+          onClick={() => switchTab("workers")}
+        >
+          Сотрудники
+        </button>
+      </div>
+
       <div className="flex-gap" style={{ marginBottom: "1rem" }}>
-        <button type="button" onClick={() => setCreateOpen(true)}>
-          Добавить пользователя
+        <button type="button" onClick={openCreate}>
+          {isWorkers ? "Добавить сотрудника" : "Добавить клиента"}
         </button>
       </div>
       {err && <p className="error">{err}</p>}
-      <div className="card">
+
+      <div className="card" style={{ overflowX: "auto" }}>
         <table>
           <thead>
             <tr>
               <th>Имя</th>
               <th>Телефон</th>
-              <th>Роль</th>
+              {isWorkers &&
+                ADMIN_PERMISSIONS.map((p) => (
+                  <th key={p.key} style={{ textAlign: "center", fontSize: "0.75rem" }}>
+                    {p.label}
+                  </th>
+                ))}
               <th>Последний вход</th>
               <th />
             </tr>
           </thead>
           <tbody>
+            {items.length === 0 && (
+              <tr>
+                <td colSpan={isWorkers ? 3 + ADMIN_PERMISSIONS.length : 4} className="muted">
+                  Пока пусто
+                </td>
+              </tr>
+            )}
             {items.map((u) => (
               <tr key={u.id}>
                 <td>
-                  <Link to={`/users/${u.id}`} className="table-link">
-                    {u.display_name?.trim() || "—"}
-                  </Link>
+                  {u.role === "user" ? (
+                    <Link to={`/users/${u.id}`} className="table-link">
+                      {u.display_name?.trim() || "—"}
+                    </Link>
+                  ) : (
+                    u.display_name?.trim() || "—"
+                  )}
                 </td>
                 <td>{u.phone}</td>
-                <td>{u.role === "worker" ? "Сотрудник" : "Пользователь"}</td>
+                {isWorkers &&
+                  ADMIN_PERMISSIONS.map((p) => {
+                    const checked = (u.admin_permissions || []).includes(p.key);
+                    const busy = permBusyId === u.id;
+                    return (
+                      <td key={p.key} style={{ textAlign: "center" }}>
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          disabled={busy}
+                          title={p.label}
+                          aria-label={`${p.label}: ${u.phone}`}
+                          onChange={() => onTogglePerm(u, p.key)}
+                        />
+                      </td>
+                    );
+                  })}
                 <td style={{ color: "var(--muted)", fontSize: "0.85rem" }}>
                   {fmtDate(u.last_login_at)}
                 </td>
@@ -245,6 +328,7 @@ export default function Users() {
           </tbody>
         </table>
       </div>
+
       <div className="flex-gap" style={{ marginTop: "1rem" }}>
         <button
           type="button"
@@ -254,6 +338,9 @@ export default function Users() {
         >
           Назад
         </button>
+        <span className="muted" style={{ alignSelf: "center" }}>
+          {total ? `${skip + 1}–${skip + items.length} из ${total}` : "0"}
+        </span>
         <button
           type="button"
           className="secondary"
@@ -271,7 +358,9 @@ export default function Users() {
           onClick={() => !saving && setCreateOpen(false)}
         >
           <div className="modal" role="dialog" onClick={(e) => e.stopPropagation()}>
-            <h3 style={{ marginTop: 0 }}>Новый пользователь</h3>
+            <h3 style={{ marginTop: 0 }}>
+              {isWorkers ? "Новый сотрудник" : "Новый клиент"}
+            </h3>
             <form className="form-stack" onSubmit={submitCreate}>
               <div>
                 <label>Телефон</label>
@@ -279,9 +368,7 @@ export default function Users() {
                   inputMode="tel"
                   placeholder="+7 (999) 123-45-67"
                   value={createPhone}
-                  onChange={(e) =>
-                    setCreatePhone(formatPhoneMask(e.target.value))
-                  }
+                  onChange={(e) => setCreatePhone(formatPhoneMask(e.target.value))}
                   required
                   autoComplete="tel"
                 />
@@ -290,13 +377,11 @@ export default function Users() {
                 <label>PIN</label>
                 <input
                   inputMode="numeric"
-                  placeholder={
-                    createRole === "worker" ? "•••-•••" : "•••-••• или длиннее"
-                  }
+                  placeholder={isWorkers ? "•••-•••" : "•••-••• или длиннее"}
                   value={createPin}
                   onChange={(e) =>
                     setCreatePin(
-                      createRole === "worker"
+                      isWorkers
                         ? formatPinMask(e.target.value)
                         : formatPinMaskUpTo12(e.target.value),
                     )
@@ -305,27 +390,28 @@ export default function Users() {
                   autoComplete="new-password"
                 />
                 <small style={{ color: "var(--muted)" }}>
-                  Сотрудник: 6 цифр (•••-•••). Пользователь: 4–12 цифр.
+                  {isWorkers
+                    ? "Сотрудник: ровно 6 цифр (•••-•••)."
+                    : "Клиент: от 4 до 12 цифр."}
                 </small>
               </div>
-              <div>
-                <label>Роль</label>
-                <select
-                  value={createRole}
-                  onChange={(e) => {
-                    const r = e.target.value;
-                    setCreateRole(r);
-                    setCreatePin((prev) =>
-                      r === "worker"
-                        ? formatPinMask(prev)
-                        : formatPinMaskUpTo12(prev),
-                    );
-                  }}
-                >
-                  <option value="user">Пользователь</option>
-                  <option value="worker">Сотрудник</option>
-                </select>
-              </div>
+              {isWorkers && (
+                <div>
+                  <label>Доступ к разделам</label>
+                  <div className="perm-checks">
+                    {ADMIN_PERMISSIONS.map((p) => (
+                      <label key={p.key} className="perm-check">
+                        <input
+                          type="checkbox"
+                          checked={createPerms.includes(p.key)}
+                          onChange={() => setCreatePerms((prev) => togglePerm(prev, p.key))}
+                        />
+                        {p.label}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div className="flex-gap">
                 <button type="submit" disabled={saving}>
                   {saving ? "Сохранение…" : "Создать"}
@@ -359,9 +445,7 @@ export default function Users() {
                   inputMode="tel"
                   placeholder="+7 (999) 123-45-67"
                   value={editPhone}
-                  onChange={(e) =>
-                    setEditPhone(formatPhoneMask(e.target.value))
-                  }
+                  onChange={(e) => setEditPhone(formatPhoneMask(e.target.value))}
                   required
                   autoComplete="tel"
                 />
@@ -373,7 +457,7 @@ export default function Users() {
                   value={editPin}
                   onChange={(e) =>
                     setEditPin(
-                      editRole === "worker"
+                      editUser.role === "worker"
                         ? formatPinMask(e.target.value)
                         : formatPinMaskUpTo12(e.target.value),
                     )
@@ -381,27 +465,6 @@ export default function Users() {
                   placeholder="оставьте пустым, если не меняете"
                   autoComplete="new-password"
                 />
-                <small style={{ color: "var(--muted)" }}>
-                  При переводе в «Сотрудник» укажите новый PIN из 6 цифр.
-                </small>
-              </div>
-              <div>
-                <label>Роль</label>
-                <select
-                  value={editRole}
-                  onChange={(e) => {
-                    const r = e.target.value;
-                    setEditRole(r);
-                    setEditPin((prev) =>
-                      r === "worker"
-                        ? formatPinMask(prev)
-                        : formatPinMaskUpTo12(prev),
-                    );
-                  }}
-                >
-                  <option value="user">Пользователь</option>
-                  <option value="worker">Сотрудник</option>
-                </select>
               </div>
               <div className="flex-gap">
                 <button type="submit" disabled={saving}>

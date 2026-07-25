@@ -21,6 +21,7 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     user_id: uuid.UUID | None = None
     role: str = "user"
+    permissions: list[str] = Field(default_factory=list)
 
 
 class RefreshRequest(BaseModel):

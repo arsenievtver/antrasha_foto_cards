@@ -18,7 +18,7 @@ import BrandOrders from "./pages/BrandOrders.jsx";
 import Payments from "./pages/Payments.jsx";
 import Shipments from "./pages/Shipments.jsx";
 import FxRates from "./pages/FxRates.jsx";
-import { getRole, hasValidSession } from "./api.js";
+import { getPermissions, getRole, hasPermission, hasValidSession } from "./api.js";
 
 function RequireAuth({ children }) {
   if (!hasValidSession()) return <Navigate to="/login" replace />;
@@ -32,11 +32,42 @@ function RoleRoute({ children, roles }) {
   return children;
 }
 
+function PermissionRoute({ children, permission, roles = ["superuser", "worker"] }) {
+  const r = getRole();
+  if (!hasValidSession()) return <Navigate to="/login" replace />;
+  if (!roles.includes(r)) return <Navigate to="/login" replace />;
+  if (r === "superuser" || hasPermission(permission)) return children;
+  return <Navigate to="/" replace />;
+}
+
+const HOME_FALLBACKS = [
+  ["stats", "/"],
+  ["photos", "/photos"],
+  ["clients", "/fitting-requests"],
+  ["ads", "/campaigns"],
+  ["product", "/seasons"],
+];
+
+function firstAllowedPath() {
+  if (getRole() === "superuser") return "/";
+  const perms = getPermissions();
+  for (const [perm, path] of HOME_FALLBACKS) {
+    if (perm === "stats" && perms.includes("stats")) return "/";
+    if (perm !== "stats" && perms.includes(perm)) return path;
+  }
+  return "/login";
+}
+
 function HomeRoute() {
   const r = getRole();
   if (!hasValidSession()) return <Navigate to="/login" replace />;
   if (r === "superuser") return <Dashboard />;
-  if (r === "worker") return <Navigate to="/photos" replace />;
+  if (r === "worker") {
+    if (hasPermission("stats")) return <Dashboard />;
+    const fallback = firstAllowedPath();
+    if (fallback === "/") return <Dashboard />;
+    return <Navigate to={fallback} replace />;
+  }
   return <Navigate to="/login" replace />;
 }
 
@@ -56,33 +87,33 @@ export default function App() {
           <Route
             path="/photos"
             element={
-              <RoleRoute roles={["superuser", "worker"]}>
+              <PermissionRoute permission="photos">
                 <Photos />
-              </RoleRoute>
+              </PermissionRoute>
             }
           />
           <Route
             path="/photo-ratings"
             element={
-              <RoleRoute roles={["superuser", "worker"]}>
+              <PermissionRoute permission="photos">
                 <PhotoRatings />
-              </RoleRoute>
+              </PermissionRoute>
             }
           />
           <Route
             path="/tags"
             element={
-              <RoleRoute roles={["superuser", "worker"]}>
+              <PermissionRoute permission="photos">
                 <Tags />
-              </RoleRoute>
+              </PermissionRoute>
             }
           />
           <Route
             path="/tagging"
             element={
-              <RoleRoute roles={["superuser", "worker"]}>
+              <PermissionRoute permission="photos">
                 <Tagging />
-              </RoleRoute>
+              </PermissionRoute>
             }
           />
           <Route
@@ -104,81 +135,81 @@ export default function App() {
           <Route
             path="/fitting-requests"
             element={
-              <RoleRoute roles={["superuser"]}>
+              <PermissionRoute permission="clients">
                 <FittingRequests />
-              </RoleRoute>
+              </PermissionRoute>
             }
           />
           <Route
             path="/campaigns"
             element={
-              <RoleRoute roles={["superuser"]}>
+              <PermissionRoute permission="ads">
                 <Campaigns />
-              </RoleRoute>
+              </PermissionRoute>
             }
           />
           <Route
             path="/promo-banners"
             element={
-              <RoleRoute roles={["superuser"]}>
+              <PermissionRoute permission="ads">
                 <PromoBanners />
-              </RoleRoute>
+              </PermissionRoute>
             }
           />
           <Route
             path="/seasons"
             element={
-              <RoleRoute roles={["superuser"]}>
+              <PermissionRoute permission="product">
                 <Seasons />
-              </RoleRoute>
+              </PermissionRoute>
             }
           />
           <Route
             path="/brands"
             element={
-              <RoleRoute roles={["superuser"]}>
+              <PermissionRoute permission="product">
                 <Brands />
-              </RoleRoute>
+              </PermissionRoute>
             }
           />
           <Route
             path="/brand-orders"
             element={
-              <RoleRoute roles={["superuser"]}>
+              <PermissionRoute permission="product">
                 <BrandOrders />
-              </RoleRoute>
+              </PermissionRoute>
             }
           />
           <Route
             path="/payments"
             element={
-              <RoleRoute roles={["superuser"]}>
+              <PermissionRoute permission="product">
                 <Payments />
-              </RoleRoute>
+              </PermissionRoute>
             }
           />
           <Route
             path="/shipments"
             element={
-              <RoleRoute roles={["superuser"]}>
+              <PermissionRoute permission="product">
                 <Shipments />
-              </RoleRoute>
+              </PermissionRoute>
             }
           />
           <Route
             path="/fx-rates"
             element={
-              <RoleRoute roles={["superuser"]}>
+              <PermissionRoute permission="product">
                 <FxRates />
-              </RoleRoute>
+              </PermissionRoute>
             }
           />
           <Route
             path="/ai-ingest"
             element={
-              <RoleRoute roles={["superuser", "worker"]}>
+              <PermissionRoute permission="photos">
                 <AiIngest />
-              </RoleRoute>
+              </PermissionRoute>
             }
           />
         </Route>

@@ -28,6 +28,10 @@ from app.schemas.auth import (
     RegisterRequest,
     TokenResponse,
 )
+from app.permissions import (
+    ADMIN_PERMISSION_KEYS,
+    effective_worker_permissions,
+)
 from app.security import (
     create_access_token,
     create_refresh_token,
@@ -43,11 +47,15 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 def _user_token_response(user: User) -> TokenResponse:
+    perms: list[str] = []
+    if user.role == UserRole.worker.value:
+        perms = effective_worker_permissions(user.admin_permissions)
     return TokenResponse(
         access_token=create_access_token(user_id=user.id, role=user.role),
         refresh_token=create_refresh_token(user_id=user.id, role=user.role),
         user_id=user.id,
         role=user.role,
+        permissions=perms,
     )
 
 
@@ -180,7 +188,12 @@ def login_superuser(body: AdminSuperuserLoginRequest) -> TokenResponse:
             detail="Invalid credentials",
         )
     token = create_access_token(role="superuser")
-    return TokenResponse(access_token=token, user_id=None, role="superuser")
+    return TokenResponse(
+        access_token=token,
+        user_id=None,
+        role="superuser",
+        permissions=sorted(ADMIN_PERMISSION_KEYS),
+    )
 
 
 @router.post("/fitting-request", response_model=FittingRequestCreateResponse)

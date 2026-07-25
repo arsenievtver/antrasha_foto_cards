@@ -179,6 +179,22 @@ textarea {
   flex-shrink: 0;
 }
 
+.perm-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.85rem;
+  margin-top: 0.35rem;
+}
+
+.perm-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+  user-select: none;
+}
+
 main.content {
   flex: 1;
   padding: 1.5rem 2rem;

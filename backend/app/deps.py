@@ -1,4 +1,5 @@
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Literal
 
@@ -8,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import User, UserRole, UserSession
+from app.permissions import effective_worker_permissions
 from app.security import decode_token_payload, decode_token_user_id
 
 _bearer = HTTPBearer(auto_error=False)
@@ -17,6 +19,23 @@ _bearer = HTTPBearer(auto_error=False)
 class AdminPrincipal:
     role: Literal["superuser", "worker"]
     user: User | None
+
+    def has_permission(self, permission: str) -> bool:
+        if self.role == "superuser":
+            return True
+        if self.role != "worker" or self.user is None:
+            return False
+        return permission in effective_worker_permissions(self.user.admin_permissions)
+
+    @property
+    def permissions(self) -> list[str]:
+        if self.role == "superuser":
+            from app.permissions import ADMIN_PERMISSION_KEYS
+
+            return sorted(ADMIN_PERMISSION_KEYS)
+        if self.user is None:
+            return []
+        return effective_worker_permissions(self.user.admin_permissions)
 
 
 def get_optional_user(
@@ -127,3 +146,17 @@ def require_superuser(
             detail="Superuser only",
         )
     return principal
+
+
+def require_permission(permission: str) -> Callable[..., AdminPrincipal]:
+    """Суперпользователь — всегда; сотрудник — если permission в admin_permissions."""
+
+    def _dep(principal: AdminPrincipal = Depends(get_admin_principal)) -> AdminPrincipal:
+        if principal.has_permission(permission):
+            return principal
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Permission required: {permission}",
+        )
+
+    return _dep

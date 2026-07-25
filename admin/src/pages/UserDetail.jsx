@@ -49,7 +49,7 @@ export default function UserDetail() {
   return (
     <div>
       <p style={{ marginTop: 0 }}>
-        <Link to="/users">← К списку пользователей</Link>
+        <Link to="/users">← К списку</Link>
       </p>
       <h2 style={{ marginTop: "0.5rem" }}>
         {u.display_name?.trim() || u.phone}
@@ -67,7 +67,7 @@ export default function UserDetail() {
             </tr>
             <tr>
               <th>Роль</th>
-              <td>{u.role === "worker" ? "Сотрудник" : "Пользователь"}</td>
+              <td>{u.role === "worker" ? "Сотрудник" : "Клиент"}</td>
             </tr>
             <tr>
               <th>Создан</th>

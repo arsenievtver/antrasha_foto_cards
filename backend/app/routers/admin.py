@@ -10,7 +10,7 @@ from starlette.responses import Response
 
 from app.config import settings
 from app.database import get_db
-from app.deps import AdminPrincipal, get_admin_principal, require_superuser
+from app.deps import AdminPrincipal, get_admin_principal, require_permission, require_superuser
 from app.models import (
     PHOTO_SOURCE_YC_OBJECT_STORAGE,
     Brand,
@@ -84,6 +84,11 @@ from app.services.campaign_stats import (
 from app.services.tagging_validation import validate_catalog_tag_selection
 from app.services.yc_photo_sync import run_sync_job_commit
 from app.services.yc_storage import bulk_delete_photo_files_from_object_storage
+from app.permissions import (
+    DEFAULT_WORKER_PERMISSIONS,
+    effective_worker_permissions,
+    normalize_permissions,
+)
 
 TAGGING_CLAIM_TTL = timedelta(minutes=5)
 
@@ -97,6 +102,33 @@ SUBGROUP_LABELS = {
 log = logging.getLogger("app.api.admin")
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+
+def _admin_user_out(u: User) -> AdminUserOut:
+    perms: list[str] = []
+    if u.role == UserRole.worker.value:
+        perms = effective_worker_permissions(u.admin_permissions)
+    return AdminUserOut(
+        id=u.id,
+        phone=u.phone,
+        display_name=u.display_name,
+        role=u.role,
+        admin_permissions=perms,
+        created_at=u.created_at,
+        last_login_at=u.last_login_at,
+    )
+
+
+@router.get("/me")
+def admin_me(
+    principal: AdminPrincipal = Depends(get_admin_principal),
+) -> dict:
+    """Текущий админ: роль и актуальные права (для обновления меню без повторного логина)."""
+    return {
+        "role": principal.role,
+        "permissions": principal.permissions,
+        "user_id": str(principal.user.id) if principal.user else None,
+    }
 
 
 def _pin_validation_http(role: str, pin: str) -> None:
@@ -294,7 +326,7 @@ def _campaign_out(c: MarketingCampaign, *, visits: int) -> AdminCampaignOut:
 @router.get("/stats", response_model=AdminStatsOut)
 def admin_stats(
     db: Session = Depends(get_db),
-    _principal: AdminPrincipal = Depends(get_admin_principal),
+    _principal: AdminPrincipal = Depends(require_permission("stats")),
 ) -> AdminStatsOut:
     users = db.scalar(select(func.count()).select_from(User)) or 0
     workers = (
@@ -1226,24 +1258,21 @@ def list_users(
     _su: AdminPrincipal = Depends(require_superuser),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
+    role: str | None = Query(default=None, pattern="^(user|worker)$"),
 ) -> AdminUserListResponse:
     _ = _su
-    total = db.scalar(select(func.count()).select_from(User)) or 0
-    rows = db.scalars(
-        select(User).order_by(User.created_at.desc()).offset(skip).limit(limit),
-    ).all()
+    filters = []
+    if role:
+        filters.append(User.role == role)
+    count_q = select(func.count()).select_from(User)
+    list_q = select(User).order_by(User.created_at.desc())
+    if filters:
+        count_q = count_q.where(*filters)
+        list_q = list_q.where(*filters)
+    total = db.scalar(count_q) or 0
+    rows = db.scalars(list_q.offset(skip).limit(limit)).all()
     return AdminUserListResponse(
-        items=[
-            AdminUserOut(
-                id=u.id,
-                phone=u.phone,
-                display_name=u.display_name,
-                role=u.role,
-                created_at=u.created_at,
-                last_login_at=u.last_login_at,
-            )
-            for u in rows
-        ],
+        items=[_admin_user_out(u) for u in rows],
         total=total,
         skip=skip,
         limit=limit,
@@ -1268,11 +1297,21 @@ def create_user(
     if body.display_name is not None:
         s = body.display_name.strip()
         dn = s if s else None
+    if body.role == UserRole.worker.value:
+        if body.admin_permissions is None:
+            perms = list(DEFAULT_WORKER_PERMISSIONS)
+        else:
+            perms = normalize_permissions(body.admin_permissions) or list(
+                DEFAULT_WORKER_PERMISSIONS
+            )
+    else:
+        perms = []
     u = User(
         phone=phone,
         display_name=dn,
         pin_hash=hash_pin(body.pin.strip()),
         role=body.role,
+        admin_permissions=perms,
     )
     db.add(u)
     try:
@@ -1284,14 +1323,7 @@ def create_user(
             detail="Phone already registered",
         )
     db.refresh(u)
-    return AdminUserOut(
-        id=u.id,
-        phone=u.phone,
-        display_name=u.display_name,
-        role=u.role,
-        created_at=u.created_at,
-        last_login_at=u.last_login_at,
-    )
+    return _admin_user_out(u)
 
 
 @router.get("/users/{user_id}/detail", response_model=AdminUserDetailOut)
@@ -1435,16 +1467,8 @@ def get_user_detail(
         for row in tp_sorted
     ]
 
-    user_out = AdminUserOut(
-        id=u.id,
-        phone=u.phone,
-        display_name=u.display_name,
-        role=u.role,
-        created_at=u.created_at,
-        last_login_at=u.last_login_at,
-    )
     return AdminUserDetailOut(
-        user=user_out,
+        user=_admin_user_out(u),
         interactions_total=interactions_total,
         likes=likes,
         dislikes=dislikes,
@@ -1496,12 +1520,21 @@ def update_user(
         _pin_validation_http(role_for_pin, body.pin)
         u.pin_hash = hash_pin(body.pin.strip())
 
-    if body.role is not None:
-        u.role = body.role
-
     if body.display_name is not None:
         s = body.display_name.strip()
         u.display_name = s if s else None
+
+    previous_role = u.role
+    if body.role is not None:
+        u.role = body.role
+
+    if u.role == UserRole.user.value:
+        u.admin_permissions = []
+    elif body.admin_permissions is not None:
+        perms = normalize_permissions(body.admin_permissions)
+        u.admin_permissions = perms or list(DEFAULT_WORKER_PERMISSIONS)
+    elif previous_role != UserRole.worker.value and u.role == UserRole.worker.value:
+        u.admin_permissions = list(DEFAULT_WORKER_PERMISSIONS)
 
     try:
         db.commit()
@@ -1512,14 +1545,7 @@ def update_user(
             detail="Phone already in use",
         )
     db.refresh(u)
-    return AdminUserOut(
-        id=u.id,
-        phone=u.phone,
-        display_name=u.display_name,
-        role=u.role,
-        created_at=u.created_at,
-        last_login_at=u.last_login_at,
-    )
+    return _admin_user_out(u)
 
 
 @router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -1600,7 +1626,7 @@ def create_brand(
 @router.get("/fitting-requests", response_model=AdminFittingRequestListResponse)
 def list_fitting_requests(
     db: Session = Depends(get_db),
-    _su: AdminPrincipal = Depends(require_superuser),
+    _su: AdminPrincipal = Depends(require_permission("clients")),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
 ) -> AdminFittingRequestListResponse:
@@ -1639,7 +1665,7 @@ def list_fitting_requests(
 @router.get("/campaigns", response_model=AdminCampaignListResponse)
 def list_campaigns(
     db: Session = Depends(get_db),
-    _su: AdminPrincipal = Depends(require_superuser),
+    _su: AdminPrincipal = Depends(require_permission("ads")),
 ) -> AdminCampaignListResponse:
     _ = _su
     visit_map = {
@@ -1660,7 +1686,7 @@ def list_campaigns(
 def create_campaign(
     body: AdminCampaignCreateRequest,
     db: Session = Depends(get_db),
-    _su: AdminPrincipal = Depends(require_superuser),
+    _su: AdminPrincipal = Depends(require_permission("ads")),
 ) -> AdminCampaignOut:
     _ = _su
     try:
@@ -1689,7 +1715,7 @@ def create_campaign(
 @router.get("/campaigns/attribution-debug", response_model=AdminAttributionDebugOut)
 def attribution_debug(
     db: Session = Depends(get_db),
-    _su: AdminPrincipal = Depends(require_superuser),
+    _su: AdminPrincipal = Depends(require_permission("ads")),
     limit: int = Query(25, ge=1, le=100),
 ) -> AdminAttributionDebugOut:
     _ = _su
