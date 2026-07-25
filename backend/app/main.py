@@ -14,6 +14,7 @@ from app.database import SessionLocal
 from app.routers import (
     admin,
     admin_ai_ingest,
+    admin_procurement,
     admin_promo_banners,
     auth,
     feed,
@@ -108,6 +109,7 @@ app.include_router(auth.router)
 app.include_router(admin.router)
 app.include_router(admin_promo_banners.router)
 app.include_router(admin_ai_ingest.router)
+app.include_router(admin_procurement.router)
 app.include_router(promo_banners.router)
 app.include_router(push.router)
 app.include_router(internal_sync.router)

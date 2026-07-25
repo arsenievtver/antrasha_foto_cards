@@ -12,6 +12,12 @@ import AiIngest from "./pages/AiIngest.jsx";
 import FittingRequests from "./pages/FittingRequests.jsx";
 import Campaigns from "./pages/Campaigns.jsx";
 import PromoBanners from "./pages/PromoBanners.jsx";
+import Seasons from "./pages/Seasons.jsx";
+import Brands from "./pages/Brands.jsx";
+import BrandOrders from "./pages/BrandOrders.jsx";
+import Payments from "./pages/Payments.jsx";
+import Shipments from "./pages/Shipments.jsx";
+import FxRates from "./pages/FxRates.jsx";
 import { getRole, hasValidSession } from "./api.js";
 
 function RequireAuth({ children }) {
@@ -116,6 +122,54 @@ export default function App() {
             element={
               <RoleRoute roles={["superuser"]}>
                 <PromoBanners />
+              </RoleRoute>
+            }
+          />
+          <Route
+            path="/seasons"
+            element={
+              <RoleRoute roles={["superuser"]}>
+                <Seasons />
+              </RoleRoute>
+            }
+          />
+          <Route
+            path="/brands"
+            element={
+              <RoleRoute roles={["superuser"]}>
+                <Brands />
+              </RoleRoute>
+            }
+          />
+          <Route
+            path="/brand-orders"
+            element={
+              <RoleRoute roles={["superuser"]}>
+                <BrandOrders />
+              </RoleRoute>
+            }
+          />
+          <Route
+            path="/payments"
+            element={
+              <RoleRoute roles={["superuser"]}>
+                <Payments />
+              </RoleRoute>
+            }
+          />
+          <Route
+            path="/shipments"
+            element={
+              <RoleRoute roles={["superuser"]}>
+                <Shipments />
+              </RoleRoute>
+            }
+          />
+          <Route
+            path="/fx-rates"
+            element={
+              <RoleRoute roles={["superuser"]}>
+                <FxRates />
               </RoleRoute>
             }
           />

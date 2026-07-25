@@ -23,3 +23,6 @@ class Brand(Base):
 
     photos = relationship("Photo", back_populates="brand_row")
     ingest_jobs = relationship("AiIngestJob", back_populates="brand")
+    orders = relationship("BrandOrder", back_populates="brand")
+    payments = relationship("Payment", back_populates="brand")
+    shipments = relationship("Shipment", back_populates="brand")

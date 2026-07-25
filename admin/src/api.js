@@ -704,6 +704,142 @@ export async function deletePromoBanner(id) {
   }
 }
 
+/** Закупки: единый хелпер, чтобы не дублировать разбор ошибок в каждом методе. */
+async function procurementRequest(path, { method = "GET", body, query } = {}) {
+  const qs = query
+    ? `?${new URLSearchParams(
+        Object.entries(query).filter(
+          ([, v]) => v !== undefined && v !== null && v !== "",
+        ),
+      )}`
+    : "";
+  const res = await fetch(`${apiUrl(path)}${qs}`, {
+    method,
+    headers: headersJson(),
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  if (res.status === 204) {
+    if (!res.ok) throw httpError(res.statusText, res.status);
+    return null;
+  }
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw httpError(detail(data, res.statusText), res.status);
+  return data;
+}
+
+export function fetchProcurementRefs() {
+  return procurementRequest("/admin/procurement/refs");
+}
+
+export function fetchSeasons() {
+  return procurementRequest("/admin/seasons");
+}
+
+export function createSeason(body) {
+  return procurementRequest("/admin/seasons", { method: "POST", body });
+}
+
+export function updateSeason(seasonId, body) {
+  return procurementRequest(`/admin/seasons/${seasonId}`, { method: "PATCH", body });
+}
+
+export function deleteSeason(seasonId) {
+  return procurementRequest(`/admin/seasons/${seasonId}`, { method: "DELETE" });
+}
+
+export function fetchProcurementCategories(query) {
+  return procurementRequest("/admin/categories", { query });
+}
+
+export function updateProcurementCategory(categoryId, body) {
+  return procurementRequest(`/admin/categories/${categoryId}`, {
+    method: "PATCH",
+    body,
+  });
+}
+
+export function fetchFxRates() {
+  return procurementRequest("/admin/fx-rates");
+}
+
+export function createFxRate(body) {
+  return procurementRequest("/admin/fx-rates", { method: "POST", body });
+}
+
+export function updateFxRate(rateId, body) {
+  return procurementRequest(`/admin/fx-rates/${rateId}`, { method: "PATCH", body });
+}
+
+export function deleteFxRate(rateId) {
+  return procurementRequest(`/admin/fx-rates/${rateId}`, { method: "DELETE" });
+}
+
+export function fetchBrandOrders(query) {
+  return procurementRequest("/admin/brand-orders", { query });
+}
+
+export function fetchBrandOrder(orderId) {
+  return procurementRequest(`/admin/brand-orders/${orderId}`);
+}
+
+export function createBrandOrder(body) {
+  return procurementRequest("/admin/brand-orders", { method: "POST", body });
+}
+
+export function updateBrandOrder(orderId, body) {
+  return procurementRequest(`/admin/brand-orders/${orderId}`, {
+    method: "PATCH",
+    body,
+  });
+}
+
+export function deleteBrandOrder(orderId) {
+  return procurementRequest(`/admin/brand-orders/${orderId}`, { method: "DELETE" });
+}
+
+export function fetchPayments(query) {
+  return procurementRequest("/admin/payments", { query });
+}
+
+export function createPayment(body) {
+  return procurementRequest("/admin/payments", { method: "POST", body });
+}
+
+export function updatePayment(paymentId, body) {
+  return procurementRequest(`/admin/payments/${paymentId}`, { method: "PATCH", body });
+}
+
+export function deletePayment(paymentId) {
+  return procurementRequest(`/admin/payments/${paymentId}`, { method: "DELETE" });
+}
+
+export function fetchShipments(query) {
+  return procurementRequest("/admin/shipments", { query });
+}
+
+export function createShipment(body) {
+  return procurementRequest("/admin/shipments", { method: "POST", body });
+}
+
+export function updateShipment(shipmentId, body) {
+  return procurementRequest(`/admin/shipments/${shipmentId}`, {
+    method: "PATCH",
+    body,
+  });
+}
+
+export function deleteShipment(shipmentId) {
+  return procurementRequest(`/admin/shipments/${shipmentId}`, { method: "DELETE" });
+}
+
+export function fetchBrandStats(query) {
+  return procurementRequest("/admin/procurement/brand-stats", { query });
+}
+
+export function fetchBrandProcurementStats(brandId) {
+  return procurementRequest(`/admin/brands/${brandId}/procurement-stats`);
+}
+
 export async function uploadPromoBannerImage(id, file) {
   const fd = new FormData();
   fd.append("file", file);
