@@ -50,11 +50,13 @@ export default function Users() {
   const [loading, setLoading] = useState(true);
 
   const [createOpen, setCreateOpen] = useState(false);
+  const [createName, setCreateName] = useState("");
   const [createPhone, setCreatePhone] = useState("");
   const [createPin, setCreatePin] = useState("");
   const [createPerms, setCreatePerms] = useState([...DEFAULT_WORKER_PERMISSIONS]);
 
   const [editUser, setEditUser] = useState(null);
+  const [editName, setEditName] = useState("");
   const [editPhone, setEditPhone] = useState("");
   const [editPin, setEditPin] = useState("");
   const [saving, setSaving] = useState(false);
@@ -95,12 +97,14 @@ export default function Users() {
 
   function openEdit(u) {
     setEditUser(u);
+    setEditName(u.display_name?.trim() || "");
     setEditPhone(phoneToMasked(u.phone));
     setEditPin("");
     setErr("");
   }
 
   function openCreate() {
+    setCreateName("");
     setCreatePhone("");
     setCreatePin("");
     setCreatePerms([...DEFAULT_WORKER_PERMISSIONS]);
@@ -120,6 +124,12 @@ export default function Users() {
         return;
       }
       const isWorker = tab === "workers";
+      const name = createName.trim();
+      if (isWorker && !name) {
+        setErr("Укажите имя сотрудника");
+        setSaving(false);
+        return;
+      }
       const p = isWorker ? pinDigits(createPin) : pinDigitsUpTo12(createPin);
       if (isWorker && p.length !== 6) {
         setErr("Для сотрудника PIN — ровно 6 цифр (•••-•••)");
@@ -135,6 +145,7 @@ export default function Users() {
         phone: norm,
         pin: p,
         role: isWorker ? "worker" : "user",
+        display_name: name || undefined,
         admin_permissions: isWorker ? createPerms : undefined,
       });
       setCreateOpen(false);
@@ -158,8 +169,17 @@ export default function Users() {
         setSaving(false);
         return;
       }
-      const body = { phone: norm };
       const isWorker = editUser.role === "worker";
+      const name = editName.trim();
+      if (isWorker && !name) {
+        setErr("Укажите имя сотрудника");
+        setSaving(false);
+        return;
+      }
+      const body = {
+        phone: norm,
+        display_name: name,
+      };
       const newPin = isWorker ? pinDigits(editPin) : pinDigitsUpTo12(editPin);
       if (newPin.length > 0) {
         if (isWorker && newPin.length !== 6) {
@@ -362,6 +382,19 @@ export default function Users() {
               {isWorkers ? "Новый сотрудник" : "Новый клиент"}
             </h3>
             <form className="form-stack" onSubmit={submitCreate}>
+              {isWorkers && (
+                <div>
+                  <label>Имя</label>
+                  <input
+                    value={createName}
+                    onChange={(e) => setCreateName(e.target.value)}
+                    placeholder="Как зовут сотрудника"
+                    required
+                    maxLength={120}
+                    autoComplete="name"
+                  />
+                </div>
+              )}
               <div>
                 <label>Телефон</label>
                 <input
@@ -439,6 +472,19 @@ export default function Users() {
           <div className="modal" role="dialog" onClick={(e) => e.stopPropagation()}>
             <h3 style={{ marginTop: 0 }}>Изменить: {editUser.phone}</h3>
             <form className="form-stack" onSubmit={submitEdit}>
+              {editUser.role === "worker" && (
+                <div>
+                  <label>Имя</label>
+                  <input
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    placeholder="Как зовут сотрудника"
+                    required
+                    maxLength={120}
+                    autoComplete="name"
+                  />
+                </div>
+              )}
               <div>
                 <label>Телефон</label>
                 <input

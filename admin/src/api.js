@@ -563,8 +563,9 @@ export async function fetchUserDetail(userId) {
   return data;
 }
 
-export async function createUser({ phone, pin, role, admin_permissions }) {
+export async function createUser({ phone, pin, role, display_name, admin_permissions }) {
   const body = { phone, pin, role };
+  if (display_name !== undefined) body.display_name = display_name;
   if (admin_permissions) body.admin_permissions = admin_permissions;
   const res = await fetch(apiUrl("/admin/users"), {
     method: "POST",
