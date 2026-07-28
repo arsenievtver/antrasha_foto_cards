@@ -1,6 +1,10 @@
 .backend.pid
 .frontend.pid
 .admin.pid
+.work.pid
 logs-backend.txt
 logs-frontend.txt
 logs-admin.txt
+logs-work.txt
+logs-ai-ingest-worker.txt
+.ai-ingest-worker.pid

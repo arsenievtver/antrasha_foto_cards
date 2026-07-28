@@ -6,11 +6,13 @@
   "scripts": {
     "dev": "vite",
     "dev:admin": "npm run dev --prefix admin",
+    "dev:work": "npm run dev --prefix work",
     "dev:up": "bash scripts/dev-up.sh",
     "dev:down": "bash scripts/dev-down.sh",
     "dev:db": "bash scripts/db-init.sh",
     "build": "vite build",
     "build:admin": "npm run build --prefix admin",
+    "build:work": "npm run build --prefix work",
     "lint": "eslint .",
     "preview": "vite preview"
   },

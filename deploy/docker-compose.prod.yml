@@ -110,6 +110,17 @@ services:
     networks:
       - antrasha_net
 
+  work:
+    build:
+      context: ..
+      dockerfile: work/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - antrasha_net
+
   nginx:
     image: nginx:1.27-alpine
     restart: unless-stopped
@@ -121,6 +132,8 @@ services:
       frontend:
         condition: service_started
       admin:
+        condition: service_started
+      work:
         condition: service_started
     ports:
       - "80:80"

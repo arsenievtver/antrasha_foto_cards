@@ -34,7 +34,8 @@ class Settings(BaseSettings):
     jwt_refresh_expire_days: int = 180
     cors_origins: str = (
         "http://localhost:5173,http://127.0.0.1:5173,"
-        "http://localhost:5174,http://127.0.0.1:5174"
+        "http://localhost:5174,http://127.0.0.1:5174,"
+        "http://localhost:5175,http://127.0.0.1:5175"
     )
     # Базовый URL публичного приложения для ссылок кампаний (?ref=slug)
     public_app_url: str = "http://localhost:5173"

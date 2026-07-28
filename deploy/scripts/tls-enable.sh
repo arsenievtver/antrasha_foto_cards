@@ -16,6 +16,10 @@ if [[ -z "${APP_DOMAIN:-}" || -z "${ADMIN_DOMAIN:-}" || -z "${LETSENCRYPT_EMAIL:
   echo "[error] APP_DOMAIN, ADMIN_DOMAIN, LETSENCRYPT_EMAIL must be set in deploy/env/.env.prod"
   exit 1
 fi
+if [[ -z "${WORK_DOMAIN:-}" ]]; then
+  echo "[error] WORK_DOMAIN must be set in deploy/env/.env.prod"
+  exit 1
+fi
 
 mkdir -p "$DEPLOY_DIR/nginx/letsencrypt" "$DEPLOY_DIR/nginx/acme"
 
@@ -36,6 +40,13 @@ compose run --rm certbot certonly \
   --email "$LETSENCRYPT_EMAIL" \
   --agree-tos --no-eff-email --non-interactive
 
+echo "[step] issuing cert for ${WORK_DOMAIN}"
+compose run --rm certbot certonly \
+  --webroot -w /var/www/certbot \
+  -d "$WORK_DOMAIN" \
+  --email "$LETSENCRYPT_EMAIL" \
+  --agree-tos --no-eff-email --non-interactive
+
 echo "[step] switching nginx template to TLS"
 # NB: только один файл *.template в deploy/nginx/templates/ — иначе образ nginx
 # генерит несколько *.conf и падает на лишнем SSL без сертификатов.
@@ -50,4 +61,4 @@ echo "[step] recreating nginx"
 compose up -d --force-recreate nginx
 
 echo "[ok] TLS enabled"
-echo "Verify: https://${APP_DOMAIN} and https://${ADMIN_DOMAIN}"
+echo "Verify: https://${APP_DOMAIN}, https://${ADMIN_DOMAIN}, https://${WORK_DOMAIN}"

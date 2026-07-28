@@ -754,6 +754,16 @@ def _load_payment(db: Session, payment_id: uuid.UUID) -> Payment:
     return row
 
 
+@router.get("/payments/{payment_id}", response_model=PaymentOut)
+def get_payment(
+    payment_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    _su: AdminPrincipal = Depends(require_permission("product")),
+) -> PaymentOut:
+    _ = _su
+    return _payment_out(_load_payment(db, payment_id))
+
+
 @router.get("/payments", response_model=PaymentListResponse)
 def list_payments(
     season_id: uuid.UUID | None = Query(default=None),
@@ -916,6 +926,16 @@ def _load_shipment(db: Session, shipment_id: uuid.UUID) -> Shipment:
             status_code=status.HTTP_404_NOT_FOUND, detail="Поставка не найдена"
         )
     return row
+
+
+@router.get("/shipments/{shipment_id}", response_model=ShipmentOut)
+def get_shipment(
+    shipment_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    _su: AdminPrincipal = Depends(require_permission("product")),
+) -> ShipmentOut:
+    _ = _su
+    return _shipment_out(_load_shipment(db, shipment_id))
 
 
 @router.get("/shipments", response_model=ShipmentListResponse)

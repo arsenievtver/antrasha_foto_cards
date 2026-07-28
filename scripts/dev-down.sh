@@ -10,12 +10,15 @@ COMPOSE="${REPO_ROOT}/backend/docker-compose.yml"
 BACKEND_PORT="${BACKEND_PORT:-8000}"
 FRONTEND_PORT="${FRONTEND_PORT:-5173}"
 ADMIN_PORT="${ADMIN_PORT:-5174}"
+WORK_PORT="${WORK_PORT:-5175}"
 FRONTEND_PREVIEW_PORT="${FRONTEND_PREVIEW_PORT:-4173}"
 ADMIN_PREVIEW_PORT="${ADMIN_PREVIEW_PORT:-4174}"
+WORK_PREVIEW_PORT="${WORK_PREVIEW_PORT:-4175}"
 PID_BACKEND="$SCRIPT_DIR/.backend.pid"
 PID_INGEST="$SCRIPT_DIR/.ai-ingest-worker.pid"
 PID_FRONT="$SCRIPT_DIR/.frontend.pid"
 PID_ADMIN="$SCRIPT_DIR/.admin.pid"
+PID_WORK="$SCRIPT_DIR/.work.pid"
 
 stop_by_pidfile() {
 	local f="$1"
@@ -39,13 +42,16 @@ stop_by_pidfile "$PID_BACKEND" "backend"
 stop_by_pidfile "$PID_INGEST" "ai-ingest worker"
 stop_by_pidfile "$PID_FRONT" "frontend"
 stop_by_pidfile "$PID_ADMIN" "admin (vite)"
+stop_by_pidfile "$PID_WORK" "work (vite)"
 
-echo "[down] порты $BACKEND_PORT, $FRONTEND_PORT, $ADMIN_PORT, preview $FRONTEND_PREVIEW_PORT и $ADMIN_PREVIEW_PORT"
+echo "[down] порты $BACKEND_PORT, $FRONTEND_PORT, $ADMIN_PORT, $WORK_PORT, preview $FRONTEND_PREVIEW_PORT / $ADMIN_PREVIEW_PORT / $WORK_PREVIEW_PORT"
 kill_port "$BACKEND_PORT"
 kill_port "$FRONTEND_PORT"
 kill_port "$ADMIN_PORT"
+kill_port "$WORK_PORT"
 kill_port "$FRONTEND_PREVIEW_PORT"
 kill_port "$ADMIN_PREVIEW_PORT"
+kill_port "$WORK_PREVIEW_PORT"
 
 if [[ "${SKIP_DOCKER_DB:-0}" != "1" ]] && [[ "${DOCKER_DOWN:-1}" == "1" ]]; then
 	if [[ -f "$COMPOSE" ]]; then
