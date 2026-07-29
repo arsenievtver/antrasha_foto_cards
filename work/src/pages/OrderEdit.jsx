@@ -1,38 +1,66 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { createBrandOrder, fetchProcurementRefs } from "../api.js";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { fetchBrandOrder, fetchProcurementRefs, updateBrandOrder } from "../api.js";
 import BrandSelect from "../components/BrandSelect.jsx";
-import { eur, num, today } from "../utils/money.js";
+import { eur, num } from "../utils/money.js";
 import { getFormCategories, normalizeCategoryId } from "../utils/procurementCategories.js";
 
-const EMPTY = {
-  season_id: "",
-  brand_id: "",
-  gender: "",
-  ordered_on: today(),
-  has_prepayment: false,
-  prepayment_amount_eur: "",
-  prepayment_due_on: "",
-  comment: "",
-};
-
-function newLine() {
-  return { key: crypto.randomUUID(), category_id: "", amount_eur: "", comment: "" };
+function newLine(line, gender = "") {
+  return {
+    key: crypto.randomUUID(),
+    category_id: normalizeCategoryId(line?.category_id || "", gender),
+    amount_eur: line?.amount_eur || "",
+    comment: line?.comment || "",
+  };
 }
 
-export default function OrderCreate() {
+export default function OrderEdit() {
+  const { id } = useParams();
   const nav = useNavigate();
   const [refs, setRefs] = useState(null);
-  const [form, setForm] = useState(EMPTY);
+  const [form, setForm] = useState({
+    season_id: "",
+    brand_id: "",
+    gender: "",
+    ordered_on: "",
+    has_prepayment: false,
+    prepayment_amount_eur: "",
+    prepayment_due_on: "",
+    comment: "",
+  });
   const [lines, setLines] = useState([newLine()]);
   const [err, setErr] = useState("");
+  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    fetchProcurementRefs()
-      .then(setRefs)
-      .catch((e) => setErr(e.message));
-  }, []);
+    let active = true;
+    Promise.all([fetchProcurementRefs(), fetchBrandOrder(id)])
+      .then(([refsRes, row]) => {
+        if (!active) return;
+        setRefs(refsRes);
+        setForm({
+          season_id: row.season_id || "",
+          brand_id: row.brand_id || "",
+          gender: row.gender || "",
+          ordered_on: row.ordered_on || "",
+          has_prepayment: Boolean(row.has_prepayment),
+          prepayment_amount_eur: row.prepayment_amount_eur || "",
+          prepayment_due_on: row.prepayment_due_on || "",
+          comment: row.comment || "",
+        });
+        setLines(
+          row.lines?.length
+            ? row.lines.map((ln) => newLine(ln, row.gender || ""))
+            : [newLine()],
+        );
+      })
+      .catch((e) => setErr(e.message))
+      .finally(() => setLoading(false));
+    return () => {
+      active = false;
+    };
+  }, [id]);
 
   const formCategories = useMemo(() => {
     return getFormCategories(refs?.categories || [], form.gender);
@@ -42,6 +70,7 @@ export default function OrderCreate() {
     () => lines.reduce((acc, ln) => acc + num(ln.amount_eur), 0),
     [lines],
   );
+  const filledLines = lines.filter((ln) => ln.category_id && num(ln.amount_eur) > 0);
 
   function set(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -53,24 +82,20 @@ export default function OrderCreate() {
     );
   }
 
-  const filledLines = lines.filter((ln) => ln.category_id && num(ln.amount_eur) > 0);
-
   async function onSubmit(e) {
     e.preventDefault();
     setBusy(true);
     setErr("");
     try {
-      const row = await createBrandOrder({
+      const row = await updateBrandOrder(id, {
         season_id: form.season_id,
         brand_id: form.brand_id,
         gender: form.gender || null,
         ordered_on: form.ordered_on || null,
         has_prepayment: form.has_prepayment,
-        prepayment_amount_eur: form.has_prepayment
-          ? form.prepayment_amount_eur || null
-          : null,
+        prepayment_amount_eur: form.has_prepayment ? form.prepayment_amount_eur || null : null,
         prepayment_due_on: form.has_prepayment ? form.prepayment_due_on || null : null,
-        comment: form.comment.trim() || null,
+        comment: form.comment,
         lines: filledLines.map((ln) => ({
           category_id: normalizeCategoryId(ln.category_id, form.gender),
           amount_eur: ln.amount_eur,
@@ -85,15 +110,16 @@ export default function OrderCreate() {
     }
   }
 
+  if (loading) return <p className="loading">Загрузка…</p>;
+
   const canSubmit = form.season_id && form.brand_id && filledLines.length > 0;
   const brands = refs?.brands || [];
 
   return (
     <div>
-      <Link to="/orders" className="back-link">
-        ← Заказы
+      <Link to={`/orders/${id}`} className="back-link">
+        ← К заказу
       </Link>
-
       {err ? <p className="error">{err}</p> : null}
 
       <form className="form-stack" onSubmit={onSubmit}>
@@ -116,7 +142,7 @@ export default function OrderCreate() {
         <BrandSelect
           brands={brands}
           value={form.brand_id}
-          onChange={(id) => set("brand_id", id)}
+          onChange={(brandId) => set("brand_id", brandId)}
           onBrandsChange={(next) => setRefs((r) => (r ? { ...r, brands: next } : r))}
           required
         />
@@ -129,7 +155,6 @@ export default function OrderCreate() {
             <option value="women">Женский</option>
             <option value="mixed">Смешанный</option>
           </select>
-          <span className="field-hint">Фильтрует список категорий ниже</span>
         </label>
 
         <label>
@@ -235,21 +260,12 @@ export default function OrderCreate() {
 
         <label>
           Комментарий к заказу
-          <input
-            value={form.comment}
-            onChange={(e) => set("comment", e.target.value)}
-            placeholder="Условия, сроки"
-          />
+          <input value={form.comment} onChange={(e) => set("comment", e.target.value)} />
         </label>
 
         <button type="submit" disabled={busy || !canSubmit}>
-          {busy ? "Создание…" : "Создать заказ"}
+          {busy ? "Сохранение…" : "Сохранить изменения"}
         </button>
-        {!canSubmit ? (
-          <span className="field-hint">
-            Нужны сезон, бренд и хотя бы одна категория с суммой.
-          </span>
-        ) : null}
       </form>
     </div>
   );

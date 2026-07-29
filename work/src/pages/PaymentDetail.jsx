@@ -36,7 +36,12 @@ export default function PaymentDetail() {
         ← Оплаты
       </Link>
       <div className="detail-card">
-        <h2>{row.brand_name}</h2>
+        <div className="detail-card-head">
+          <h2>{row.brand_name}</h2>
+          <Link to={`/payments/${row.id}/edit`} className="icon-edit" aria-label="Редактировать оплату">
+            ✏️
+          </Link>
+        </div>
         <p className="sub" style={{ margin: 0, color: "var(--muted)" }}>
           {row.season_name}
         </p>

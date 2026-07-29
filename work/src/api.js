@@ -174,6 +174,10 @@ export function createBrandOrder(body) {
   return request("/admin/brand-orders", { method: "POST", body });
 }
 
+export function updateBrandOrder(orderId, body) {
+  return request(`/admin/brand-orders/${orderId}`, { method: "PATCH", body });
+}
+
 export function fetchPayments(query) {
   return request("/admin/payments", { query });
 }
@@ -186,6 +190,10 @@ export function createPayment(body) {
   return request("/admin/payments", { method: "POST", body });
 }
 
+export function updatePayment(paymentId, body) {
+  return request(`/admin/payments/${paymentId}`, { method: "PATCH", body });
+}
+
 export function fetchShipments(query) {
   return request("/admin/shipments", { query });
 }
@@ -196,4 +204,8 @@ export function fetchShipment(shipmentId) {
 
 export function createShipment(body) {
   return request("/admin/shipments", { method: "POST", body });
+}
+
+export function updateShipment(shipmentId, body) {
+  return request(`/admin/shipments/${shipmentId}`, { method: "PATCH", body });
 }

@@ -1,43 +1,54 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import {
-  createShipment,
   fetchBrandOrders,
+  fetchPayment,
   fetchProcurementRefs,
+  updatePayment,
 } from "../api.js";
 import BrandSelect from "../components/BrandSelect.jsx";
-import { dateRu, eur, num, rub, today } from "../utils/money.js";
+import { dateRu, eur, num } from "../utils/money.js";
 
-const EMPTY = {
-  season_id: "",
-  brand_id: "",
-  order_id: "",
-  shipped_on: today(),
-  amount_eur: "",
-  weight_kg: "",
-  eur_rub_rate: "",
-  comment: "",
-};
-
-export default function ShipmentCreate() {
+export default function PaymentEdit() {
+  const { id } = useParams();
   const nav = useNavigate();
   const [refs, setRefs] = useState(null);
   const [orders, setOrders] = useState([]);
-  const [form, setForm] = useState(EMPTY);
+  const [form, setForm] = useState({
+    season_id: "",
+    brand_id: "",
+    order_id: "",
+    paid_on: "",
+    kind: "main",
+    amount_eur: "",
+    comment: "",
+  });
   const [err, setErr] = useState("");
+  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    fetchProcurementRefs()
-      .then((res) => {
-        setRefs(res);
-        setForm((prev) => ({
-          ...prev,
-          eur_rub_rate: prev.eur_rub_rate || res.latest_fx_rate?.eur_rub || "",
-        }));
+    let active = true;
+    Promise.all([fetchProcurementRefs(), fetchPayment(id)])
+      .then(([refsRes, row]) => {
+        if (!active) return;
+        setRefs(refsRes);
+        setForm({
+          season_id: row.season_id || "",
+          brand_id: row.brand_id || "",
+          order_id: row.order_id || "",
+          paid_on: row.paid_on || "",
+          kind: row.kind || "main",
+          amount_eur: row.amount_eur || "",
+          comment: row.comment || "",
+        });
       })
-      .catch((e) => setErr(e.message));
-  }, []);
+      .catch((e) => setErr(e.message))
+      .finally(() => setLoading(false));
+    return () => {
+      active = false;
+    };
+  }, [id]);
 
   useEffect(() => {
     if (!form.season_id || !form.brand_id) {
@@ -48,11 +59,6 @@ export default function ShipmentCreate() {
       .then((res) => setOrders(res.items || []))
       .catch((e) => setErr(e.message));
   }, [form.season_id, form.brand_id]);
-
-  const amountRub = useMemo(() => {
-    if (!form.amount_eur || !form.eur_rub_rate) return null;
-    return num(form.amount_eur) * num(form.eur_rub_rate);
-  }, [form.amount_eur, form.eur_rub_rate]);
 
   function set(field, value) {
     setForm((prev) => {
@@ -67,17 +73,17 @@ export default function ShipmentCreate() {
     setBusy(true);
     setErr("");
     try {
-      const row = await createShipment({
+      const row = await updatePayment(id, {
         season_id: form.season_id,
         brand_id: form.brand_id,
         order_id: form.order_id || null,
-        shipped_on: form.shipped_on,
+        clear_order: !form.order_id,
+        paid_on: form.paid_on,
+        kind: form.kind,
         amount_eur: form.amount_eur,
-        weight_kg: form.weight_kg || null,
-        eur_rub_rate: form.eur_rub_rate || null,
-        comment: form.comment.trim() || null,
+        comment: form.comment,
       });
-      nav(`/shipments/${row.id}`, { replace: true });
+      nav(`/payments/${row.id}`, { replace: true });
     } catch (ex) {
       setErr(ex.message);
     } finally {
@@ -85,15 +91,16 @@ export default function ShipmentCreate() {
     }
   }
 
+  if (loading) return <p className="loading">Загрузка…</p>;
+
   const canSubmit = form.season_id && form.brand_id && num(form.amount_eur) > 0;
   const brands = refs?.brands || [];
 
   return (
     <div>
-      <Link to="/shipments" className="back-link">
-        ← Поставки
+      <Link to={`/payments/${id}`} className="back-link">
+        ← К оплате
       </Link>
-
       {err ? <p className="error">{err}</p> : null}
 
       <form className="form-stack" onSubmit={onSubmit}>
@@ -116,7 +123,7 @@ export default function ShipmentCreate() {
         <BrandSelect
           brands={brands}
           value={form.brand_id}
-          onChange={(id) => set("brand_id", id)}
+          onChange={(brandId) => set("brand_id", brandId)}
           onBrandsChange={(next) => setRefs((r) => (r ? { ...r, brands: next } : r))}
           required
         />
@@ -131,21 +138,28 @@ export default function ShipmentCreate() {
             <option value="">Без привязки</option>
             {orders.map((o) => (
               <option key={o.id} value={o.id}>
-                {dateRu(o.ordered_on)} · {eur(o.amount_eur)} · осталось{" "}
-                {eur(o.balance_to_ship_eur)}
+                {dateRu(o.ordered_on)} · {eur(o.amount_eur)} · остаток {eur(o.balance_to_pay_eur)}
               </option>
             ))}
           </select>
         </label>
 
         <label>
-          Дата поставки
+          Дата оплаты
           <input
             type="date"
-            value={form.shipped_on}
-            onChange={(e) => set("shipped_on", e.target.value)}
+            value={form.paid_on}
+            onChange={(e) => set("paid_on", e.target.value)}
             required
           />
+        </label>
+
+        <label>
+          Категория
+          <select value={form.kind} onChange={(e) => set("kind", e.target.value)}>
+            <option value="main">Основная</option>
+            <option value="prepayment">Предоплата</option>
+          </select>
         </label>
 
         <label>
@@ -162,43 +176,12 @@ export default function ShipmentCreate() {
         </label>
 
         <label>
-          Вес, кг
-          <input
-            type="number"
-            step="0.001"
-            min="0"
-            inputMode="decimal"
-            value={form.weight_kg}
-            onChange={(e) => set("weight_kg", e.target.value)}
-          />
-        </label>
-
-        <label>
-          Курс EUR/RUB
-          <input
-            type="number"
-            step="0.0001"
-            min="0"
-            inputMode="decimal"
-            value={form.eur_rub_rate}
-            onChange={(e) => set("eur_rub_rate", e.target.value)}
-          />
-          <span className="field-hint">
-            {amountRub !== null ? `Будет ${rub(amountRub)}` : "Пусто — из справочника"}
-          </span>
-        </label>
-
-        <label>
           Комментарий
-          <input
-            value={form.comment}
-            onChange={(e) => set("comment", e.target.value)}
-            placeholder="Инвойс, перевозчик"
-          />
+          <input value={form.comment} onChange={(e) => set("comment", e.target.value)} />
         </label>
 
         <button type="submit" disabled={busy || !canSubmit}>
-          {busy ? "Сохранение…" : "Сохранить"}
+          {busy ? "Сохранение…" : "Сохранить изменения"}
         </button>
       </form>
     </div>

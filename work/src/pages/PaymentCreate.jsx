@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   createPayment,
@@ -6,7 +6,7 @@ import {
   fetchProcurementRefs,
 } from "../api.js";
 import BrandSelect from "../components/BrandSelect.jsx";
-import { dateRu, eur, num, rub, today } from "../utils/money.js";
+import { dateRu, eur, num, today } from "../utils/money.js";
 
 const EMPTY = {
   season_id: "",
@@ -15,7 +15,6 @@ const EMPTY = {
   paid_on: today(),
   kind: "main",
   amount_eur: "",
-  eur_rub_rate: "",
   comment: "",
 };
 
@@ -29,13 +28,7 @@ export default function PaymentCreate() {
 
   useEffect(() => {
     fetchProcurementRefs()
-      .then((res) => {
-        setRefs(res);
-        setForm((prev) => ({
-          ...prev,
-          eur_rub_rate: prev.eur_rub_rate || res.latest_fx_rate?.eur_rub || "",
-        }));
-      })
+      .then(setRefs)
       .catch((e) => setErr(e.message));
   }, []);
 
@@ -48,11 +41,6 @@ export default function PaymentCreate() {
       .then((res) => setOrders(res.items || []))
       .catch((e) => setErr(e.message));
   }, [form.season_id, form.brand_id]);
-
-  const amountRub = useMemo(() => {
-    if (!form.amount_eur || !form.eur_rub_rate) return null;
-    return num(form.amount_eur) * num(form.eur_rub_rate);
-  }, [form.amount_eur, form.eur_rub_rate]);
 
   function set(field, value) {
     setForm((prev) => {
@@ -74,7 +62,6 @@ export default function PaymentCreate() {
         paid_on: form.paid_on,
         kind: form.kind,
         amount_eur: form.amount_eur,
-        eur_rub_rate: form.eur_rub_rate || null,
         comment: form.comment.trim() || null,
       });
       nav(`/payments/${row.id}`, { replace: true });
@@ -93,9 +80,6 @@ export default function PaymentCreate() {
       <Link to="/payments" className="back-link">
         ← Оплаты
       </Link>
-      <div className="page-head">
-        <h1>Новая оплата</h1>
-      </div>
 
       {err ? <p className="error">{err}</p> : null}
 
@@ -170,21 +154,6 @@ export default function PaymentCreate() {
             onChange={(e) => set("amount_eur", e.target.value)}
             required
           />
-        </label>
-
-        <label>
-          Курс EUR/RUB
-          <input
-            type="number"
-            step="0.0001"
-            min="0"
-            inputMode="decimal"
-            value={form.eur_rub_rate}
-            onChange={(e) => set("eur_rub_rate", e.target.value)}
-          />
-          <span className="field-hint">
-            {amountRub !== null ? `Будет ${rub(amountRub)}` : "Пусто — из справочника"}
-          </span>
         </label>
 
         <label>

@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from "react-router-dom";
+import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { clearSession } from "../api.js";
 
 const TABS = [
@@ -8,11 +8,34 @@ const TABS = [
 ];
 
 export default function Shell() {
+  const { pathname } = useLocation();
+  const page = getPageMeta(pathname);
+
   return (
     <div className="app-shell">
+      <header className="app-header">
+        <h1>{page.title}</h1>
+        <button
+          type="button"
+          className="header-logout"
+          aria-label="Выйти"
+          title="Выйти"
+          onClick={() => {
+            clearSession();
+            window.location.replace("/login");
+          }}
+        >
+          🚪
+        </button>
+      </header>
       <main className="app-main">
         <Outlet />
       </main>
+      {page.addTo ? (
+        <Link to={page.addTo} className="fab-add" aria-label={page.addLabel}>
+          +
+        </Link>
+      ) : null}
       <nav className="bottom-nav" aria-label="Разделы">
         {TABS.map((t) => (
           <NavLink
@@ -27,25 +50,22 @@ export default function Shell() {
           </NavLink>
         ))}
       </nav>
-      <button
-        type="button"
-        className="secondary"
-        style={{
-          position: "fixed",
-          top: "calc(0.5rem + var(--safe-top))",
-          right: "0.75rem",
-          zIndex: 30,
-          padding: "0.35rem 0.65rem",
-          fontSize: "0.75rem",
-          opacity: 0.7,
-        }}
-        onClick={() => {
-          clearSession();
-          window.location.replace("/login");
-        }}
-      >
-        Выйти
-      </button>
     </div>
   );
+}
+
+function getPageMeta(pathname) {
+  if (pathname === "/orders") return { title: "Заказы", addTo: "/orders/new", addLabel: "Добавить заказ" };
+  if (pathname === "/payments") return { title: "Оплаты", addTo: "/payments/new", addLabel: "Добавить оплату" };
+  if (pathname === "/shipments") return { title: "Поставки", addTo: "/shipments/new", addLabel: "Добавить поставку" };
+  if (pathname === "/orders/new") return { title: "Новый заказ" };
+  if (pathname === "/payments/new") return { title: "Новая оплата" };
+  if (pathname === "/shipments/new") return { title: "Новая поставка" };
+  if (pathname.endsWith("/edit") && pathname.startsWith("/orders/")) return { title: "Редактировать заказ" };
+  if (pathname.endsWith("/edit") && pathname.startsWith("/payments/")) return { title: "Редактировать оплату" };
+  if (pathname.endsWith("/edit") && pathname.startsWith("/shipments/")) return { title: "Редактировать поставку" };
+  if (pathname.startsWith("/orders/")) return { title: "Заказ" };
+  if (pathname.startsWith("/payments/")) return { title: "Оплата" };
+  if (pathname.startsWith("/shipments/")) return { title: "Поставка" };
+  return { title: "Товар" };
 }

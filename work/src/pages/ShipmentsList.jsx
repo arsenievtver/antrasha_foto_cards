@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import { fetchProcurementRefs, fetchShipments } from "../api.js";
 import EntityRow from "../components/EntityRow.jsx";
 import { dateRu, eur, kg } from "../utils/money.js";
@@ -36,15 +35,9 @@ export default function ShipmentsList() {
 
   return (
     <div>
-      <div className="page-head">
-        <div>
-          <h1>Поставки</h1>
-          <p className="sub">{data.total ? `${data.total} записей` : " "}</p>
-        </div>
-        <Link to="/shipments/new" className="btn-add">
-          Добавить
-        </Link>
-      </div>
+      <p className="sub" style={{ margin: "0 0 1rem" }}>
+        {data.total ? `${data.total} записей` : " "}
+      </p>
 
       <button
         type="button"

@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import { fetchPayments, fetchProcurementRefs } from "../api.js";
 import EntityRow from "../components/EntityRow.jsx";
 import { dateRu, eur, paymentKindLabel } from "../utils/money.js";
@@ -36,15 +35,9 @@ export default function PaymentsList() {
 
   return (
     <div>
-      <div className="page-head">
-        <div>
-          <h1>Оплаты</h1>
-          <p className="sub">{data.total ? `${data.total} записей` : " "}</p>
-        </div>
-        <Link to="/payments/new" className="btn-add">
-          Добавить
-        </Link>
-      </div>
+      <p className="sub" style={{ margin: "0 0 1rem" }}>
+        {data.total ? `${data.total} записей` : " "}
+      </p>
 
       <button
         type="button"

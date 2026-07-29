@@ -43,7 +43,12 @@ export default function OrderDetail() {
         ← Заказы
       </Link>
       <div className="detail-card">
-        <h2>{row.brand_name}</h2>
+        <div className="detail-card-head">
+          <h2>{row.brand_name}</h2>
+          <Link to={`/orders/${row.id}/edit`} className="icon-edit" aria-label="Редактировать заказ">
+            ✏️
+          </Link>
+        </div>
         <p className="sub" style={{ margin: 0, color: "var(--muted)" }}>
           {row.season_name}
           {row.gender ? ` · ${genderLabel(row.gender)}` : ""}

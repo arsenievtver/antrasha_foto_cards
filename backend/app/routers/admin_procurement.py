@@ -71,11 +71,77 @@ router = APIRouter(prefix="/admin", tags=["admin-procurement"])
 ZERO = Decimal("0")
 _CENTS = Decimal("0.01")
 
+_CATEGORY_ALIAS_TO_CANONICAL_MS_ID = {
+    "463e7bec-34dd-11f1-0a80-148d00118078": "79292943-9e44-11e9-9ff4-31500007d6f3",
+    "8ade28c6-6e3e-11f1-0a80-00b0001171b1": "78fabba1-9e44-11e9-9ff4-31500007d6c1",
+}
+
+_CANONICAL_CATEGORY_DISPLAY = {
+    "0ebca617-f97a-11e9-0a80-0579004f6022": ("Верхняя одежда муж", "men"),
+    "009bd151-b37b-11e9-9ff4-3150003a1bb1": ("Пиджаки, жакеты, бомбер муж", "men"),
+    "46a5c5b7-5708-11e9-9ff4-315000d0798d": ("Футболки, поло муж", "men"),
+    "46b4f0d3-5708-11e9-9ff4-315000d079ad": ("Брюки, джинсы, бриджи, шорты муж", "men"),
+    "7958c78e-9e44-11e9-9ff4-31500007d713": ("Трикотаж муж", "men"),
+    "797d0e35-9e44-11e9-9ff4-31500007d733": ("Рубашки", "men"),
+    "eec41100-9847-11eb-0a80-0616000ac009": ("Костюмы муж", "men"),
+    "f8fae156-b37a-11e9-9ff4-3150003a11ec": ("Обувь муж", "men"),
+    "0dea4445-f97a-11e9-0a80-0579004f5ecf": ("Верхняя одежда жен", "women"),
+    "79292943-9e44-11e9-9ff4-31500007d6f3": ("Пиджаки, жакеты, бомбер жен", "women"),
+    "f7b6946e-b37a-11e9-9ff4-3150003a0ff5": ("Футболки, поло, топы жен", "women"),
+    "21e1d207-b53f-11e9-9ff4-31500015315b": ("Блузки, рубашки жен", "women"),
+    "cd27a401-d3a6-11e9-0a80-02690003e199": ("Трикотаж жен", "women"),
+    "78fabba1-9e44-11e9-9ff4-31500007d6c1": (
+        "Брюки, джинсы, бриджи, шорты жен",
+        "women",
+    ),
+    "26114fa1-a495-11e9-9ff4-3150000fa9a1": ("Платья, юбки жен", "women"),
+    "79419e87-9e44-11e9-9ff4-31500007d6fe": ("Обувь жен", "women"),
+    "82adf299-8e8b-11e9-9ff4-31500007fc47": ("Аксессуары", "unisex"),
+}
+
 
 def _money(value: Decimal | int | float | None) -> Decimal:
     if value is None:
         return ZERO
     return Decimal(value).quantize(_CENTS, rounding=ROUND_HALF_UP)
+
+
+def _canonical_ms_id(ms_id: str | None) -> str | None:
+    if not ms_id:
+        return ms_id
+    return _CATEGORY_ALIAS_TO_CANONICAL_MS_ID.get(ms_id, ms_id)
+
+
+def _category_out(category: Category) -> CategoryOut:
+    ms_id = _canonical_ms_id(category.moy_sklad_id)
+    display_name, display_gender = _CANONICAL_CATEGORY_DISPLAY.get(
+        ms_id, (category.name, category.gender)
+    )
+    return CategoryOut(
+        id=category.id,
+        name=display_name,
+        gender=display_gender,
+        moy_sklad_id=ms_id,
+        path_name=category.path_name,
+        is_active=category.is_active,
+        sort_order=category.sort_order,
+    )
+
+
+def _normalize_categories(rows: list[Category]) -> list[CategoryOut]:
+    normalized: dict[str, Category] = {}
+    passthrough: list[CategoryOut] = []
+    for row in rows:
+        ms_id = _canonical_ms_id(row.moy_sklad_id)
+        if not ms_id:
+            passthrough.append(_category_out(row))
+            continue
+        current = normalized.get(ms_id)
+        if current is None or (not current.is_active and row.is_active):
+            normalized[ms_id] = row
+
+    ordered = sorted(normalized.values(), key=lambda r: (r.sort_order, r.name))
+    return [_category_out(row) for row in ordered] + passthrough
 
 
 def _to_rub(amount_eur: Decimal | None, rate: Decimal | None) -> Decimal | None:
@@ -294,7 +360,7 @@ def list_categories(
     if active_only:
         stmt = stmt.where(Category.is_active.is_(True))
     rows = db.scalars(stmt.order_by(Category.sort_order, Category.name)).all()
-    return CategoryListResponse(items=[CategoryOut.model_validate(r) for r in rows])
+    return CategoryListResponse(items=_normalize_categories(rows))
 
 
 @router.patch("/categories/{category_id}", response_model=CategoryOut)
@@ -420,7 +486,18 @@ def _load_categories(db: Session, lines: list[OrderLineIn]) -> dict[uuid.UUID, C
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Категории не найдены: {', '.join(str(m) for m in sorted(missing, key=str))}",
         )
-    return found
+    canonical_ms_ids = {_canonical_ms_id(row.moy_sklad_id) for row in rows if row.moy_sklad_id}
+    canonical_rows = db.scalars(
+        select(Category).where(Category.moy_sklad_id.in_(canonical_ms_ids))
+    ).all()
+    canonical_by_ms_id = {row.moy_sklad_id: row for row in canonical_rows if row.moy_sklad_id}
+
+    normalized: dict[uuid.UUID, Category] = {}
+    for input_id, row in found.items():
+        canonical_ms_id = _canonical_ms_id(row.moy_sklad_id)
+        canonical = canonical_by_ms_id.get(canonical_ms_id or "")
+        normalized[input_id] = canonical or row
+    return normalized
 
 
 def _order_facts(
@@ -486,18 +563,21 @@ def _order_out(
         created_at=order.created_at,
         updated_at=order.updated_at,
         lines=[
-            OrderLineOut(
-                id=ln.id,
-                category_id=ln.category_id,
-                category_name=ln.category.name if ln.category else "",
-                category_gender=ln.category.gender if ln.category else "",
-                amount_eur=_money(ln.amount_eur),
-                comment=ln.comment,
-            )
+            (
+                lambda category_out: OrderLineOut(
+                    id=ln.id,
+                    category_id=ln.category.id,
+                    category_name=category_out.name,
+                    category_gender=category_out.gender,
+                    amount_eur=_money(ln.amount_eur),
+                    comment=ln.comment,
+                )
+            )(_category_out(ln.category))
             for ln in sorted(
                 order.lines,
                 key=lambda x: (x.category.sort_order if x.category else 0),
             )
+            if ln.category
         ],
         paid_eur=_money(paid),
         prepaid_eur=_money(prepaid),
@@ -615,7 +695,7 @@ def create_brand_order(
     _ = _su
     _get_season(db, body.season_id)
     _get_brand(db, body.brand_id)
-    _load_categories(db, body.lines)
+    categories = _load_categories(db, body.lines)
 
     if body.lines:
         amount = _money(sum((ln.amount_eur for ln in body.lines), ZERO))
@@ -638,7 +718,7 @@ def create_brand_order(
     for ln in body.lines:
         order.lines.append(
             BrandOrderCategoryLine(
-                category_id=ln.category_id,
+                category_id=categories[ln.category_id].id,
                 amount_eur=_money(ln.amount_eur),
                 comment=ln.comment.strip() if ln.comment else None,
             )
@@ -675,13 +755,13 @@ def update_brand_order(
         order.eur_rub_rate = body.eur_rub_rate
 
     if body.lines is not None:
-        _load_categories(db, body.lines)
+        categories = _load_categories(db, body.lines)
         order.lines.clear()
         db.flush()
         for ln in body.lines:
             order.lines.append(
                 BrandOrderCategoryLine(
-                    category_id=ln.category_id,
+                    category_id=categories[ln.category_id].id,
                     amount_eur=_money(ln.amount_eur),
                     comment=ln.comment.strip() if ln.comment else None,
                 )
@@ -1233,29 +1313,51 @@ def get_brand_procurement_stats(
         )
     by_season.sort(key=lambda s: s.orders_eur, reverse=True)
 
+    category_totals: dict[str, dict[str, object]] = {}
+    for cid, name, gender, ms_id, total in db.execute(
+        select(
+            Category.id,
+            Category.name,
+            Category.gender,
+            Category.moy_sklad_id,
+            func.sum(BrandOrderCategoryLine.amount_eur),
+        )
+        .join(
+            BrandOrderCategoryLine,
+            BrandOrderCategoryLine.category_id == Category.id,
+        )
+        .join(BrandOrder, BrandOrder.id == BrandOrderCategoryLine.order_id)
+        .where(BrandOrder.brand_id == brand_id)
+        .group_by(Category.id, Category.name, Category.gender, Category.moy_sklad_id)
+    ).all():
+        canonical_ms_id = _canonical_ms_id(ms_id)
+        display_name, display_gender = _CANONICAL_CATEGORY_DISPLAY.get(
+            canonical_ms_id, (name, gender)
+        )
+        key = canonical_ms_id or str(cid)
+        entry = category_totals.setdefault(
+            key,
+            {
+                "category_id": cid,
+                "category_name": display_name,
+                "category_gender": display_gender,
+                "amount_eur": ZERO,
+            },
+        )
+        entry["amount_eur"] = Decimal(entry["amount_eur"]) + Decimal(total or 0)
+
     by_category = [
         BrandCategoryStatOut(
-            category_id=cid,
-            category_name=name,
-            category_gender=gender,
-            amount_eur=_money(total),
+            category_id=entry["category_id"],
+            category_name=entry["category_name"],
+            category_gender=entry["category_gender"],
+            amount_eur=_money(entry["amount_eur"]),
         )
-        for cid, name, gender, total in db.execute(
-            select(
-                Category.id,
-                Category.name,
-                Category.gender,
-                func.sum(BrandOrderCategoryLine.amount_eur),
-            )
-            .join(
-                BrandOrderCategoryLine,
-                BrandOrderCategoryLine.category_id == Category.id,
-            )
-            .join(BrandOrder, BrandOrder.id == BrandOrderCategoryLine.order_id)
-            .where(BrandOrder.brand_id == brand_id)
-            .group_by(Category.id, Category.name, Category.gender)
-            .order_by(func.sum(BrandOrderCategoryLine.amount_eur).desc())
-        ).all()
+        for entry in sorted(
+            category_totals.values(),
+            key=lambda item: Decimal(item["amount_eur"]),
+            reverse=True,
+        )
     ]
 
     prepaid_by_order = {
@@ -1330,7 +1432,7 @@ def get_procurement_refs(
     ).first()
     return ProcurementRefsOut(
         seasons=[SeasonOut.model_validate(s) for s in seasons],
-        categories=[CategoryOut.model_validate(c) for c in categories],
+        categories=_normalize_categories(categories),
         brands=[BrandRefOut.model_validate(b) for b in brands],
         latest_fx_rate=FxRateOut.model_validate(current) if current else None,
     )
