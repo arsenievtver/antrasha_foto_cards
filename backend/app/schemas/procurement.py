@@ -7,7 +7,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 OrderGender = Literal["men", "women", "mixed"]
 CategoryGender = Literal["men", "women", "unisex"]
@@ -340,3 +340,52 @@ class ProcurementRefsOut(BaseModel):
     categories: list[CategoryOut]
     brands: list[BrandRefOut]
     latest_fx_rate: FxRateOut | None = None
+
+
+# --- Подсказки для заказа (остатки / размеры) ------------------------------
+
+
+class OrderGuidancePeriodOut(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
+
+    from_: str = Field(alias="from")
+    to: str
+
+
+class OrderGuidanceStockTotalsOut(BaseModel):
+    total: int
+    fresh_vl26: int
+    old: int
+
+
+class OrderGuidanceSizeSalesChartOut(BaseModel):
+    period: OrderGuidancePeriodOut
+    axis_x: str
+    axis_y: str
+    labels: list[str]
+    sellQuantity: list[int]
+
+
+class OrderGuidanceCategoryOut(BaseModel):
+    key: str
+    name: str
+    gender: str
+    moy_sklad_id: str | None = None
+    comment: str
+    reinforce_sizes: list[str] = Field(default_factory=list)
+    weaken_sizes: list[str] = Field(default_factory=list)
+    stock_totals: OrderGuidanceStockTotalsOut
+    size_sales_chart: OrderGuidanceSizeSalesChartOut
+
+
+class OrderGuidanceMetaOut(BaseModel):
+    as_of: str | None = None
+    sales_period: OrderGuidancePeriodOut | None = None
+    comment_format: str | None = None
+    chart_rule: str | None = None
+    fresh_definition: str | None = None
+
+
+class OrderGuidanceOut(BaseModel):
+    meta: OrderGuidanceMetaOut
+    categories: list[OrderGuidanceCategoryOut]

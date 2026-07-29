@@ -5,6 +5,7 @@ import OrdersList from "./pages/OrdersList.jsx";
 import OrderDetail from "./pages/OrderDetail.jsx";
 import OrderCreate from "./pages/OrderCreate.jsx";
 import OrderEdit from "./pages/OrderEdit.jsx";
+import OrderGuidance from "./pages/OrderGuidance.jsx";
 import PaymentsList from "./pages/PaymentsList.jsx";
 import PaymentDetail from "./pages/PaymentDetail.jsx";
 import PaymentCreate from "./pages/PaymentCreate.jsx";
@@ -41,6 +42,7 @@ export default function App() {
           <Route path="/orders/new" element={<OrderCreate />} />
           <Route path="/orders/:id" element={<OrderDetail />} />
           <Route path="/orders/:id/edit" element={<OrderEdit />} />
+          <Route path="/for-order" element={<OrderGuidance />} />
           <Route path="/payments" element={<PaymentsList />} />
           <Route path="/payments/new" element={<PaymentCreate />} />
           <Route path="/payments/:id" element={<PaymentDetail />} />

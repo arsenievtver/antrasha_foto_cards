@@ -152,7 +152,7 @@ label {
   height: calc(var(--nav-h) + var(--safe-bottom));
   padding-bottom: var(--safe-bottom);
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   background: var(--surface);
   border-top: 1px solid var(--border);
   z-index: 40;
@@ -166,9 +166,11 @@ label {
   gap: 0.15rem;
   text-decoration: none;
   color: var(--muted);
-  font-size: 0.72rem;
+  font-size: 0.65rem;
   font-weight: 600;
   letter-spacing: 0.01em;
+  padding: 0 0.15rem;
+  text-align: center;
 }
 
 .bottom-nav a.active {
@@ -539,4 +541,151 @@ label {
 
 .modal-actions button {
   flex: 1;
+}
+
+/* —— Order guidance («Для заказа») —— */
+.guidance-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.guidance-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 0.9rem 0.95rem 1rem;
+}
+
+.guidance-card__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.guidance-card__title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+.guidance-card__gender {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.guidance-card__stock {
+  margin: 0 0 0.45rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.guidance-card__hint {
+  margin: 0 0 0.25rem;
+  font-size: 0.88rem;
+}
+
+.guidance-card__hint--up {
+  color: var(--ok);
+}
+
+.guidance-card__hint--down {
+  color: var(--warn);
+}
+
+.guidance-card__comment {
+  margin: 0.55rem 0 0.75rem;
+  font-size: 0.82rem;
+  color: var(--text);
+  line-height: 1.4;
+  opacity: 0.92;
+}
+
+.guidance-card__nochart {
+  margin: 0.5rem 0 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.size-chart__caption {
+  margin: 0 0 0.45rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.size-chart__bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.2rem;
+  min-height: 120px;
+  overflow-x: auto;
+  padding-bottom: 0.15rem;
+  -webkit-overflow-scrolling: touch;
+}
+
+.size-chart__col {
+  flex: 0 0 auto;
+  width: 1.85rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.size-chart__qty {
+  font-size: 0.62rem;
+  color: var(--muted);
+  line-height: 1;
+  min-height: 0.7rem;
+}
+
+.size-chart__bar-wrap {
+  width: 100%;
+  height: 88px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.size-chart__bar {
+  width: 70%;
+  min-height: 2px;
+  border-radius: 4px 4px 2px 2px;
+  background: var(--accent);
+  opacity: 0.85;
+}
+
+.size-chart__col--up .size-chart__bar {
+  background: var(--ok);
+  opacity: 1;
+}
+
+.size-chart__col--down .size-chart__bar {
+  background: var(--warn);
+  opacity: 1;
+}
+
+.size-chart__label {
+  font-size: 0.58rem;
+  color: var(--muted);
+  text-align: center;
+  line-height: 1.1;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.size-chart__col--up .size-chart__label {
+  color: var(--ok);
+  font-weight: 650;
+}
+
+.size-chart__col--down .size-chart__label {
+  color: var(--warn);
+  font-weight: 650;
 }

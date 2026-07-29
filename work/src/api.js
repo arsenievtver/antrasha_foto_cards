@@ -158,6 +158,10 @@ export function fetchProcurementRefs() {
   return request("/admin/procurement/refs");
 }
 
+export function fetchOrderGuidance() {
+  return request("/admin/procurement/order-guidance");
+}
+
 export function createBrand(name) {
   return request("/admin/brands", { method: "POST", body: { name } });
 }

@@ -7,10 +7,13 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import uuid
 from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
+from functools import lru_cache
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
@@ -44,6 +47,7 @@ from app.schemas.procurement import (
     FxRateOut,
     FxRateUpdateRequest,
     OrderCreateRequest,
+    OrderGuidanceOut,
     OrderLineIn,
     OrderLineOut,
     OrderListResponse,
@@ -62,6 +66,10 @@ from app.schemas.procurement import (
     ShipmentListResponse,
     ShipmentOut,
     ShipmentUpdateRequest,
+)
+
+_ORDER_GUIDANCE_PATH = (
+    Path(__file__).resolve().parent.parent / "data" / "order_guidance_vl2027.json"
 )
 
 log = logging.getLogger("app.api.admin_procurement")
@@ -1436,3 +1444,36 @@ def get_procurement_refs(
         brands=[BrandRefOut.model_validate(b) for b in brands],
         latest_fx_rate=FxRateOut.model_validate(current) if current else None,
     )
+
+
+@lru_cache(maxsize=1)
+def _load_order_guidance() -> dict:
+    if not _ORDER_GUIDANCE_PATH.is_file():
+        raise FileNotFoundError(str(_ORDER_GUIDANCE_PATH))
+    payload = json.loads(_ORDER_GUIDANCE_PATH.read_text(encoding="utf-8"))
+    meta = payload.get("meta") or {}
+    meta.pop("raw_dir", None)
+    payload["meta"] = meta
+    return payload
+
+
+@router.get("/procurement/order-guidance", response_model=OrderGuidanceOut)
+def get_order_guidance(
+    _su: AdminPrincipal = Depends(require_permission("product")),
+) -> OrderGuidanceOut:
+    """Подсказки по размерам для закупки VL2027: комментарии и графики продаж."""
+    _ = _su
+    try:
+        payload = _load_order_guidance()
+    except FileNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Файл подсказок для заказа не найден",
+        ) from exc
+    except (json.JSONDecodeError, OSError) as exc:
+        log.exception("order-guidance load failed")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Не удалось прочитать подсказки для заказа",
+        ) from exc
+    return OrderGuidanceOut.model_validate(payload)

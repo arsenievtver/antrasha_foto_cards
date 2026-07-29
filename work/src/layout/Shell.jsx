@@ -3,6 +3,7 @@ import { clearSession } from "../api.js";
 
 const TABS = [
   { to: "/orders", label: "Заказы", ico: "◇" },
+  { to: "/for-order", label: "Для заказа", ico: "▤" },
   { to: "/payments", label: "Оплаты", ico: "◎" },
   { to: "/shipments", label: "Поставки", ico: "▣" },
 ];
@@ -56,6 +57,7 @@ export default function Shell() {
 
 function getPageMeta(pathname) {
   if (pathname === "/orders") return { title: "Заказы", addTo: "/orders/new", addLabel: "Добавить заказ" };
+  if (pathname === "/for-order") return { title: "Для заказа" };
   if (pathname === "/payments") return { title: "Оплаты", addTo: "/payments/new", addLabel: "Добавить оплату" };
   if (pathname === "/shipments") return { title: "Поставки", addTo: "/shipments/new", addLabel: "Добавить поставку" };
   if (pathname === "/orders/new") return { title: "Новый заказ" };
