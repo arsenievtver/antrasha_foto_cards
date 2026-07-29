@@ -2,8 +2,8 @@ import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { clearSession } from "../api.js";
 
 const TABS = [
-  { to: "/orders", label: "Заказы", ico: "◇" },
   { to: "/for-order", label: "Для заказа", ico: "▤" },
+  { to: "/orders", label: "Заказы", ico: "◇" },
   { to: "/payments", label: "Оплаты", ico: "◎" },
   { to: "/shipments", label: "Поставки", ico: "▣" },
 ];

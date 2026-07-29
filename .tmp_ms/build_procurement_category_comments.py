@@ -300,27 +300,10 @@ def stock_ss_by_size(items: list[dict]) -> dict[str, dict]:
     return dict(by)
 
 
-def metrics_vl25_26(items_stock: list[dict], items_sales: list[dict]):
-    """Per-size received/sold/stock for ВЛ2025+ВЛ2026 only.
-
-    received = sold + stock so table rows reconcile.
+def metrics_table(by_size_ss: dict[str, dict], items_sales: list[dict]):
+    """Per-size table: stock = same SS totals as comment (F+O);
+    sold = ВЛ2025+ВЛ2026 net sales; received = sold + stock.
     """
-    stock = defaultdict(int)
-    for it in items_stock:
-        name = it.get("name") or ""
-        if not is_vl25_or_26(name):
-            continue
-        size = extract_size(name)
-        if not size:
-            continue
-        qty = int(
-            it.get("quantity")
-            if it.get("quantity") is not None
-            else (it.get("stock") or 0)
-        )
-        if qty > 0:
-            stock[size] += qty
-
     sold = defaultdict(int)
     for it in items_sales:
         name = it.get("name") or ""
@@ -335,13 +318,15 @@ def metrics_vl25_26(items_stock: list[dict], items_sales: list[dict]):
         if net > 0:
             sold[size] += net
 
-    sizes = sorted(set(stock) | set(sold), key=size_sort_key)
+    sizes = sorted(set(by_size_ss) | set(sold), key=size_sort_key)
     rows = []
     chart_labels = []
     chart_sold = []
     for size in sizes:
         s = sold[size]
-        st = stock[size]
+        st = int((by_size_ss.get(size) or {}).get("total") or 0)
+        if s <= 0 and st <= 0:
+            continue
         rows.append(
             {
                 "size": size,
@@ -429,9 +414,7 @@ def main() -> None:
         sales = load_json(sales_path)
         by_size = stock_ss_by_size(stock.get("items") or [])
         comment, reinforce, weaken = make_comment(by_size)
-        rows, labels, sold_qty = metrics_vl25_26(
-            stock.get("items") or [], sales.get("items") or []
-        )
+        rows, labels, sold_qty = metrics_table(by_size, sales.get("items") or [])
         fresh = sum(v["fresh"] for v in by_size.values())
         old = sum(v["old"] for v in by_size.values())
         total = fresh + old
@@ -476,9 +459,9 @@ def main() -> None:
             "fresh_definition": "ВЛ2026 within SS stock",
             "old_definition": "other SS seasons (ВЛ2025 and older SS)",
             "table_rule": (
-                "sizes of ВЛ2025+ВЛ2026; "
-                "received_total = sold_total + stock_total "
-                "(collection throughput so rows reconcile)"
+                "stock_total = SS stock per size (same F+O as comment); "
+                "sold_total = ВЛ2025+ВЛ2026 net sales; "
+                "received_total = sold_total + stock_total"
             ),
             "chart_rule": (
                 "per category; X = sizes ascending; "

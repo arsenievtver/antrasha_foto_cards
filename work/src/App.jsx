@@ -37,7 +37,7 @@ export default function App() {
             </RequireWork>
           }
         >
-          <Route path="/" element={<Navigate to="/orders" replace />} />
+          <Route path="/" element={<Navigate to="/for-order" replace />} />
           <Route path="/orders" element={<OrdersList />} />
           <Route path="/orders/new" element={<OrderCreate />} />
           <Route path="/orders/:id" element={<OrderDetail />} />
@@ -52,7 +52,7 @@ export default function App() {
           <Route path="/shipments/:id" element={<ShipmentDetail />} />
           <Route path="/shipments/:id/edit" element={<ShipmentEdit />} />
         </Route>
-        <Route path="*" element={<Navigate to="/orders" replace />} />
+        <Route path="*" element={<Navigate to="/for-order" replace />} />
       </Routes>
     </BrowserRouter>
   );

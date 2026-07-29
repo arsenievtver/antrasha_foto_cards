@@ -10,7 +10,7 @@
     "stock_rule": "only spring-summer (ВЛ / весна-лето); exclude ОЗ / осень-зима",
     "fresh_definition": "ВЛ2026 within SS stock",
     "old_definition": "other SS seasons (ВЛ2025 and older SS)",
-    "table_rule": "sizes of ВЛ2025+ВЛ2026; received_total = sold_total + stock_total (collection throughput so rows reconcile)",
+    "table_rule": "stock_total = SS stock per size (same F+O as comment); sold_total = ВЛ2025+ВЛ2026 net sales; received_total = sold_total + stock_total",
     "chart_rule": "per category; X = sizes ascending; Y = sold pcs of ВЛ2025+ВЛ2026 for Feb 2025–now"
   },
   "categories": [
@@ -36,21 +36,21 @@
       "size_summary_rows": [
         {
           "size": "48",
-          "received_total": 1,
+          "received_total": 2,
           "sold_total": 0,
-          "stock_total": 1
+          "stock_total": 2
         },
         {
           "size": "50",
-          "received_total": 15,
+          "received_total": 19,
           "sold_total": 10,
-          "stock_total": 5
+          "stock_total": 9
         },
         {
           "size": "52",
-          "received_total": 23,
+          "received_total": 26,
           "sold_total": 15,
-          "stock_total": 8
+          "stock_total": 11
         },
         {
           "size": "54",
@@ -125,22 +125,28 @@
       },
       "size_summary_rows": [
         {
+          "size": "46/48",
+          "received_total": 1,
+          "sold_total": 0,
+          "stock_total": 1
+        },
+        {
           "size": "48",
-          "received_total": 5,
+          "received_total": 6,
           "sold_total": 2,
-          "stock_total": 3
+          "stock_total": 4
         },
         {
           "size": "50",
-          "received_total": 19,
+          "received_total": 20,
           "sold_total": 7,
-          "stock_total": 12
+          "stock_total": 13
         },
         {
           "size": "52",
-          "received_total": 26,
+          "received_total": 28,
           "sold_total": 11,
-          "stock_total": 15
+          "stock_total": 17
         },
         {
           "size": "54",
@@ -150,9 +156,9 @@
         },
         {
           "size": "56",
-          "received_total": 17,
+          "received_total": 19,
           "sold_total": 8,
-          "stock_total": 9
+          "stock_total": 11
         },
         {
           "size": "58",
@@ -212,39 +218,39 @@
       "size_summary_rows": [
         {
           "size": "46",
-          "received_total": 7,
+          "received_total": 10,
           "sold_total": 2,
-          "stock_total": 5
+          "stock_total": 8
         },
         {
           "size": "48",
-          "received_total": 68,
+          "received_total": 82,
           "sold_total": 36,
-          "stock_total": 32
+          "stock_total": 46
         },
         {
           "size": "50",
-          "received_total": 138,
+          "received_total": 143,
           "sold_total": 75,
-          "stock_total": 63
+          "stock_total": 68
         },
         {
           "size": "52",
-          "received_total": 125,
+          "received_total": 142,
           "sold_total": 91,
-          "stock_total": 34
+          "stock_total": 51
         },
         {
           "size": "54",
-          "received_total": 90,
+          "received_total": 100,
           "sold_total": 54,
-          "stock_total": 36
+          "stock_total": 46
         },
         {
           "size": "56",
-          "received_total": 40,
+          "received_total": 45,
           "sold_total": 25,
-          "stock_total": 15
+          "stock_total": 20
         }
       ],
       "size_sales_chart": {
@@ -314,9 +320,9 @@
         },
         {
           "size": "32/34",
-          "received_total": 24,
+          "received_total": 25,
           "sold_total": 13,
-          "stock_total": 11
+          "stock_total": 12
         },
         {
           "size": "33",
@@ -332,9 +338,9 @@
         },
         {
           "size": "33/34",
-          "received_total": 26,
+          "received_total": 28,
           "sold_total": 14,
-          "stock_total": 12
+          "stock_total": 14
         },
         {
           "size": "34",
@@ -350,9 +356,9 @@
         },
         {
           "size": "34/34",
-          "received_total": 25,
+          "received_total": 26,
           "sold_total": 17,
-          "stock_total": 8
+          "stock_total": 9
         },
         {
           "size": "35",
@@ -368,9 +374,9 @@
         },
         {
           "size": "35/34",
-          "received_total": 25,
+          "received_total": 27,
           "sold_total": 18,
-          "stock_total": 7
+          "stock_total": 9
         },
         {
           "size": "36",
@@ -386,9 +392,9 @@
         },
         {
           "size": "36/34",
-          "received_total": 25,
+          "received_total": 27,
           "sold_total": 16,
-          "stock_total": 9
+          "stock_total": 11
         },
         {
           "size": "38",
@@ -404,9 +410,9 @@
         },
         {
           "size": "38/34",
-          "received_total": 24,
+          "received_total": 26,
           "sold_total": 19,
-          "stock_total": 5
+          "stock_total": 7
         },
         {
           "size": "40/32",
@@ -416,9 +422,9 @@
         },
         {
           "size": "40/34",
-          "received_total": 20,
+          "received_total": 22,
           "sold_total": 16,
-          "stock_total": 4
+          "stock_total": 6
         },
         {
           "size": "42/32",
@@ -446,45 +452,45 @@
         },
         {
           "size": "46",
-          "received_total": 2,
+          "received_total": 4,
           "sold_total": 2,
-          "stock_total": 0
+          "stock_total": 2
         },
         {
           "size": "48",
-          "received_total": 33,
+          "received_total": 36,
           "sold_total": 20,
-          "stock_total": 13
+          "stock_total": 16
         },
         {
           "size": "50",
-          "received_total": 80,
+          "received_total": 81,
           "sold_total": 51,
-          "stock_total": 29
+          "stock_total": 30
         },
         {
           "size": "52",
-          "received_total": 94,
+          "received_total": 96,
           "sold_total": 59,
-          "stock_total": 35
+          "stock_total": 37
         },
         {
           "size": "54",
-          "received_total": 82,
+          "received_total": 83,
           "sold_total": 48,
-          "stock_total": 34
+          "stock_total": 35
         },
         {
           "size": "56",
-          "received_total": 53,
+          "received_total": 55,
           "sold_total": 27,
-          "stock_total": 26
+          "stock_total": 28
         },
         {
           "size": "58",
-          "received_total": 16,
+          "received_total": 17,
           "sold_total": 10,
-          "stock_total": 6
+          "stock_total": 7
         }
       ],
       "size_sales_chart": {
@@ -576,28 +582,34 @@
       },
       "size_summary_rows": [
         {
-          "size": "48",
-          "received_total": 17,
-          "sold_total": 12,
-          "stock_total": 5
+          "size": "46",
+          "received_total": 1,
+          "sold_total": 0,
+          "stock_total": 1
         },
         {
-          "size": "50",
-          "received_total": 41,
-          "sold_total": 30,
+          "size": "48",
+          "received_total": 23,
+          "sold_total": 12,
           "stock_total": 11
         },
         {
+          "size": "50",
+          "received_total": 48,
+          "sold_total": 30,
+          "stock_total": 18
+        },
+        {
           "size": "52",
-          "received_total": 41,
+          "received_total": 47,
           "sold_total": 33,
-          "stock_total": 8
+          "stock_total": 14
         },
         {
           "size": "54",
-          "received_total": 28,
+          "received_total": 31,
           "sold_total": 24,
-          "stock_total": 4
+          "stock_total": 7
         },
         {
           "size": "56",
@@ -665,46 +677,52 @@
       },
       "size_summary_rows": [
         {
+          "size": "39",
+          "received_total": 5,
+          "sold_total": 0,
+          "stock_total": 5
+        },
+        {
           "size": "40",
-          "received_total": 16,
+          "received_total": 22,
           "sold_total": 5,
-          "stock_total": 11
+          "stock_total": 17
         },
         {
           "size": "41",
-          "received_total": 17,
+          "received_total": 22,
           "sold_total": 10,
-          "stock_total": 7
+          "stock_total": 12
         },
         {
           "size": "42",
-          "received_total": 17,
+          "received_total": 18,
           "sold_total": 4,
-          "stock_total": 13
+          "stock_total": 14
         },
         {
           "size": "43",
-          "received_total": 17,
+          "received_total": 19,
           "sold_total": 8,
-          "stock_total": 9
+          "stock_total": 11
         },
         {
           "size": "44",
-          "received_total": 17,
+          "received_total": 24,
           "sold_total": 4,
-          "stock_total": 13
+          "stock_total": 20
         },
         {
           "size": "45",
-          "received_total": 17,
+          "received_total": 22,
           "sold_total": 4,
-          "stock_total": 13
+          "stock_total": 18
         },
         {
           "size": "46",
-          "received_total": 7,
+          "received_total": 21,
           "sold_total": 1,
-          "stock_total": 6
+          "stock_total": 20
         },
         {
           "size": "47",
@@ -714,33 +732,33 @@
         },
         {
           "size": "48",
-          "received_total": 14,
+          "received_total": 19,
           "sold_total": 10,
-          "stock_total": 4
-        },
-        {
-          "size": "50",
-          "received_total": 22,
-          "sold_total": 16,
-          "stock_total": 6
-        },
-        {
-          "size": "52",
-          "received_total": 21,
-          "sold_total": 12,
           "stock_total": 9
         },
         {
+          "size": "50",
+          "received_total": 25,
+          "sold_total": 16,
+          "stock_total": 9
+        },
+        {
+          "size": "52",
+          "received_total": 24,
+          "sold_total": 12,
+          "stock_total": 12
+        },
+        {
           "size": "54",
-          "received_total": 18,
+          "received_total": 23,
           "sold_total": 13,
-          "stock_total": 5
+          "stock_total": 10
         },
         {
           "size": "56",
-          "received_total": 7,
+          "received_total": 12,
           "sold_total": 5,
-          "stock_total": 2
+          "stock_total": 7
         }
       ],
       "size_sales_chart": {
@@ -804,9 +822,9 @@
       "size_summary_rows": [
         {
           "size": "50",
-          "received_total": 1,
+          "received_total": 2,
           "sold_total": 1,
-          "stock_total": 0
+          "stock_total": 1
         },
         {
           "size": "52",
@@ -822,9 +840,9 @@
         },
         {
           "size": "56",
-          "received_total": 1,
+          "received_total": 2,
           "sold_total": 1,
-          "stock_total": 0
+          "stock_total": 1
         }
       ],
       "size_sales_chart": {
@@ -976,9 +994,9 @@
         },
         {
           "size": "48",
-          "received_total": 8,
+          "received_total": 10,
           "sold_total": 4,
-          "stock_total": 4
+          "stock_total": 6
         },
         {
           "size": "50",
@@ -1040,21 +1058,21 @@
         },
         {
           "size": "44",
-          "received_total": 15,
+          "received_total": 17,
           "sold_total": 12,
-          "stock_total": 3
-        },
-        {
-          "size": "46",
-          "received_total": 12,
-          "sold_total": 7,
           "stock_total": 5
         },
         {
+          "size": "46",
+          "received_total": 15,
+          "sold_total": 7,
+          "stock_total": 8
+        },
+        {
           "size": "48",
-          "received_total": 8,
+          "received_total": 11,
           "sold_total": 5,
-          "stock_total": 3
+          "stock_total": 6
         }
       ],
       "size_sales_chart": {
@@ -1106,27 +1124,27 @@
       "size_summary_rows": [
         {
           "size": "42",
-          "received_total": 57,
+          "received_total": 63,
           "sold_total": 41,
-          "stock_total": 16
+          "stock_total": 22
         },
         {
           "size": "44",
-          "received_total": 73,
+          "received_total": 82,
           "sold_total": 45,
-          "stock_total": 28
+          "stock_total": 37
         },
         {
           "size": "46",
-          "received_total": 76,
+          "received_total": 91,
           "sold_total": 42,
-          "stock_total": 34
+          "stock_total": 49
         },
         {
           "size": "48",
-          "received_total": 62,
+          "received_total": 67,
           "sold_total": 29,
-          "stock_total": 33
+          "stock_total": 38
         },
         {
           "size": "50",
@@ -1185,40 +1203,52 @@
       },
       "size_summary_rows": [
         {
-          "size": "40",
+          "size": "36",
           "received_total": 1,
           "sold_total": 0,
           "stock_total": 1
         },
         {
-          "size": "42",
-          "received_total": 13,
-          "sold_total": 11,
-          "stock_total": 2
+          "size": "38",
+          "received_total": 1,
+          "sold_total": 0,
+          "stock_total": 1
         },
         {
-          "size": "44",
-          "received_total": 28,
-          "sold_total": 17,
-          "stock_total": 11
-        },
-        {
-          "size": "46",
-          "received_total": 29,
-          "sold_total": 18,
-          "stock_total": 11
-        },
-        {
-          "size": "48",
-          "received_total": 22,
-          "sold_total": 12,
-          "stock_total": 10
-        },
-        {
-          "size": "50",
+          "size": "40",
           "received_total": 2,
           "sold_total": 0,
           "stock_total": 2
+        },
+        {
+          "size": "42",
+          "received_total": 18,
+          "sold_total": 11,
+          "stock_total": 7
+        },
+        {
+          "size": "44",
+          "received_total": 31,
+          "sold_total": 17,
+          "stock_total": 14
+        },
+        {
+          "size": "46",
+          "received_total": 34,
+          "sold_total": 18,
+          "stock_total": 16
+        },
+        {
+          "size": "48",
+          "received_total": 25,
+          "sold_total": 12,
+          "stock_total": 13
+        },
+        {
+          "size": "50",
+          "received_total": 4,
+          "sold_total": 0,
+          "stock_total": 4
         }
       ],
       "size_sales_chart": {
@@ -1278,33 +1308,51 @@
         },
         {
           "size": "42",
-          "received_total": 29,
+          "received_total": 30,
           "sold_total": 20,
-          "stock_total": 9
-        },
-        {
-          "size": "44",
-          "received_total": 41,
-          "sold_total": 27,
-          "stock_total": 14
-        },
-        {
-          "size": "46",
-          "received_total": 41,
-          "sold_total": 24,
-          "stock_total": 17
-        },
-        {
-          "size": "48",
-          "received_total": 36,
-          "sold_total": 26,
           "stock_total": 10
         },
         {
+          "size": "44",
+          "received_total": 46,
+          "sold_total": 27,
+          "stock_total": 19
+        },
+        {
+          "size": "46",
+          "received_total": 43,
+          "sold_total": 24,
+          "stock_total": 19
+        },
+        {
+          "size": "48",
+          "received_total": 40,
+          "sold_total": 26,
+          "stock_total": 14
+        },
+        {
           "size": "50",
-          "received_total": 5,
+          "received_total": 6,
           "sold_total": 3,
-          "stock_total": 2
+          "stock_total": 3
+        },
+        {
+          "size": "S",
+          "received_total": 1,
+          "sold_total": 0,
+          "stock_total": 1
+        },
+        {
+          "size": "M",
+          "received_total": 3,
+          "sold_total": 0,
+          "stock_total": 3
+        },
+        {
+          "size": "L",
+          "received_total": 1,
+          "sold_total": 0,
+          "stock_total": 1
         }
       ],
       "size_sales_chart": {
@@ -1361,40 +1409,76 @@
       },
       "size_summary_rows": [
         {
+          "size": "27",
+          "received_total": 1,
+          "sold_total": 0,
+          "stock_total": 1
+        },
+        {
+          "size": "29",
+          "received_total": 1,
+          "sold_total": 0,
+          "stock_total": 1
+        },
+        {
+          "size": "30",
+          "received_total": 1,
+          "sold_total": 0,
+          "stock_total": 1
+        },
+        {
+          "size": "33/34",
+          "received_total": 1,
+          "sold_total": 0,
+          "stock_total": 1
+        },
+        {
+          "size": "38",
+          "received_total": 1,
+          "sold_total": 0,
+          "stock_total": 1
+        },
+        {
+          "size": "40",
+          "received_total": 1,
+          "sold_total": 0,
+          "stock_total": 1
+        },
+        {
           "size": "42",
-          "received_total": 63,
+          "received_total": 73,
           "sold_total": 33,
-          "stock_total": 30
+          "stock_total": 40
         },
         {
           "size": "44",
-          "received_total": 92,
+          "received_total": 127,
           "sold_total": 54,
-          "stock_total": 38
+          "stock_total": 73
         },
         {
           "size": "46",
-          "received_total": 91,
+          "received_total": 125,
           "sold_total": 46,
-          "stock_total": 45
+          "stock_total": 79
         },
         {
           "size": "48",
-          "received_total": 78,
+          "received_total": 109,
           "sold_total": 43,
-          "stock_total": 35
+          "stock_total": 66
         },
         {
           "size": "50",
-          "received_total": 18,
+          "received_total": 32,
           "sold_total": 5,
-          "stock_total": 13
+          "stock_total": 27
         },
         {
           "size": "52",
-          "received_total": 6,
+          "received_total": 7,
           "sold_total": 2,
-          "stock_total": 4
+          "stock_total": 5
         }
       ],
       "size_sales_chart": {
@@ -1451,34 +1535,52 @@
       },
       "size_summary_rows": [
         {
+          "size": "36",
+          "received_total": 1,
+          "sold_total": 0,
+          "stock_total": 1
+        },
+        {
+          "size": "38",
+          "received_total": 2,
+          "sold_total": 0,
+          "stock_total": 2
+        },
+        {
+          "size": "40",
+          "received_total": 2,
+          "sold_total": 0,
+          "stock_total": 2
+        },
+        {
           "size": "42",
-          "received_total": 26,
+          "received_total": 33,
           "sold_total": 14,
-          "stock_total": 12
+          "stock_total": 19
         },
         {
           "size": "44",
-          "received_total": 40,
+          "received_total": 55,
           "sold_total": 17,
-          "stock_total": 23
+          "stock_total": 38
         },
         {
           "size": "46",
-          "received_total": 42,
+          "received_total": 66,
           "sold_total": 19,
-          "stock_total": 23
+          "stock_total": 47
         },
         {
           "size": "48",
-          "received_total": 25,
+          "received_total": 48,
           "sold_total": 10,
-          "stock_total": 15
+          "stock_total": 38
         },
         {
           "size": "50",
-          "received_total": 4,
+          "received_total": 14,
           "sold_total": 2,
-          "stock_total": 2
+          "stock_total": 12
         },
         {
           "size": "52",
@@ -1543,34 +1645,40 @@
       },
       "size_summary_rows": [
         {
+          "size": "36",
+          "received_total": 1,
+          "sold_total": 0,
+          "stock_total": 1
+        },
+        {
           "size": "37",
-          "received_total": 4,
+          "received_total": 8,
           "sold_total": 1,
-          "stock_total": 3
-        },
-        {
-          "size": "38",
-          "received_total": 7,
-          "sold_total": 2,
-          "stock_total": 5
-        },
-        {
-          "size": "39",
-          "received_total": 10,
-          "sold_total": 3,
           "stock_total": 7
         },
         {
-          "size": "40",
-          "received_total": 4,
+          "size": "38",
+          "received_total": 9,
           "sold_total": 2,
-          "stock_total": 2
+          "stock_total": 7
+        },
+        {
+          "size": "39",
+          "received_total": 14,
+          "sold_total": 3,
+          "stock_total": 11
+        },
+        {
+          "size": "40",
+          "received_total": 8,
+          "sold_total": 2,
+          "stock_total": 6
         },
         {
           "size": "41",
-          "received_total": 3,
+          "received_total": 5,
           "sold_total": 2,
-          "stock_total": 1
+          "stock_total": 3
         }
       ],
       "size_sales_chart": {
@@ -1637,6 +1745,18 @@
           "stock_total": 21
         },
         {
+          "size": "46",
+          "received_total": 1,
+          "sold_total": 0,
+          "stock_total": 1
+        },
+        {
+          "size": "48",
+          "received_total": 1,
+          "sold_total": 0,
+          "stock_total": 1
+        },
+        {
           "size": "90",
           "received_total": 17,
           "sold_total": 2,
@@ -1677,6 +1797,12 @@
           "received_total": 10,
           "sold_total": 1,
           "stock_total": 9
+        },
+        {
+          "size": "S",
+          "received_total": 3,
+          "sold_total": 0,
+          "stock_total": 3
         }
       ],
       "size_sales_chart": {

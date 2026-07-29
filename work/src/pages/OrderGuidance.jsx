@@ -7,7 +7,7 @@ export default function OrderGuidance() {
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(true);
-  const [filters, setFilters] = useState({ gender: "", q: "" });
+  const [filters, setFilters] = useState({ gender: "", key: "" });
 
   useEffect(() => {
     let cancelled = false;
@@ -28,12 +28,17 @@ export default function OrderGuidance() {
     };
   }, []);
 
+  const categoryOptions = useMemo(() => {
+    const list = data?.categories || [];
+    if (!filters.gender) return list;
+    return list.filter((c) => c.gender === filters.gender);
+  }, [data, filters.gender]);
+
   const items = useMemo(() => {
     const list = data?.categories || [];
-    const q = filters.q.trim().toLowerCase();
     return list.filter((c) => {
       if (filters.gender && c.gender !== filters.gender) return false;
-      if (q && !(c.name || "").toLowerCase().includes(q)) return false;
+      if (filters.key && c.key !== filters.key) return false;
       return true;
     });
   }, [data, filters]);
@@ -64,7 +69,19 @@ export default function OrderGuidance() {
           Пол
           <select
             value={filters.gender}
-            onChange={(e) => setFilters((p) => ({ ...p, gender: e.target.value }))}
+            onChange={(e) => {
+              const gender = e.target.value;
+              setFilters((p) => {
+                const next = { ...p, gender };
+                if (p.key) {
+                  const ok = (data?.categories || []).some(
+                    (c) => c.key === p.key && (!gender || c.gender === gender),
+                  );
+                  if (!ok) next.key = "";
+                }
+                return next;
+              });
+            }}
           >
             <option value="">Все</option>
             <option value="men">Мужской</option>
@@ -74,12 +91,17 @@ export default function OrderGuidance() {
         </label>
         <label>
           Категория
-          <input
-            type="search"
-            placeholder="Поиск…"
-            value={filters.q}
-            onChange={(e) => setFilters((p) => ({ ...p, q: e.target.value }))}
-          />
+          <select
+            value={filters.key}
+            onChange={(e) => setFilters((p) => ({ ...p, key: e.target.value }))}
+          >
+            <option value="">Все</option>
+            {categoryOptions.map((c) => (
+              <option key={c.key} value={c.key}>
+                {c.name}
+              </option>
+            ))}
+          </select>
         </label>
       </div>
 
@@ -159,7 +181,7 @@ function GuidanceCard({ cat }) {
           </tbody>
         </table>
       ) : (
-        <p className="guidance-card__nochart">Нет данных ВЛ2025/ВЛ2026 по размерам</p>
+        <p className="guidance-card__nochart">Нет данных по размерам</p>
       )}
 
       {labels.length ? (
