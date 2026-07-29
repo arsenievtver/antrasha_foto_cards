@@ -1,6 +1,6 @@
 """normalize procurement categories to canonical names
 
-Revision ID: 034_procurement_category_normalization
+Revision ID: 034_cat_norm
 Revises: 033_worker_admin_permissions
 Create Date: 2026-07-29
 
@@ -15,7 +15,7 @@ from typing import Sequence, Union
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "034_procurement_category_normalization"
+revision: str = "034_cat_norm"
 down_revision: Union[str, None] = "033_worker_admin_permissions"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
