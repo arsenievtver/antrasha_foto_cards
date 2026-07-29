@@ -300,9 +300,36 @@ def stock_ss_by_size(items: list[dict]) -> dict[str, dict]:
     return dict(by)
 
 
-def metrics_table(by_size_ss: dict[str, dict], items_sales: list[dict]):
-    """Per-size table: stock = same SS totals as comment (F+O);
-    sold = ВЛ2025+ВЛ2026 net sales; received = sold + stock.
+def stock_vl25_26_by_size(items: list[dict]) -> dict[str, int]:
+    """Current stock pcs of ВЛ2025+ВЛ2026 only, by size."""
+    by: dict[str, int] = defaultdict(int)
+    for it in items:
+        name = it.get("name") or ""
+        if not is_vl25_or_26(name):
+            continue
+        size = extract_size(name)
+        if not size:
+            continue
+        qty = int(
+            it.get("quantity")
+            if it.get("quantity") is not None
+            else (it.get("stock") or 0)
+        )
+        if qty > 0:
+            by[size] += qty
+    return dict(by)
+
+
+def metrics_table(
+    by_size_ss: dict[str, dict],
+    stock_vl25_26: dict[str, int],
+    items_sales: list[dict],
+):
+    """Table columns:
+    - sold_total: ВЛ2025+ВЛ2026 net sales
+    - stock_total: all SS stock (same F+O as comment)
+    - received_total: sold + stock of ВЛ2025+ВЛ2026 only
+      (two-season intake; may be << stock_total when old SS tails remain)
     """
     sold = defaultdict(int)
     for it in items_sales:
@@ -318,21 +345,24 @@ def metrics_table(by_size_ss: dict[str, dict], items_sales: list[dict]):
         if net > 0:
             sold[size] += net
 
-    sizes = sorted(set(by_size_ss) | set(sold), key=size_sort_key)
+    sizes = sorted(
+        set(by_size_ss) | set(sold) | set(stock_vl25_26), key=size_sort_key
+    )
     rows = []
     chart_labels = []
     chart_sold = []
     for size in sizes:
         s = sold[size]
-        st = int((by_size_ss.get(size) or {}).get("total") or 0)
-        if s <= 0 and st <= 0:
+        st_ss = int((by_size_ss.get(size) or {}).get("total") or 0)
+        st_two = int(stock_vl25_26.get(size) or 0)
+        if s <= 0 and st_ss <= 0 and st_two <= 0:
             continue
         rows.append(
             {
                 "size": size,
-                "received_total": s + st,
+                "received_total": s + st_two,
                 "sold_total": s,
-                "stock_total": st,
+                "stock_total": st_ss,
             }
         )
         if s > 0:
@@ -413,8 +443,11 @@ def main() -> None:
         stock = load_json(stock_path)
         sales = load_json(sales_path)
         by_size = stock_ss_by_size(stock.get("items") or [])
+        stock_two = stock_vl25_26_by_size(stock.get("items") or [])
         comment, reinforce, weaken = make_comment(by_size)
-        rows, labels, sold_qty = metrics_table(by_size, sales.get("items") or [])
+        rows, labels, sold_qty = metrics_table(
+            by_size, stock_two, sales.get("items") or []
+        )
         fresh = sum(v["fresh"] for v in by_size.values())
         old = sum(v["old"] for v in by_size.values())
         total = fresh + old
@@ -459,9 +492,10 @@ def main() -> None:
             "fresh_definition": "ВЛ2026 within SS stock",
             "old_definition": "other SS seasons (ВЛ2025 and older SS)",
             "table_rule": (
-                "stock_total = SS stock per size (same F+O as comment); "
                 "sold_total = ВЛ2025+ВЛ2026 net sales; "
-                "received_total = sold_total + stock_total"
+                "stock_total = all SS stock (same F+O as comment); "
+                "received_total = sold_total + stock of ВЛ2025+ВЛ2026 only "
+                "(two-season intake; may be less than stock_total if old SS tails)"
             ),
             "chart_rule": (
                 "per category; X = sizes ascending; "
@@ -483,7 +517,9 @@ def main() -> None:
         st = c["stock_totals"]
         assert st["total"] == st["fresh_vl26"] + st["old"]
         for row in c["size_summary_rows"]:
-            assert row["received_total"] == row["sold_total"] + row["stock_total"]
+            assert row["sold_total"] >= 0
+            assert row["stock_total"] >= 0
+            assert row["received_total"] >= row["sold_total"]
         print(
             f"\n=== {c['name']} €{c['order_amount_eur']} ===\n{c['comment']}\n"
             f"rows={len(c['size_summary_rows'])} chart={list(zip(c['size_sales_chart']['labels'], c['size_sales_chart']['sellQuantity']))[:8]}"
