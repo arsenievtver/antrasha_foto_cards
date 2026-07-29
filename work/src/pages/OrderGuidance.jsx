@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { fetchOrderGuidance } from "../api.js";
-import { dateRu, genderLabel } from "../utils/money.js";
+import { dateRu, eur } from "../utils/money.js";
 
 export default function OrderGuidance() {
   const [data, setData] = useState(null);
@@ -47,7 +47,8 @@ export default function OrderGuidance() {
     <div>
       <p className="sub" style={{ margin: "0 0 1rem" }}>
         {data?.meta?.as_of ? `Остатки на ${data.meta.as_of}` : " "}
-        {periodLabel ? ` · продажи ${periodLabel}` : ""}
+        {periodLabel ? ` · ВЛ2025+ВЛ2026 с ${periodLabel}` : ""}
+        {" · только весна-лето"}
       </p>
 
       <button
@@ -104,6 +105,7 @@ function GuidanceCard({ cat }) {
   const chart = cat.size_sales_chart || {};
   const labels = chart.labels || [];
   const values = chart.sellQuantity || [];
+  const rows = cat.size_summary_rows || [];
   const reinforce = new Set(cat.reinforce_sizes || []);
   const weaken = new Set(cat.weaken_sizes || []);
 
@@ -111,14 +113,13 @@ function GuidanceCard({ cat }) {
     <article className="guidance-card">
       <header className="guidance-card__head">
         <h2 className="guidance-card__title">{cat.name}</h2>
-        <span className="guidance-card__gender">{genderLabel(cat.gender)}</span>
+        <span className="guidance-card__amount">{eur(cat.order_amount_eur)}</span>
       </header>
 
       <p className="guidance-card__stock">
-        Остатки: {st.total ?? "—"} шт
-        {st.fresh_vl26 != null || st.old != null
-          ? ` · ВЛ2026 ${st.fresh_vl26 ?? 0} / старые ${st.old ?? 0}`
-          : ""}
+        {st.total != null
+          ? `Остатки: ${st.total} шт (${st.fresh_vl26 ?? 0};${st.old ?? 0}) ${st.fresh_vl26 ?? 0}-ВЛ2026; ${st.old ?? 0}-старые`
+          : "Остатки: —"}
       </p>
 
       {cat.reinforce_sizes?.length ? (
@@ -136,6 +137,31 @@ function GuidanceCard({ cat }) {
 
       {cat.comment ? <p className="guidance-card__comment">{cat.comment}</p> : null}
 
+      {rows.length ? (
+        <table className="guidance-table">
+          <thead>
+            <tr>
+              <th>Размер</th>
+              <th>Поступило</th>
+              <th>Продано</th>
+              <th>Остатки</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.size}>
+                <td>{row.size}</td>
+                <td>{row.received_total}</td>
+                <td>{row.sold_total}</td>
+                <td>{row.stock_total}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : (
+        <p className="guidance-card__nochart">Нет данных ВЛ2025/ВЛ2026 по размерам</p>
+      )}
+
       {labels.length ? (
         <SizeSalesChart
           labels={labels}
@@ -143,9 +169,7 @@ function GuidanceCard({ cat }) {
           reinforce={reinforce}
           weaken={weaken}
         />
-      ) : (
-        <p className="guidance-card__nochart">Нет продаж за период</p>
-      )}
+      ) : null}
     </article>
   );
 }
@@ -155,7 +179,7 @@ function SizeSalesChart({ labels, values, reinforce, weaken }) {
 
   return (
     <div className="size-chart" aria-label="Продажи по размерам">
-      <p className="size-chart__caption">Продажи по размерам (шт)</p>
+      <p className="size-chart__caption">Продано ВЛ2025+ВЛ2026 (шт)</p>
       <div className="size-chart__bars">
         {labels.map((label, i) => {
           const qty = Number(values[i]) || 0;

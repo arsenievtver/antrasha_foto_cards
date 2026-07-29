@@ -364,6 +364,14 @@ class OrderGuidanceSizeSalesChartOut(BaseModel):
     axis_y: str
     labels: list[str]
     sellQuantity: list[int]
+    seasons: list[str] = Field(default_factory=list)
+
+
+class OrderGuidanceSizeSummaryRowOut(BaseModel):
+    size: str
+    received_total: int
+    sold_total: int
+    stock_total: int
 
 
 class OrderGuidanceCategoryOut(BaseModel):
@@ -371,19 +379,25 @@ class OrderGuidanceCategoryOut(BaseModel):
     name: str
     gender: str
     moy_sklad_id: str | None = None
+    order_amount_eur: float
     comment: str
     reinforce_sizes: list[str] = Field(default_factory=list)
     weaken_sizes: list[str] = Field(default_factory=list)
     stock_totals: OrderGuidanceStockTotalsOut
+    size_summary_rows: list[OrderGuidanceSizeSummaryRowOut] = Field(default_factory=list)
     size_sales_chart: OrderGuidanceSizeSalesChartOut
 
 
 class OrderGuidanceMetaOut(BaseModel):
     as_of: str | None = None
     sales_period: OrderGuidancePeriodOut | None = None
+    scenario: str | None = None
     comment_format: str | None = None
     chart_rule: str | None = None
+    stock_rule: str | None = None
     fresh_definition: str | None = None
+    old_definition: str | None = None
+    table_rule: str | None = None
 
 
 class OrderGuidanceOut(BaseModel):

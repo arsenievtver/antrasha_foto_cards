@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Build buyer comments + ascending size sales charts per category."""
+"""Rebuild VL2027 order guidance: SS-only stock, VL25+VL26 table/chart, order EUR."""
 from __future__ import annotations
 
 import json
@@ -7,15 +7,19 @@ import re
 from collections import defaultdict
 from pathlib import Path
 
-RAW = Path(
-    "/Users/alekseiarsenev/WebstormProjects/antrasha_tinder/.tmp_ms/raw"
-)
-OUT = Path(
-    "/Users/alekseiarsenev/WebstormProjects/antrasha_tinder/"
-    ".tmp_ms/procurement_comments_vl2027_with_size_charts.json"
+RAW = Path(__file__).resolve().parent / "raw"
+OUT_TMP = Path(__file__).resolve().parent / "procurement_comments_vl2027_with_size_charts.json"
+OUT_BACKEND = (
+    Path(__file__).resolve().parents[1]
+    / "backend"
+    / "app"
+    / "data"
+    / "order_guidance_vl2027.json"
 )
 
 SEASON_TAG_RE = re.compile(r"(ВЛ|ОЗ)\s*20?(\d{2})", re.I)
+SS_TEXT_RE = re.compile(r"весна[\s\-–]*лето", re.I)
+AW_TEXT_RE = re.compile(r"осень[\s\-–]*зима", re.I)
 PAREN_RE = re.compile(r"\(([^)]+)\)")
 DATE_RE = re.compile(r"(?:^|/)(\d{2})\.(\d{2})(?:\b|$)")
 LETTER_ORDER = {
@@ -32,6 +36,7 @@ COLOR_WORDS = {
     "бежевый",
     "серый",
     "черный",
+    "чёрный",
     "белый",
     "синий",
     "голубой",
@@ -45,7 +50,6 @@ COLOR_WORDS = {
     "жёлтый",
     "оранжевый",
     "фиолетовый",
-    "бежевый",
     "хаки",
     "молочный",
     "кремовый",
@@ -53,8 +57,28 @@ COLOR_WORDS = {
     "оливковый",
     "терракотовый",
     "графит",
-    "белый",
-    "чёрный",
+}
+
+# Scenario B ~60k EUR from Excel sheet 5. Кат_B_60k
+# Pants = jeans + shorts; dresses = dresses + skirts
+ORDER_AMOUNT_EUR = {
+    "men_outerwear": 2480.8,
+    "men_jackets": 3581.6,
+    "men_tshirts": 5629.5,
+    "men_pants": 11230.5,  # 9622.9 + 1607.6
+    "men_knitwear": 1708.6,
+    "men_shirts": 2897.6,
+    "men_suits": 2418.2,
+    "men_shoes": 1288.8,
+    "women_outerwear": 1038.7,
+    "women_jackets": 3353.1,
+    "women_tshirts": 3125.1,
+    "women_blouses": 2596.9,
+    "women_knitwear": 2746.7,
+    "women_pants": 7951.1,  # 7429.1 + 522.0
+    "women_dresses": 3937.5,  # 2825.1 + 1112.4
+    "women_shoes": 519.9,
+    "accessories": 1223.2,
 }
 
 CATEGORIES = [
@@ -162,26 +186,9 @@ CATEGORIES = [
     },
 ]
 
-
-def parse_month_year(src: str):
-    m = DATE_RE.search(src or "")
-    if not m:
-        return None
-    return int(m.group(1)), int(m.group(2))
-
-
-def is_fresh_vl26(name: str, article: str) -> bool:
-    sm = SEASON_TAG_RE.search(name or "")
-    if not sm:
-        return False
-    season = sm.group(1).upper()
-    yy = int(sm.group(2))
-    if not (season == "ВЛ" and yy == 26):
-        return False
-    dt = parse_month_year(article or "")
-    if not dt:
-        return False
-    return dt[0] in (2, 3, 4, 5, 6, 7, 8)
+PERIOD_FROM = "2025-02-01"
+PERIOD_TO = "2026-07-29"
+AS_OF = "29.07.2026"
 
 
 def is_size_token(token: str) -> bool:
@@ -192,13 +199,11 @@ def is_size_token(token: str) -> bool:
         return False
     if SEASON_TAG_RE.fullmatch(t):
         return False
-    # reject season phrases / nested-paren debris like "осень-зима(2016"
     if re.search(r"весна|лето|осень|зима|притален|пуховик", t, re.I):
         return False
     if t.upper() in LETTER_ORDER:
         return True
-    # numeric sizes / jeans like 42, 42/34, 36/34, 46/48
-    return bool(re.fullmatch(r"\d{1,3}(?:/\d{1,3})?", t))
+    return bool(re.fullmatch(r"\d{1,3}(?:/\d{1,3})?|\d{2}-\d{2}|\d+(?:[.,]\d+)?", t))
 
 
 def size_sort_key(size: str):
@@ -213,27 +218,67 @@ def size_sort_key(size: str):
 
 
 def extract_size(name: str) -> str | None:
-    """Size = last size-like comma token inside (...); skip color/season tokens."""
     for m in reversed(list(PAREN_RE.finditer(name or ""))):
-        inner = m.group(1)
-        parts = [p.strip() for p in inner.split(",") if p.strip()]
+        parts = [p.strip() for p in m.group(1).split(",") if p.strip()]
         for token in reversed(parts):
             if is_size_token(token):
                 return token
     return None
 
 
-def load_raw(key: str, kind: str) -> dict:
-    path = RAW / f"{key}_{kind}.json"
+def season_kind(name: str) -> str | None:
+    """Return 'ss', 'aw', or None if unclassified."""
+    n = name or ""
+    if AW_TEXT_RE.search(n) or re.search(r"ОЗ\s*20?\d{2}", n, re.I):
+        return "aw"
+    if SS_TEXT_RE.search(n) or re.search(r"ВЛ\s*20?\d{2}", n, re.I):
+        return "ss"
+    return None
+
+
+def vl_year(name: str) -> int | None:
+    """Return 2-digit year for ВЛ season tag, else None."""
+    m = SEASON_TAG_RE.search(name or "")
+    if not m:
+        return None
+    if m.group(1).upper() != "ВЛ":
+        return None
+    return int(m.group(2))
+
+
+def is_ss_item(name: str) -> bool:
+    return season_kind(name) == "ss"
+
+
+def is_vl26(name: str) -> bool:
+    return vl_year(name) == 26
+
+
+def is_vl25_or_26(name: str) -> bool:
+    y = vl_year(name)
+    return y in (25, 26)
+
+
+def load_json(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def stock_by_size(items: list[dict]) -> dict[str, dict]:
+def pick_sales_path(key: str) -> Path:
+    preferred = RAW / f"{key}_sales_feb2025.json"
+    if preferred.is_file():
+        return preferred
+    return RAW / f"{key}_sales.json"
+
+
+def stock_ss_by_size(items: list[dict]) -> dict[str, dict]:
     by = defaultdict(lambda: {"fresh": 0, "old": 0, "total": 0})
     for it in items:
-        if it.get("type") != "variant":
-            continue
+        if it.get("type") not in (None, "variant", "product"):
+            # keep variants; products without size skipped later
+            pass
         name = it.get("name") or ""
+        if not is_ss_item(name):
+            continue
         size = extract_size(name)
         if not size:
             continue
@@ -244,19 +289,43 @@ def stock_by_size(items: list[dict]) -> dict[str, dict]:
         )
         if qty <= 0:
             continue
-        article = it.get("article") or it.get("code") or ""
-        if is_fresh_vl26(name, article):
+        if is_vl26(name):
             by[size]["fresh"] += qty
         else:
             by[size]["old"] += qty
         by[size]["total"] += qty
+    # enforce identity
+    for v in by.values():
+        v["total"] = v["fresh"] + v["old"]
     return dict(by)
 
 
-def sales_by_size(items: list[dict]) -> dict[str, int]:
-    by = defaultdict(int)
-    for it in items:
+def metrics_vl25_26(items_stock: list[dict], items_sales: list[dict]):
+    """Per-size received/sold/stock for ВЛ2025+ВЛ2026 only.
+
+    received = sold + stock so table rows reconcile.
+    """
+    stock = defaultdict(int)
+    for it in items_stock:
         name = it.get("name") or ""
+        if not is_vl25_or_26(name):
+            continue
+        size = extract_size(name)
+        if not size:
+            continue
+        qty = int(
+            it.get("quantity")
+            if it.get("quantity") is not None
+            else (it.get("stock") or 0)
+        )
+        if qty > 0:
+            stock[size] += qty
+
+    sold = defaultdict(int)
+    for it in items_sales:
+        name = it.get("name") or ""
+        if not is_vl25_or_26(name):
+            continue
         size = extract_size(name)
         if not size:
             continue
@@ -264,8 +333,27 @@ def sales_by_size(items: list[dict]) -> dict[str, int]:
         ret = int(it.get("returnQuantity") or 0)
         net = qty - ret
         if net > 0:
-            by[size] += net
-    return dict(by)
+            sold[size] += net
+
+    sizes = sorted(set(stock) | set(sold), key=size_sort_key)
+    rows = []
+    chart_labels = []
+    chart_sold = []
+    for size in sizes:
+        s = sold[size]
+        st = stock[size]
+        rows.append(
+            {
+                "size": size,
+                "received_total": s + st,
+                "sold_total": s,
+                "stock_total": st,
+            }
+        )
+        if s > 0:
+            chart_labels.append(size)
+            chart_sold.append(s)
+    return rows, chart_labels, chart_sold
 
 
 def make_comment(by_size: dict[str, dict]) -> tuple[str, list[str], list[str]]:
@@ -273,6 +361,7 @@ def make_comment(by_size: dict[str, dict]) -> tuple[str, list[str], list[str]]:
     total = sum(v["total"] for _, v in sizes)
     fresh = sum(v["fresh"] for _, v in sizes)
     old = sum(v["old"] for _, v in sizes)
+    assert total == fresh + old
 
     sizes_sorted = sorted(sizes, key=lambda x: (x[1]["fresh"], -x[1]["total"]))
     reinforce: list[str] = []
@@ -314,8 +403,7 @@ def make_comment(by_size: dict[str, dict]) -> tuple[str, list[str], list[str]]:
         ", ".join(fmt(s) for s in reinforce) if reinforce else "нет данных"
     )
     comment = (
-        f"Остатки на июль: всего {total} шт; ({fresh};{old}) {fresh} шт - ВЛ2026; "
-        f"{old} шт - старые. "
+        f"Остатки: {total} шт ({fresh};{old}) {fresh}-ВЛ2026; {old}-старые. "
         f"Усилить: {reinforce_txt}. "
         + (
             f"Ослабить: {', '.join(fmt(s) for s in weaken)}."
@@ -326,71 +414,97 @@ def make_comment(by_size: dict[str, dict]) -> tuple[str, list[str], list[str]]:
     return comment, reinforce, weaken
 
 
-def ascending_chart(sales: dict[str, int]) -> dict:
-    labels = sorted(sales.keys(), key=size_sort_key)
-    return {
-        "period": {"from": "2026-03-01", "to": "2026-07-29"},
-        "axis_x": "size_asc",
-        "axis_y": "sellQuantity_pcs",
-        "labels": labels,
-        "sellQuantity": [sales[s] for s in labels],
-    }
-
-
 def main() -> None:
     out_cats = []
     for cat in CATEGORIES:
-        stock = load_raw(cat["key"], "stock")
-        sales = load_raw(cat["key"], "sales")
-        by_size = stock_by_size(stock["items"])
-        sold = sales_by_size(sales["items"])
+        key = cat["key"]
+        stock_path = RAW / f"{key}_stock.json"
+        sales_path = pick_sales_path(key)
+        if not stock_path.is_file():
+            raise SystemExit(f"missing stock: {stock_path}")
+        if not sales_path.is_file():
+            raise SystemExit(f"missing sales: {sales_path}")
+
+        stock = load_json(stock_path)
+        sales = load_json(sales_path)
+        by_size = stock_ss_by_size(stock.get("items") or [])
         comment, reinforce, weaken = make_comment(by_size)
-        chart = ascending_chart(sold)
+        rows, labels, sold_qty = metrics_vl25_26(
+            stock.get("items") or [], sales.get("items") or []
+        )
+        fresh = sum(v["fresh"] for v in by_size.values())
+        old = sum(v["old"] for v in by_size.values())
+        total = fresh + old
+
         out_cats.append(
             {
-                "key": cat["key"],
+                "key": key,
                 "name": cat["name"],
                 "gender": cat["gender"],
                 "moy_sklad_id": cat["moy_sklad_id"],
+                "order_amount_eur": ORDER_AMOUNT_EUR[key],
                 "comment": comment,
                 "reinforce_sizes": reinforce,
                 "weaken_sizes": weaken,
                 "stock_totals": {
-                    "total": sum(v["total"] for v in by_size.values()),
-                    "fresh_vl26": sum(v["fresh"] for v in by_size.values()),
-                    "old": sum(v["old"] for v in by_size.values()),
+                    "total": total,
+                    "fresh_vl26": fresh,
+                    "old": old,
                 },
-                "size_sales_chart": chart,
+                "size_summary_rows": rows,
+                "size_sales_chart": {
+                    "period": {"from": PERIOD_FROM, "to": PERIOD_TO},
+                    "axis_x": "size_asc",
+                    "axis_y": "sellQuantity_pcs",
+                    "seasons": ["ВЛ2026", "ВЛ2025"],
+                    "labels": labels,
+                    "sellQuantity": sold_qty,
+                },
             }
         )
 
     payload = {
         "meta": {
-            "as_of": "29.07.2026",
-            "sales_period": {"from": "2026-03-01", "to": "2026-07-29"},
+            "as_of": AS_OF,
+            "sales_period": {"from": PERIOD_FROM, "to": PERIOD_TO},
+            "scenario": "B_60k",
             "comment_format": (
-                "Остатки на июль: всего N шт; (F;O) F шт - ВЛ2026; O шт - старые. "
+                "Остатки: N шт (F;O) F-ВЛ2026; O-старые. "
                 "Усилить: size (F;O)... Ослабить: size (F;O)..."
             ),
-            "chart_rule": (
-                "per category; X = sizes ascending (small→large); "
-                "Y = sold pcs Mar–now"
+            "stock_rule": "only spring-summer (ВЛ / весна-лето); exclude ОЗ / осень-зима",
+            "fresh_definition": "ВЛ2026 within SS stock",
+            "old_definition": "other SS seasons (ВЛ2025 and older SS)",
+            "table_rule": (
+                "sizes of ВЛ2025+ВЛ2026; "
+                "received_total = sold_total + stock_total "
+                "(collection throughput so rows reconcile)"
             ),
-            "fresh_definition": "ВЛ2026 + month in article Feb–Aug",
-            "raw_dir": str(RAW),
+            "chart_rule": (
+                "per category; X = sizes ascending; "
+                "Y = sold pcs of ВЛ2025+ВЛ2026 for Feb 2025–now"
+            ),
         },
         "categories": out_cats,
     }
-    OUT.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-    print("saved", OUT)
+
+    text = json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
+    OUT_TMP.write_text(text, encoding="utf-8")
+    OUT_BACKEND.parent.mkdir(parents=True, exist_ok=True)
+    OUT_BACKEND.write_text(text, encoding="utf-8")
+    print("saved", OUT_TMP)
+    print("saved", OUT_BACKEND)
     print("categories", len(out_cats))
-    for key in ("men_pants", "women_pants"):
+    for key in ("men_pants", "women_pants", "men_tshirts"):
         c = next(x for x in out_cats if x["key"] == key)
-        print("\n===", c["name"], "===")
-        print(c["comment"])
-        ch = c["size_sales_chart"]
-        pairs = list(zip(ch["labels"], ch["sellQuantity"]))
-        print("chart (size→qty):", ", ".join(f"{s}:{q}" for s, q in pairs))
+        st = c["stock_totals"]
+        assert st["total"] == st["fresh_vl26"] + st["old"]
+        for row in c["size_summary_rows"]:
+            assert row["received_total"] == row["sold_total"] + row["stock_total"]
+        print(
+            f"\n=== {c['name']} €{c['order_amount_eur']} ===\n{c['comment']}\n"
+            f"rows={len(c['size_summary_rows'])} chart={list(zip(c['size_sales_chart']['labels'], c['size_sales_chart']['sellQuantity']))[:8]}"
+        )
 
 
 if __name__ == "__main__":
