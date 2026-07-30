@@ -14,12 +14,15 @@ from app.deps import AdminPrincipal, get_admin_principal, require_permission, re
 from app.models import (
     PHOTO_SOURCE_YC_OBJECT_STORAGE,
     Brand,
+    BrandOrder,
     FeedSettings,
     FittingRequest,
     Interaction,
     MarketingCampaign,
+    Payment,
     Photo,
     PhotoTag,
+    Shipment,
     Tag,
     TagGroup,
     User,
@@ -42,6 +45,7 @@ from app.schemas.admin import (
     AdminPhotoTagOut,
     AdminPhotoTagsPutBody,
     AdminBrandCreateRequest,
+    AdminBrandUpdateRequest,
     FeedSettingsOut,
     FeedSettingsPatch,
     AdminFittingRequestListResponse,
@@ -1621,6 +1625,81 @@ def create_brand(
         ) from None
     db.refresh(b)
     return AdminBrandOut(id=b.id, name=b.name, created_at=b.created_at)
+
+
+@router.patch("/brands/{brand_id}", response_model=AdminBrandOut)
+def update_brand(
+    brand_id: uuid.UUID,
+    body: AdminBrandUpdateRequest,
+    db: Session = Depends(get_db),
+    _principal: AdminPrincipal = Depends(get_admin_principal),
+) -> AdminBrandOut:
+    _ = _principal
+    b = db.get(Brand, brand_id)
+    if not b:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Бренд не найден")
+    name = body.name.strip()
+    if not name:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Укажите название бренда",
+        )
+    if name != b.name:
+        b.name = name
+        db.execute(update(Photo).where(Photo.brand_id == brand_id).values(brand=name))
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Бренд с таким названием уже есть",
+            ) from None
+        db.refresh(b)
+    return AdminBrandOut(id=b.id, name=b.name, created_at=b.created_at)
+
+
+@router.delete("/brands/{brand_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_brand(
+    brand_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    _principal: AdminPrincipal = Depends(get_admin_principal),
+) -> Response:
+    _ = _principal
+    b = db.get(Brand, brand_id)
+    if not b:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Бренд не найден")
+    used = (
+        db.scalar(
+            select(func.count()).select_from(BrandOrder).where(BrandOrder.brand_id == brand_id)
+        )
+        or 0
+    )
+    used += (
+        db.scalar(select(func.count()).select_from(Payment).where(Payment.brand_id == brand_id))
+        or 0
+    )
+    used += (
+        db.scalar(select(func.count()).select_from(Shipment).where(Shipment.brand_id == brand_id))
+        or 0
+    )
+    if used:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Бренд используется в заказах, оплатах или поставках",
+        )
+    # brand_id на фото/ingest — ON DELETE SET NULL; денормализованный текст чистим сами.
+    db.execute(update(Photo).where(Photo.brand_id == brand_id).values(brand=None))
+    db.delete(b)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Бренд нельзя удалить: есть связанные записи",
+        ) from None
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/fitting-requests", response_model=AdminFittingRequestListResponse)

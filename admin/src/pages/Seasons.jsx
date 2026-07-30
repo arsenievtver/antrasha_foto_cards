@@ -9,6 +9,8 @@ export default function Seasons() {
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [editingId, setEditingId] = useState("");
+  const [edit, setEdit] = useState(EMPTY);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -31,6 +33,24 @@ export default function Seasons() {
     setForm((prev) => ({ ...prev, [field]: value }));
   }
 
+  function setEditField(field, value) {
+    setEdit((prev) => ({ ...prev, [field]: value }));
+  }
+
+  function startEdit(row) {
+    setEditingId(row.id);
+    setEdit({
+      name: row.name,
+      code: row.code,
+      sort_order: row.sort_order ?? 0,
+    });
+  }
+
+  function cancelEdit() {
+    setEditingId("");
+    setEdit(EMPTY);
+  }
+
   async function onCreate(e) {
     e.preventDefault();
     setBusy(true);
@@ -42,6 +62,31 @@ export default function Seasons() {
         sort_order: Number(form.sort_order) || 0,
       });
       setForm(EMPTY);
+      await reload();
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onSaveEdit() {
+    if (!editingId) return;
+    const name = edit.name.trim();
+    const code = edit.code.trim();
+    if (!name || !code) {
+      setErr("Название и код обязательны");
+      return;
+    }
+    setBusy(true);
+    setErr("");
+    try {
+      await updateSeason(editingId, {
+        name,
+        code,
+        sort_order: Number(edit.sort_order) || 0,
+      });
+      cancelEdit();
       await reload();
     } catch (e) {
       setErr(e.message);
@@ -65,6 +110,7 @@ export default function Seasons() {
     setErr("");
     try {
       await deleteSeason(row.id);
+      if (editingId === row.id) cancelEdit();
       await reload();
     } catch (e) {
       setErr(e.message);
@@ -131,33 +177,93 @@ export default function Seasons() {
               <tr>
                 <th>Название</th>
                 <th>Код</th>
+                <th>Порядок</th>
                 <th>Статус</th>
                 <th />
               </tr>
             </thead>
             <tbody>
-              {items.map((row) => (
-                <tr key={row.id}>
-                  <td>{row.name}</td>
-                  <td>
-                    <code>{row.code}</code>
-                  </td>
-                  <td>{row.is_active ? "Активен" : "Архив"}</td>
-                  <td>
-                    <button type="button" className="secondary" onClick={() => onToggle(row)}>
-                      {row.is_active ? "В архив" : "Вернуть"}
-                    </button>
-                    <button
-                      type="button"
-                      className="secondary"
-                      style={{ marginLeft: "0.4rem" }}
-                      onClick={() => onDelete(row)}
-                    >
-                      Удалить
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {items.map((row) => {
+                const isEditing = editingId === row.id;
+                return (
+                  <tr key={row.id}>
+                    <td>
+                      {isEditing ? (
+                        <input
+                          value={edit.name}
+                          onChange={(e) => setEditField("name", e.target.value)}
+                          maxLength={120}
+                          autoFocus
+                        />
+                      ) : (
+                        row.name
+                      )}
+                    </td>
+                    <td>
+                      {isEditing ? (
+                        <input
+                          value={edit.code}
+                          onChange={(e) => setEditField("code", e.target.value)}
+                          maxLength={32}
+                        />
+                      ) : (
+                        <code>{row.code}</code>
+                      )}
+                    </td>
+                    <td>
+                      {isEditing ? (
+                        <input
+                          type="number"
+                          value={edit.sort_order}
+                          onChange={(e) => setEditField("sort_order", e.target.value)}
+                          style={{ width: 80 }}
+                        />
+                      ) : (
+                        row.sort_order
+                      )}
+                    </td>
+                    <td>{row.is_active ? "Активен" : "Архив"}</td>
+                    <td>
+                      <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
+                        {isEditing ? (
+                          <>
+                            <button type="button" onClick={onSaveEdit} disabled={busy}>
+                              Сохранить
+                            </button>
+                            <button type="button" className="secondary" onClick={cancelEdit}>
+                              Отмена
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              className="secondary"
+                              onClick={() => startEdit(row)}
+                            >
+                              Изменить
+                            </button>
+                            <button
+                              type="button"
+                              className="secondary"
+                              onClick={() => onToggle(row)}
+                            >
+                              {row.is_active ? "В архив" : "Вернуть"}
+                            </button>
+                            <button
+                              type="button"
+                              className="secondary"
+                              onClick={() => onDelete(row)}
+                            >
+                              Удалить
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}

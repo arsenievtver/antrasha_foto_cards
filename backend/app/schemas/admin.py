@@ -76,6 +76,10 @@ class AdminBrandCreateRequest(BaseModel):
     name: str = Field(min_length=1, max_length=200)
 
 
+class AdminBrandUpdateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+
+
 class AdminFittingRequestOut(BaseModel):
     id: uuid.UUID
     user_id: uuid.UUID | None = None

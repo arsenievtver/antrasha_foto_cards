@@ -636,6 +636,27 @@ export async function createBrand(name) {
   return data;
 }
 
+export async function updateBrand(brandId, name) {
+  const res = await fetch(apiUrl(`/admin/brands/${brandId}`), {
+    method: "PATCH",
+    headers: headersJson(),
+    body: JSON.stringify({ name }),
+  });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
+export async function deleteBrand(brandId) {
+  const res = await fetch(apiUrl(`/admin/brands/${brandId}`), {
+    method: "DELETE",
+    headers: headersJson(),
+  });
+  if (res.status === 204) return;
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+}
+
 export async function fetchFittingRequests({ skip = 0, limit = 50 } = {}) {
   const q = new URLSearchParams({ skip: String(skip), limit: String(limit) });
   const res = await fetch(`${apiUrl("/admin/fitting-requests")}?${q}`, { headers: headersJson() });

@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   createBrand,
+  deleteBrand,
   fetchBrandProcurementStats,
   fetchBrandStats,
   fetchBrands,
   fetchSeasons,
+  updateBrand,
 } from "../api.js";
 import { balanceStyle, dateRu, eur, genderLabel, kg } from "../utils/money.js";
 
@@ -152,6 +154,8 @@ export default function Brands() {
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [editingId, setEditingId] = useState("");
+  const [editingName, setEditingName] = useState("");
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -194,6 +198,43 @@ export default function Brands() {
       setErr(e.message);
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function onSaveEdit() {
+    if (!editingId) return;
+    const next = editingName.trim();
+    if (!next) {
+      setErr("Название бренда не может быть пустым");
+      return;
+    }
+    setBusy(true);
+    setErr("");
+    try {
+      await updateBrand(editingId, next);
+      setEditingId("");
+      setEditingName("");
+      await reload();
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onDelete(b) {
+    if (!window.confirm(`Удалить бренд «${b.name}»?`)) return;
+    setErr("");
+    try {
+      await deleteBrand(b.id);
+      if (editingId === b.id) {
+        setEditingId("");
+        setEditingName("");
+      }
+      if (selected === b.id) setSelected("");
+      await reload();
+    } catch (e) {
+      setErr(e.message);
     }
   }
 
@@ -274,9 +315,21 @@ export default function Brands() {
             <tbody>
               {brands.map((b) => {
                 const s = statsByBrand[b.id];
+                const isEditing = editingId === b.id;
                 return (
                   <tr key={b.id}>
-                    <td>{b.name}</td>
+                    <td>
+                      {isEditing ? (
+                        <input
+                          value={editingName}
+                          onChange={(e) => setEditingName(e.target.value)}
+                          maxLength={200}
+                          autoFocus
+                        />
+                      ) : (
+                        b.name
+                      )}
+                    </td>
                     <td>{s?.orders_count ?? 0}</td>
                     <td>{eur(s?.orders_eur)}</td>
                     <td>{eur(s?.paid_eur)}</td>
@@ -288,13 +341,52 @@ export default function Brands() {
                       {eur(s?.balance_to_ship_eur)}
                     </td>
                     <td>
-                      <button
-                        type="button"
-                        className="secondary"
-                        onClick={() => setSelected(b.id)}
-                      >
-                        Статистика
-                      </button>
+                      <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
+                        {isEditing ? (
+                          <>
+                            <button type="button" onClick={onSaveEdit} disabled={busy}>
+                              Сохранить
+                            </button>
+                            <button
+                              type="button"
+                              className="secondary"
+                              onClick={() => {
+                                setEditingId("");
+                                setEditingName("");
+                              }}
+                            >
+                              Отмена
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              className="secondary"
+                              onClick={() => {
+                                setEditingId(b.id);
+                                setEditingName(b.name);
+                              }}
+                            >
+                              Изменить
+                            </button>
+                            <button
+                              type="button"
+                              className="secondary"
+                              onClick={() => setSelected(b.id)}
+                            >
+                              Статистика
+                            </button>
+                            <button
+                              type="button"
+                              className="secondary"
+                              onClick={() => onDelete(b)}
+                            >
+                              Удалить
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );
