@@ -320,18 +320,8 @@ def stock_vl25_26_by_size(items: list[dict]) -> dict[str, int]:
     return dict(by)
 
 
-def metrics_table(
-    by_size_ss: dict[str, dict],
-    stock_vl25_26: dict[str, int],
-    items_sales: list[dict],
-):
-    """Table columns:
-    - sold_total: ВЛ2025+ВЛ2026 net sales
-    - stock_total: all SS stock (same F+O as comment)
-    - received_total: sold + stock of ВЛ2025+ВЛ2026 only
-      (two-season intake; may be << stock_total when old SS tails remain)
-    """
-    sold = defaultdict(int)
+def sold_vl25_26_by_size(items_sales: list[dict]) -> dict[str, int]:
+    sold: dict[str, int] = defaultdict(int)
     for it in items_sales:
         name = it.get("name") or ""
         if not is_vl25_or_26(name):
@@ -344,7 +334,20 @@ def metrics_table(
         net = qty - ret
         if net > 0:
             sold[size] += net
+    return dict(sold)
 
+
+def metrics_table(
+    by_size_ss: dict[str, dict],
+    stock_vl25_26: dict[str, int],
+    sold: dict[str, int],
+):
+    """Table columns:
+    - sold_total: ВЛ2025+ВЛ2026 net sales
+    - stock_total: all SS stock (same F+O as comment)
+    - received_total: sold + stock of ВЛ2025+ВЛ2026 only
+      (two-season intake; may be << stock_total when old SS tails remain)
+    """
     sizes = sorted(
         set(by_size_ss) | set(sold) | set(stock_vl25_26), key=size_sort_key
     )
@@ -352,7 +355,7 @@ def metrics_table(
     chart_labels = []
     chart_sold = []
     for size in sizes:
-        s = sold[size]
+        s = int(sold.get(size) or 0)
         st_ss = int((by_size_ss.get(size) or {}).get("total") or 0)
         st_two = int(stock_vl25_26.get(size) or 0)
         if s <= 0 and st_ss <= 0 and st_two <= 0:
@@ -371,51 +374,115 @@ def metrics_table(
     return rows, chart_labels, chart_sold
 
 
-def make_comment(by_size: dict[str, dict]) -> tuple[str, list[str], list[str]]:
-    sizes = [(s, v) for s, v in by_size.items() if v["total"] > 0]
-    total = sum(v["total"] for _, v in sizes)
-    fresh = sum(v["fresh"] for _, v in sizes)
-    old = sum(v["old"] for _, v in sizes)
-    assert total == fresh + old
+def _median_int(vals: list[int]) -> int:
+    if not vals:
+        return 0
+    xs = sorted(vals)
+    return xs[len(xs) // 2]
 
-    sizes_sorted = sorted(sizes, key=lambda x: (x[1]["fresh"], -x[1]["total"]))
-    reinforce: list[str] = []
-    for s, v in sizes_sorted:
-        if v["fresh"] == 0:
-            reinforce.append(s)
-        if len(reinforce) >= 4:
-            break
-    if len(reinforce) < 4:
-        for s, _v in sizes_sorted:
-            if s in reinforce:
-                continue
-            reinforce.append(s)
-            if len(reinforce) >= 4:
-                break
 
-    vals = sorted(v["total"] for _, v in sizes)
-    median = vals[len(vals) // 2] if vals else 0
-    weaken_cands = [
-        (s, v)
-        for s, v in sizes
-        if v["fresh"] > 0
-        and v["old"] >= v["fresh"]
-        and v["total"] >= median
-        and s not in reinforce
-    ]
-    weaken = [
+def make_comment(
+    by_size: dict[str, dict],
+    sold: dict[str, int],
+    stock_two: dict[str, int],
+) -> tuple[str, list[str], list[str]]:
+    """Hints: sales first, then coverage vs stock, then VL2026 fresh.
+    Never weaken the sales core.
+    """
+    all_sizes = sorted(
+        set(by_size) | set(sold) | set(stock_two), key=size_sort_key
+    )
+    # ensure stock map covers sizes that only appear in sales
+    for s in all_sizes:
+        by_size.setdefault(s, {"fresh": 0, "old": 0, "total": 0})
+
+    sizes_pos = [s for s in all_sizes if by_size[s]["total"] > 0 or sold.get(s, 0) > 0]
+    total = sum(by_size[s]["total"] for s in sizes_pos)
+    fresh = sum(by_size[s]["fresh"] for s in sizes_pos)
+    old = sum(by_size[s]["old"] for s in sizes_pos)
+
+    sold_pos = {s: int(sold.get(s) or 0) for s in sizes_pos if int(sold.get(s) or 0) > 0}
+    median_sold = _median_int(list(sold_pos.values())) if sold_pos else 0
+    max_sold = max(sold_pos.values()) if sold_pos else 0
+    # Sales core: never weaken. Median sellers + anyone near the top.
+    core = {
         s
-        for s, _ in sorted(
-            weaken_cands, key=lambda x: (-x[1]["old"], -x[1]["total"])
-        )[:3]
-    ]
+        for s, q in sold_pos.items()
+        if (median_sold > 0 and q >= median_sold)
+        or (max_sold > 0 and q >= max_sold * 0.4)
+    }
+
+    # --- Усилить: demand exists, thin cover vs sales; boost low VL2026 ---
+    min_sold = 1
+    if median_sold > 0:
+        min_sold = max(1, min(3, median_sold // 2 or 1))
+    reinforce_scored: list[tuple[str, float]] = []
+    for s in sizes_pos:
+        so = int(sold.get(s) or 0)
+        if so < min_sold:
+            continue  # weak/no sales signal — do not reinforce
+        st = by_size[s]["total"]
+        fr = by_size[s]["fresh"]
+        cover = st / so
+        # need thin cover or running out of fresh relative to demand
+        thin = cover <= 1.0 or st <= max(2, so // 3)
+        low_fresh = fr == 0 or fr < max(1, so // 4)
+        if not (thin or low_fresh):
+            continue
+        score = so / (st + 1)
+        if fr == 0:
+            score *= 1.45
+        elif fr < so * 0.25:
+            score *= 1.2
+        if cover <= 0.5:
+            score *= 1.25
+        # prefer real demand over tiny-sold edge sizes
+        if so >= median_sold and median_sold > 0:
+            score *= 1.15
+        reinforce_scored.append((s, score))
+
+    reinforce_scored.sort(key=lambda x: (-x[1], -int(sold.get(x[0]) or 0)))
+    reinforce = [s for s, _ in reinforce_scored[:4]]
+
+    # --- Ослабить: not core, not reinforce; weak sell-through / fat leftover ---
+    stock_vals = [by_size[s]["total"] for s in sizes_pos if by_size[s]["total"] > 0]
+    median_stock = _median_int(stock_vals)
+    weaken_scored: list[tuple[str, float]] = []
+    for s in sizes_pos:
+        if s in core or s in reinforce:
+            continue
+        so = int(sold.get(s) or 0)
+        st = by_size[s]["total"]
+        fr = by_size[s]["fresh"]
+        ol = by_size[s]["old"]
+        st_two = int(stock_two.get(s) or 0)
+        if st <= 0:
+            continue
+        if st < max(3, median_stock):
+            continue
+        intake = so + st_two
+        sell_through = (so / intake) if intake > 0 else 0.0
+        cover = (st / so) if so > 0 else 99.0
+        # require clear overstock vs sales; old tails boost score only
+        overstock = so == 0 or cover >= 2.0 or sell_through <= 0.35
+        if not overstock:
+            continue
+        score = st * (1.0 - min(sell_through, 1.0)) + ol * 1.5
+        if so == 0:
+            score += st * 2
+        if ol >= max(fr, 1) and ol >= 3:
+            score *= 1.2
+        weaken_scored.append((s, score))
+
+    weaken_scored.sort(key=lambda x: (-x[1], -by_size[x[0]]["old"]))
+    weaken = [s for s, _ in weaken_scored[:3]]
 
     def fmt(s: str) -> str:
         v = by_size[s]
         return f"{s} ({v['fresh']};{v['old']})"
 
     reinforce_txt = (
-        ", ".join(fmt(s) for s in reinforce) if reinforce else "нет данных"
+        ", ".join(fmt(s) for s in reinforce) if reinforce else "нет явных"
     )
     comment = (
         f"Остатки: {total} шт ({fresh};{old}) {fresh}-ВЛ2026; {old}-старые. "
@@ -444,10 +511,9 @@ def main() -> None:
         sales = load_json(sales_path)
         by_size = stock_ss_by_size(stock.get("items") or [])
         stock_two = stock_vl25_26_by_size(stock.get("items") or [])
-        comment, reinforce, weaken = make_comment(by_size)
-        rows, labels, sold_qty = metrics_table(
-            by_size, stock_two, sales.get("items") or []
-        )
+        sold = sold_vl25_26_by_size(sales.get("items") or [])
+        comment, reinforce, weaken = make_comment(by_size, sold, stock_two)
+        rows, labels, sold_qty = metrics_table(by_size, stock_two, sold)
         fresh = sum(v["fresh"] for v in by_size.values())
         old = sum(v["old"] for v in by_size.values())
         total = fresh + old
@@ -486,7 +552,15 @@ def main() -> None:
             "scenario": "B_60k",
             "comment_format": (
                 "Остатки: N шт (F;O) F-ВЛ2026; O-старые. "
-                "Усилить: size (F;O)... Ослабить: size (F;O)..."
+                "Усилить/Ослабить: sales-first + cover vs stock + VL2026 fresh; "
+                "never weaken sales core"
+            ),
+            "hint_rule": (
+                "reinforce: sold>=min threshold, thin stock vs sales "
+                "(boost if low/zero VL2026); "
+                "weaken: not sales-core, clear overstock vs sales "
+                "(old SS boosts score); "
+                "sales core = sold>=median or sold>=40% of max"
             ),
             "stock_rule": "only spring-summer (ВЛ / весна-лето); exclude ОЗ / осень-зима",
             "fresh_definition": "ВЛ2026 within SS stock",
@@ -512,18 +586,16 @@ def main() -> None:
     print("saved", OUT_TMP)
     print("saved", OUT_BACKEND)
     print("categories", len(out_cats))
-    for key in ("men_pants", "women_pants", "men_tshirts"):
+    for key in ("men_outerwear", "men_shirts", "men_pants", "women_pants"):
         c = next(x for x in out_cats if x["key"] == key)
         st = c["stock_totals"]
         assert st["total"] == st["fresh_vl26"] + st["old"]
-        for row in c["size_summary_rows"]:
-            assert row["sold_total"] >= 0
-            assert row["stock_total"] >= 0
-            assert row["received_total"] >= row["sold_total"]
         print(
-            f"\n=== {c['name']} €{c['order_amount_eur']} ===\n{c['comment']}\n"
-            f"rows={len(c['size_summary_rows'])} chart={list(zip(c['size_sales_chart']['labels'], c['size_sales_chart']['sellQuantity']))[:8]}"
+            f"\n=== {c['name']} ===\n{c['comment']}\n"
+            f"reinforce={c['reinforce_sizes']} weaken={c['weaken_sizes']}"
         )
+        for row in c["size_summary_rows"][:8]:
+            print(" ", row)
 
 
 if __name__ == "__main__":

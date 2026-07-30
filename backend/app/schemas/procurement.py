@@ -395,6 +395,7 @@ class OrderGuidanceMetaOut(BaseModel):
     comment_format: str | None = None
     chart_rule: str | None = None
     stock_rule: str | None = None
+    hint_rule: str | None = None
     fresh_definition: str | None = None
     old_definition: str | None = None
     table_rule: str | None = None
