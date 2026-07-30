@@ -17,6 +17,7 @@ const EMPTY_FORM = {
   gender: "",
   ordered_on: today(),
   eur_rub_rate: "",
+  amount_eur: "",
   has_prepayment: false,
   prepayment_amount_eur: "",
   prepayment_due_on: "",
@@ -98,13 +99,14 @@ export default function BrandOrders() {
   }
 
   const filledLines = lines.filter((ln) => ln.category_id && num(ln.amount_eur) > 0);
+  const orderAmount = filledLines.length > 0 ? linesTotal : num(form.amount_eur);
 
   async function onCreate(e) {
     e.preventDefault();
     setBusy(true);
     setErr("");
     try {
-      await createBrandOrder({
+      const payload = {
         season_id: form.season_id,
         brand_id: form.brand_id,
         gender: form.gender || null,
@@ -121,7 +123,11 @@ export default function BrandOrders() {
           amount_eur: ln.amount_eur,
           comment: ln.comment.trim() || null,
         })),
-      });
+      };
+      if (!filledLines.length) {
+        payload.amount_eur = form.amount_eur;
+      }
+      await createBrandOrder(payload);
       resetForm();
       setShowForm(false);
       await reload();
@@ -143,13 +149,15 @@ export default function BrandOrders() {
     }
   }
 
-  const canSubmit = form.season_id && form.brand_id && filledLines.length > 0;
+  const canSubmit =
+    form.season_id && form.brand_id && (filledLines.length > 0 || num(form.amount_eur) > 0);
 
   return (
     <div>
       <h2 style={{ marginTop: 0 }}>Заказы брендам</h2>
       <p style={{ color: "var(--muted)", maxWidth: 760 }}>
-        Сумма заказа считается как сумма строк по категориям. Предоплата здесь — план:
+        Сумма заказа считается как сумма строк по категориям. Можно сохранить и без
+        категорий — только общую сумму (архив / исключения). Предоплата здесь — план:
         сколько и к какому сроку должны. Фактические платежи заводятся в разделе
         «Оплаты».
       </p>
@@ -283,6 +291,11 @@ export default function BrandOrders() {
               <legend style={{ padding: "0 0.4rem", fontSize: "0.85rem" }}>
                 Разбивка по категориям
               </legend>
+              {lines.length === 0 ? (
+                <p className="field-hint">
+                  Категории не выбраны — укажите общую сумму заказа ниже.
+                </p>
+              ) : null}
               {lines.map((ln) => (
                 <div
                   key={ln.key}
@@ -329,7 +342,6 @@ export default function BrandOrders() {
                   <button
                     type="button"
                     className="secondary"
-                    disabled={lines.length === 1}
                     onClick={() =>
                       setLines((prev) => prev.filter((x) => x.key !== ln.key))
                     }
@@ -345,13 +357,35 @@ export default function BrandOrders() {
               >
                 + Категория
               </button>
-              <p className="field-hint" style={{ marginBottom: 0 }}>
-                Сумма заказа: <strong>{eur(linesTotal)}</strong>
-                {form.eur_rub_rate
-                  ? ` ≈ ${rub(linesTotal * num(form.eur_rub_rate))}`
-                  : ""}
-              </p>
+              {filledLines.length > 0 ? (
+                <p className="field-hint" style={{ marginBottom: 0 }}>
+                  Сумма заказа: <strong>{eur(linesTotal)}</strong>
+                  {form.eur_rub_rate
+                    ? ` ≈ ${rub(linesTotal * num(form.eur_rub_rate))}`
+                    : ""}
+                </p>
+              ) : null}
             </fieldset>
+
+            {filledLines.length === 0 ? (
+              <label style={{ maxWidth: 240 }}>
+                Сумма заказа, €
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={form.amount_eur}
+                  onChange={(e) => set("amount_eur", e.target.value)}
+                  required
+                />
+                <span className="field-hint">
+                  Можно сохранить без категорий — только общую сумму (архив / исключения).
+                  {form.eur_rub_rate && num(form.amount_eur) > 0
+                    ? ` ≈ ${rub(orderAmount * num(form.eur_rub_rate))}`
+                    : ""}
+                </span>
+              </label>
+            ) : null}
 
             <label style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
               <input
@@ -401,7 +435,7 @@ export default function BrandOrders() {
             </button>
             {!canSubmit ? (
               <span className="field-hint">
-                Нужны сезон, бренд и хотя бы одна категория с суммой больше нуля.
+                Нужны сезон, бренд и либо категории с суммами, либо общая сумма заказа.
               </span>
             ) : null}
           </form>

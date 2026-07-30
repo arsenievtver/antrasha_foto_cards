@@ -23,6 +23,7 @@ export default function OrderEdit() {
     brand_id: "",
     gender: "",
     ordered_on: "",
+    amount_eur: "",
     has_prepayment: false,
     prepayment_amount_eur: "",
     prepayment_due_on: "",
@@ -44,6 +45,7 @@ export default function OrderEdit() {
           brand_id: row.brand_id || "",
           gender: row.gender || "",
           ordered_on: row.ordered_on || "",
+          amount_eur: row.lines?.length ? "" : row.amount_eur || "",
           has_prepayment: Boolean(row.has_prepayment),
           prepayment_amount_eur: row.prepayment_amount_eur || "",
           prepayment_due_on: row.prepayment_due_on || "",
@@ -52,7 +54,7 @@ export default function OrderEdit() {
         setLines(
           row.lines?.length
             ? row.lines.map((ln) => newLine(ln, row.gender || ""))
-            : [newLine()],
+            : [],
         );
       })
       .catch((e) => setErr(e.message))
@@ -87,7 +89,7 @@ export default function OrderEdit() {
     setBusy(true);
     setErr("");
     try {
-      const row = await updateBrandOrder(id, {
+      const payload = {
         season_id: form.season_id,
         brand_id: form.brand_id,
         gender: form.gender || null,
@@ -101,7 +103,11 @@ export default function OrderEdit() {
           amount_eur: ln.amount_eur,
           comment: ln.comment.trim() || null,
         })),
-      });
+      };
+      if (!filledLines.length) {
+        payload.amount_eur = form.amount_eur;
+      }
+      const row = await updateBrandOrder(id, payload);
       nav(`/orders/${row.id}`, { replace: true });
     } catch (ex) {
       setErr(ex.message);
@@ -112,7 +118,8 @@ export default function OrderEdit() {
 
   if (loading) return <p className="loading">Загрузка…</p>;
 
-  const canSubmit = form.season_id && form.brand_id && filledLines.length > 0;
+  const canSubmit =
+    form.season_id && form.brand_id && (filledLines.length > 0 || num(form.amount_eur) > 0);
   const brands = refs?.brands || [];
 
   return (
@@ -169,6 +176,11 @@ export default function OrderEdit() {
         <p className="section-title" style={{ marginTop: 0 }}>
           Категории
         </p>
+        {lines.length === 0 ? (
+          <p className="field-hint">
+            Категории не выбраны — укажите общую сумму заказа ниже.
+          </p>
+        ) : null}
         {lines.map((ln) => (
           <div key={ln.key} className="line-card">
             <label>
@@ -206,7 +218,6 @@ export default function OrderEdit() {
             <button
               type="button"
               className="secondary"
-              disabled={lines.length === 1}
               onClick={() => setLines((prev) => prev.filter((x) => x.key !== ln.key))}
             >
               Убрать
@@ -220,9 +231,27 @@ export default function OrderEdit() {
         >
           + Категория
         </button>
-        <p className="field-hint">
-          Сумма заказа: <strong>{eur(linesTotal)}</strong>
-        </p>
+        {filledLines.length > 0 ? (
+          <p className="field-hint">
+            Сумма заказа: <strong>{eur(linesTotal)}</strong>
+          </p>
+        ) : (
+          <label>
+            Сумма заказа, €
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              inputMode="decimal"
+              value={form.amount_eur}
+              onChange={(e) => set("amount_eur", e.target.value)}
+              required
+            />
+            <span className="field-hint">
+              Можно сохранить без категорий — только общую сумму (архив / исключения).
+            </span>
+          </label>
+        )}
 
         <label className="check-row">
           <input
@@ -266,6 +295,11 @@ export default function OrderEdit() {
         <button type="submit" disabled={busy || !canSubmit}>
           {busy ? "Сохранение…" : "Сохранить изменения"}
         </button>
+        {!canSubmit ? (
+          <span className="field-hint">
+            Нужны сезон, бренд и либо категории с суммами, либо общая сумма заказа.
+          </span>
+        ) : null}
       </form>
     </div>
   );

@@ -709,6 +709,11 @@ def create_brand_order(
         amount = _money(sum((ln.amount_eur for ln in body.lines), ZERO))
     else:
         amount = _money(body.amount_eur)
+        if amount <= ZERO:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Укажите сумму заказа или хотя бы одну категорию",
+            )
     _validate_prepayment(body.has_prepayment, body.prepayment_amount_eur, amount)
 
     order = BrandOrder(
@@ -774,7 +779,16 @@ def update_brand_order(
                     comment=ln.comment.strip() if ln.comment else None,
                 )
             )
-        order.amount_eur = _money(sum((ln.amount_eur for ln in body.lines), ZERO))
+        if body.lines:
+            order.amount_eur = _money(sum((ln.amount_eur for ln in body.lines), ZERO))
+        else:
+            # Пустые строки — заказ без категорий: сумма только из amount_eur.
+            if body.amount_eur is None or _money(body.amount_eur) <= ZERO:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Укажите сумму заказа или хотя бы одну категорию",
+                )
+            order.amount_eur = _money(body.amount_eur)
     elif body.amount_eur is not None:
         order.amount_eur = _money(body.amount_eur)
 
