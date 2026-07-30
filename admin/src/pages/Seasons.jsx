@@ -105,6 +105,17 @@ export default function Seasons() {
     }
   }
 
+  async function onSetPrimary(row) {
+    if (row.is_primary) return;
+    setErr("");
+    try {
+      await updateSeason(row.id, { is_primary: true });
+      await reload();
+    } catch (e) {
+      setErr(e.message);
+    }
+  }
+
   async function onDelete(row) {
     if (!window.confirm(`Удалить сезон «${row.name}»?`)) return;
     setErr("");
@@ -123,6 +134,7 @@ export default function Seasons() {
       <p style={{ color: "var(--muted)", maxWidth: 720 }}>
         Сезон закупки — ярлык, к которому привязываются заказы, оплаты и поставки.
         Код нужен для коротких подписей в отчётах, например <code>ВЛ2027</code>.
+        Основной сезон показывается на дашборде в PWA.
       </p>
 
       {err ? <p className="error">{err}</p> : null}
@@ -175,6 +187,7 @@ export default function Seasons() {
           <table>
             <thead>
               <tr>
+                <th>PWA</th>
                 <th>Название</th>
                 <th>Код</th>
                 <th>Порядок</th>
@@ -187,6 +200,27 @@ export default function Seasons() {
                 const isEditing = editingId === row.id;
                 return (
                   <tr key={row.id}>
+                    <td>
+                      <label
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "0.35rem",
+                          cursor: "pointer",
+                          whiteSpace: "nowrap",
+                        }}
+                        title="Основной сезон для дашборда PWA"
+                      >
+                        <input
+                          type="radio"
+                          name="primary-season"
+                          checked={Boolean(row.is_primary)}
+                          onChange={() => onSetPrimary(row)}
+                          disabled={busy}
+                        />
+                        {row.is_primary ? "Основной" : ""}
+                      </label>
+                    </td>
                     <td>
                       {isEditing ? (
                         <input

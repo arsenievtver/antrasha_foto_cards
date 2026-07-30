@@ -2,10 +2,11 @@ import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { clearSession } from "../api.js";
 
 const TABS = [
+  { to: "/dashboard", label: "Дашборд", ico: "▣" },
   { to: "/for-order", label: "Для заказа", ico: "▤" },
   { to: "/orders", label: "Заказы", ico: "◇" },
   { to: "/payments", label: "Оплаты", ico: "◎" },
-  { to: "/shipments", label: "Поставки", ico: "▣" },
+  { to: "/shipments", label: "Поставки", ico: "▢" },
 ];
 
 export default function Shell() {
@@ -56,6 +57,7 @@ export default function Shell() {
 }
 
 function getPageMeta(pathname) {
+  if (pathname === "/dashboard") return { title: "Дашборд" };
   if (pathname === "/orders") return { title: "Заказы", addTo: "/orders/new", addLabel: "Добавить заказ" };
   if (pathname === "/for-order") return { title: "Для заказа" };
   if (pathname === "/payments") return { title: "Оплаты", addTo: "/payments/new", addLabel: "Добавить оплату" };

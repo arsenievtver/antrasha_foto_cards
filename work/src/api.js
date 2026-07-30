@@ -162,6 +162,12 @@ export function fetchOrderGuidance() {
   return request("/admin/procurement/order-guidance");
 }
 
+export function fetchSeasonDashboard(seasonId) {
+  return request("/admin/procurement/season-dashboard", {
+    query: seasonId ? { season_id: seasonId } : undefined,
+  });
+}
+
 export function createBrand(name) {
   return request("/admin/brands", { method: "POST", body: { name } });
 }

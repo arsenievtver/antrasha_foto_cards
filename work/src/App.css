@@ -152,7 +152,7 @@ label {
   height: calc(var(--nav-h) + var(--safe-bottom));
   padding-bottom: var(--safe-bottom);
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   background: var(--surface);
   border-top: 1px solid var(--border);
   z-index: 40;
@@ -166,11 +166,12 @@ label {
   gap: 0.15rem;
   text-decoration: none;
   color: var(--muted);
-  font-size: 0.65rem;
+  font-size: 0.6rem;
   font-weight: 600;
   letter-spacing: 0.01em;
-  padding: 0 0.15rem;
+  padding: 0 0.1rem;
   text-align: center;
+  line-height: 1.15;
 }
 
 .bottom-nav a.active {
@@ -719,4 +720,214 @@ label {
 .size-chart__col--down .size-chart__label {
   color: var(--warn);
   font-weight: 650;
+}
+
+/* —— Dashboard —— */
+.dash {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding-bottom: 0.5rem;
+}
+
+.dash-season {
+  padding: 0.15rem 0 0.25rem;
+}
+
+.dash-season__name {
+  font-size: 1.05rem;
+  font-weight: 650;
+}
+
+.dash-season__code {
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin-top: 0.15rem;
+}
+
+.dash-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.9rem 0.85rem 1rem;
+}
+
+.dash-card__title {
+  margin: 0 0 0.75rem;
+  font-size: 0.85rem;
+  font-weight: 650;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.dash-bars {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.6rem;
+  height: 180px;
+  margin-bottom: 0.65rem;
+}
+
+.dash-bars__col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  min-width: 0;
+}
+
+.dash-bars__value {
+  font-size: 0.72rem;
+  font-weight: 650;
+  margin-bottom: 0.35rem;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.dash-bars__track {
+  flex: 1;
+  width: 100%;
+  max-width: 52px;
+  background: var(--surface-2);
+  border-radius: 8px;
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+}
+
+.dash-bars__fill {
+  width: 100%;
+  border-radius: 8px 8px 0 0;
+  min-height: 4px;
+  transition: height 0.35s ease;
+}
+
+.dash-bars__label {
+  margin-top: 0.4rem;
+  font-size: 0.72rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+.dash-gender__sums {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.45rem;
+  font-size: 0.82rem;
+  font-weight: 650;
+}
+
+.dash-gender__sum--men {
+  color: #6b9bd1;
+}
+
+.dash-gender__sum--women {
+  color: #e07a9a;
+}
+
+.dash-gender__sum--other {
+  color: var(--muted);
+}
+
+.dash-gender__bar {
+  display: flex;
+  height: 14px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--surface-2);
+}
+
+.dash-gender__seg--men {
+  background: #6b9bd1;
+}
+
+.dash-gender__seg--women {
+  background: #e07a9a;
+}
+
+.dash-gender__seg--other {
+  background: #6a707a;
+}
+
+.dash-gender__pcts {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.4rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.dash-gender__pct--men {
+  color: #6b9bd1;
+}
+
+.dash-gender__pct--women {
+  color: #e07a9a;
+}
+
+.dash-pie {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.dash-donut {
+  display: block;
+  flex-shrink: 0;
+}
+
+.dash-donut--empty {
+  width: 160px;
+  height: 160px;
+  border-radius: 50%;
+  border: 28px solid var(--surface-2);
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  font-size: 0.75rem;
+  text-align: center;
+  padding: 0.5rem;
+}
+
+.dash-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.dash-legend li {
+  display: grid;
+  grid-template-columns: 10px 1fr auto;
+  gap: 0.5rem;
+  align-items: start;
+  font-size: 0.8rem;
+}
+
+.dash-legend__swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  margin-top: 0.25rem;
+}
+
+.dash-legend__name {
+  line-height: 1.25;
+}
+
+.dash-legend__meta {
+  color: var(--muted);
+  white-space: nowrap;
+  font-size: 0.75rem;
 }

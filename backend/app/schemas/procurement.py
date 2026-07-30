@@ -24,6 +24,7 @@ class SeasonOut(BaseModel):
     name: str
     code: str
     is_active: bool
+    is_primary: bool = False
     sort_order: int
     created_at: datetime
 
@@ -38,6 +39,7 @@ class SeasonCreateRequest(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     code: str = Field(min_length=1, max_length=32)
     is_active: bool = True
+    is_primary: bool = False
     sort_order: int = 0
 
 
@@ -45,6 +47,7 @@ class SeasonUpdateRequest(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=120)
     code: str | None = Field(default=None, min_length=1, max_length=32)
     is_active: bool | None = None
+    is_primary: bool | None = None
     sort_order: int | None = None
 
 
@@ -323,6 +326,43 @@ class BrandStatsOut(BaseModel):
 
 class BrandStatsListResponse(BaseModel):
     items: list[BrandStatsOut]
+
+
+# --- Дашборд сезона -------------------------------------------------------
+
+
+class SeasonDashboardTotalsOut(BaseModel):
+    orders_count: int
+    orders_eur: Decimal
+    paid_eur: Decimal
+    shipped_eur: Decimal
+    balance_to_pay_eur: Decimal
+    balance_to_ship_eur: Decimal
+
+
+class SeasonGenderStatOut(BaseModel):
+    gender: str  # men | women | mixed | unknown
+    orders_count: int
+    orders_eur: Decimal
+
+
+class SeasonCategoryStatOut(BaseModel):
+    category_id: uuid.UUID
+    category_name: str
+    category_gender: str
+    amount_eur: Decimal
+    share: float = 0  # 0..1 от суммы категорий этого пола
+
+
+class SeasonDashboardOut(BaseModel):
+    season_id: uuid.UUID
+    season_name: str
+    season_code: str
+    is_primary: bool
+    totals: SeasonDashboardTotalsOut
+    by_gender: list[SeasonGenderStatOut] = Field(default_factory=list)
+    by_category_men: list[SeasonCategoryStatOut] = Field(default_factory=list)
+    by_category_women: list[SeasonCategoryStatOut] = Field(default_factory=list)
 
 
 # --- Справочники для форм -------------------------------------------------

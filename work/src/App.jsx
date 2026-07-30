@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import Shell from "./layout/Shell.jsx";
 import Login from "./pages/Login.jsx";
+import Dashboard from "./pages/Dashboard.jsx";
 import OrdersList from "./pages/OrdersList.jsx";
 import OrderDetail from "./pages/OrderDetail.jsx";
 import OrderCreate from "./pages/OrderCreate.jsx";
@@ -37,7 +38,8 @@ export default function App() {
             </RequireWork>
           }
         >
-          <Route path="/" element={<Navigate to="/for-order" replace />} />
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/orders" element={<OrdersList />} />
           <Route path="/orders/new" element={<OrderCreate />} />
           <Route path="/orders/:id" element={<OrderDetail />} />
@@ -52,7 +54,7 @@ export default function App() {
           <Route path="/shipments/:id" element={<ShipmentDetail />} />
           <Route path="/shipments/:id/edit" element={<ShipmentEdit />} />
         </Route>
-        <Route path="*" element={<Navigate to="/for-order" replace />} />
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </BrowserRouter>
   );

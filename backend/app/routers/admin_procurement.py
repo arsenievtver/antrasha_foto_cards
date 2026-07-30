@@ -16,7 +16,7 @@ from functools import lru_cache
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
@@ -58,7 +58,11 @@ from app.schemas.procurement import (
     PaymentOut,
     PaymentUpdateRequest,
     ProcurementRefsOut,
+    SeasonCategoryStatOut,
     SeasonCreateRequest,
+    SeasonDashboardOut,
+    SeasonDashboardTotalsOut,
+    SeasonGenderStatOut,
     SeasonListResponse,
     SeasonOut,
     SeasonUpdateRequest,
@@ -256,6 +260,33 @@ def _assert_order_matches(order: BrandOrder, season_id: uuid.UUID, brand_id: uui
 # --- Сезоны ---------------------------------------------------------------
 
 
+def _clear_other_primary_seasons(db: Session, keep_id: uuid.UUID | None = None) -> None:
+    stmt = update(Season).where(Season.is_primary.is_(True)).values(is_primary=False)
+    if keep_id is not None:
+        stmt = stmt.where(Season.id != keep_id)
+    db.execute(stmt)
+
+
+def _resolve_dashboard_season(db: Session, season_id: uuid.UUID | None) -> Season:
+    if season_id is not None:
+        return _get_season(db, season_id)
+    primary = db.scalars(select(Season).where(Season.is_primary.is_(True)).limit(1)).first()
+    if primary:
+        return primary
+    fallback = db.scalars(
+        select(Season)
+        .where(Season.is_active.is_(True))
+        .order_by(Season.sort_order.desc(), Season.created_at.desc())
+        .limit(1)
+    ).first()
+    if fallback:
+        return fallback
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="Нет сезонов для дашборда — создайте сезон и отметьте основной",
+    )
+
+
 @router.get("/seasons", response_model=SeasonListResponse)
 def list_seasons(
     db: Session = Depends(get_db),
@@ -275,10 +306,13 @@ def create_season(
     _su: AdminPrincipal = Depends(require_permission("product")),
 ) -> SeasonOut:
     _ = _su
+    if body.is_primary:
+        _clear_other_primary_seasons(db)
     row = Season(
         name=body.name.strip(),
         code=body.code.strip(),
         is_active=body.is_active,
+        is_primary=body.is_primary,
         sort_order=body.sort_order,
     )
     db.add(row)
@@ -311,6 +345,12 @@ def update_season(
         row.is_active = body.is_active
     if body.sort_order is not None:
         row.sort_order = body.sort_order
+    if body.is_primary is not None:
+        if body.is_primary:
+            _clear_other_primary_seasons(db, keep_id=season_id)
+            row.is_primary = True
+        else:
+            row.is_primary = False
     try:
         db.commit()
     except IntegrityError as e:
@@ -1175,6 +1215,139 @@ def _sum_by_brand(db: Session, column, model, *conditions) -> dict[uuid.UUID, De
     for cond in conditions:
         stmt = stmt.where(cond)
     return {bid: Decimal(total or 0) for bid, total in db.execute(stmt).all()}
+
+
+def _category_stats_for_season(
+    db: Session, season_id: uuid.UUID, gender: str
+) -> list[SeasonCategoryStatOut]:
+    """Разбивка строк заказов сезона по категориям указанного пола (men/women)."""
+    category_totals: dict[str, dict[str, object]] = {}
+    for cid, name, cat_gender, ms_id, total in db.execute(
+        select(
+            Category.id,
+            Category.name,
+            Category.gender,
+            Category.moy_sklad_id,
+            func.sum(BrandOrderCategoryLine.amount_eur),
+        )
+        .join(
+            BrandOrderCategoryLine,
+            BrandOrderCategoryLine.category_id == Category.id,
+        )
+        .join(BrandOrder, BrandOrder.id == BrandOrderCategoryLine.order_id)
+        .where(BrandOrder.season_id == season_id)
+        .group_by(Category.id, Category.name, Category.gender, Category.moy_sklad_id)
+    ).all():
+        canonical_ms_id = _canonical_ms_id(ms_id)
+        display_name, display_gender = _CANONICAL_CATEGORY_DISPLAY.get(
+            canonical_ms_id, (name, cat_gender)
+        )
+        if display_gender != gender:
+            continue
+        key = canonical_ms_id or str(cid)
+        entry = category_totals.setdefault(
+            key,
+            {
+                "category_id": cid,
+                "category_name": display_name,
+                "category_gender": display_gender,
+                "amount_eur": ZERO,
+            },
+        )
+        entry["amount_eur"] = Decimal(entry["amount_eur"]) + Decimal(total or 0)
+
+    total_amount = sum((Decimal(e["amount_eur"]) for e in category_totals.values()), ZERO)
+    items = []
+    for entry in sorted(
+        category_totals.values(),
+        key=lambda item: Decimal(item["amount_eur"]),
+        reverse=True,
+    ):
+        amount = _money(entry["amount_eur"])
+        share = float(amount / total_amount) if total_amount > ZERO else 0.0
+        items.append(
+            SeasonCategoryStatOut(
+                category_id=entry["category_id"],
+                category_name=entry["category_name"],
+                category_gender=entry["category_gender"],
+                amount_eur=amount,
+                share=share,
+            )
+        )
+    return items
+
+
+@router.get("/procurement/season-dashboard", response_model=SeasonDashboardOut)
+def get_season_dashboard(
+    season_id: uuid.UUID | None = Query(default=None),
+    db: Session = Depends(get_db),
+    _su: AdminPrincipal = Depends(require_permission("product")),
+) -> SeasonDashboardOut:
+    """Сводка сезона для PWA: заказы/оплаты/поставки, пол и категории."""
+    _ = _su
+    season = _resolve_dashboard_season(db, season_id)
+
+    orders_count = int(
+        db.scalar(
+            select(func.count()).select_from(BrandOrder).where(
+                BrandOrder.season_id == season.id
+            )
+        )
+        or 0
+    )
+    orders_eur = _money(
+        db.scalar(
+            select(func.sum(BrandOrder.amount_eur)).where(
+                BrandOrder.season_id == season.id
+            )
+        )
+    )
+    paid_eur = _money(
+        db.scalar(
+            select(func.sum(Payment.amount_eur)).where(Payment.season_id == season.id)
+        )
+    )
+    shipped_eur = _money(
+        db.scalar(
+            select(func.sum(Shipment.amount_eur)).where(Shipment.season_id == season.id)
+        )
+    )
+
+    gender_rows = db.execute(
+        select(BrandOrder.gender, func.count(), func.sum(BrandOrder.amount_eur))
+        .where(BrandOrder.season_id == season.id)
+        .group_by(BrandOrder.gender)
+    ).all()
+    by_gender: list[SeasonGenderStatOut] = []
+    for g, cnt, total in gender_rows:
+        by_gender.append(
+            SeasonGenderStatOut(
+                gender=g or "unknown",
+                orders_count=int(cnt or 0),
+                orders_eur=_money(total),
+            )
+        )
+    by_gender.sort(
+        key=lambda x: {"men": 0, "women": 1, "mixed": 2}.get(x.gender, 3),
+    )
+
+    return SeasonDashboardOut(
+        season_id=season.id,
+        season_name=season.name,
+        season_code=season.code,
+        is_primary=bool(season.is_primary),
+        totals=SeasonDashboardTotalsOut(
+            orders_count=orders_count,
+            orders_eur=orders_eur,
+            paid_eur=paid_eur,
+            shipped_eur=shipped_eur,
+            balance_to_pay_eur=orders_eur - paid_eur,
+            balance_to_ship_eur=orders_eur - shipped_eur,
+        ),
+        by_gender=by_gender,
+        by_category_men=_category_stats_for_season(db, season.id, "men"),
+        by_category_women=_category_stats_for_season(db, season.id, "women"),
+    )
 
 
 @router.get("/procurement/brand-stats", response_model=BrandStatsListResponse)

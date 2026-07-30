@@ -19,6 +19,7 @@ class Season(Base):
     name: Mapped[str] = mapped_column(String(120), unique=True, nullable=False, index=True)
     code: Mapped[str] = mapped_column(String(32), unique=True, nullable=False, index=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    is_primary: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

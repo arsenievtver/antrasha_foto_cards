@@ -16,7 +16,7 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
 
   if (hasValidSession() && hasProductAccess()) {
-    return <Navigate to="/for-order" replace />;
+    return <Navigate to="/dashboard" replace />;
   }
 
   async function onSubmit(e) {
@@ -38,7 +38,7 @@ export default function Login() {
       }
       const data = await loginWorker(norm, p);
       setSession(data.access_token, data.role, data.permissions);
-      nav("/for-order", { replace: true });
+      nav("/dashboard", { replace: true });
     } catch (err) {
       setError(err.message || "Ошибка входа");
     } finally {
