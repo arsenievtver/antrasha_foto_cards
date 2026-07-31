@@ -58,6 +58,7 @@ from app.schemas.procurement import (
     PaymentOut,
     PaymentUpdateRequest,
     ProcurementRefsOut,
+    SeasonBrandStatOut,
     SeasonCategoryStatOut,
     SeasonCreateRequest,
     SeasonDashboardOut,
@@ -1217,6 +1218,39 @@ def _sum_by_brand(db: Session, column, model, *conditions) -> dict[uuid.UUID, De
     return {bid: Decimal(total or 0) for bid, total in db.execute(stmt).all()}
 
 
+def _brand_stats_for_season(
+    db: Session, season_id: uuid.UUID
+) -> list[SeasonBrandStatOut]:
+    """Разбивка заказов сезона по брендам (несколько заказов одного бренда суммируются)."""
+    rows = db.execute(
+        select(
+            Brand.id,
+            Brand.name,
+            func.count(BrandOrder.id),
+            func.sum(BrandOrder.amount_eur),
+        )
+        .join(BrandOrder, BrandOrder.brand_id == Brand.id)
+        .where(BrandOrder.season_id == season_id)
+        .group_by(Brand.id, Brand.name)
+        .order_by(func.sum(BrandOrder.amount_eur).desc())
+    ).all()
+    total_amount = sum((Decimal(total or 0) for _, _, _, total in rows), ZERO)
+    items: list[SeasonBrandStatOut] = []
+    for brand_id, brand_name, cnt, total in rows:
+        amount = _money(total)
+        share = float(amount / total_amount) if total_amount > ZERO else 0.0
+        items.append(
+            SeasonBrandStatOut(
+                brand_id=brand_id,
+                brand_name=brand_name,
+                orders_count=int(cnt or 0),
+                amount_eur=amount,
+                share=share,
+            )
+        )
+    return items
+
+
 def _category_stats_for_season(
     db: Session, season_id: uuid.UUID, gender: str
 ) -> list[SeasonCategoryStatOut]:
@@ -1345,6 +1379,7 @@ def get_season_dashboard(
             balance_to_ship_eur=orders_eur - shipped_eur,
         ),
         by_gender=by_gender,
+        by_brand=_brand_stats_for_season(db, season.id),
         by_category_men=_category_stats_for_season(db, season.id, "men"),
         by_category_women=_category_stats_for_season(db, season.id, "women"),
     )

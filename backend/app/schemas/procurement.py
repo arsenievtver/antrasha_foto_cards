@@ -354,6 +354,14 @@ class SeasonCategoryStatOut(BaseModel):
     share: float = 0  # 0..1 от суммы категорий этого пола
 
 
+class SeasonBrandStatOut(BaseModel):
+    brand_id: uuid.UUID
+    brand_name: str
+    orders_count: int
+    amount_eur: Decimal
+    share: float = 0  # 0..1 от суммы заказов сезона
+
+
 class SeasonDashboardOut(BaseModel):
     season_id: uuid.UUID
     season_name: str
@@ -361,6 +369,7 @@ class SeasonDashboardOut(BaseModel):
     is_primary: bool
     totals: SeasonDashboardTotalsOut
     by_gender: list[SeasonGenderStatOut] = Field(default_factory=list)
+    by_brand: list[SeasonBrandStatOut] = Field(default_factory=list)
     by_category_men: list[SeasonCategoryStatOut] = Field(default_factory=list)
     by_category_women: list[SeasonCategoryStatOut] = Field(default_factory=list)
 

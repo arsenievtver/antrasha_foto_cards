@@ -180,27 +180,27 @@ function GenderProgress({ byGender }) {
   );
 }
 
-function CategoryPieBlock({ title, items }) {
+function PieBlock({ title, items, emptyLabel }) {
   const chartItems = useMemo(
     () =>
       (items || []).map((it, i) => ({
-        key: it.category_id,
-        label: it.category_name,
-        amount: num(it.amount_eur),
-        share: it.share,
+        key: it.key,
+        label: it.label,
+        amount: num(it.amount),
         color: PIE_COLORS[i % PIE_COLORS.length],
       })),
     [items],
   );
+  const total = chartItems.reduce((a, x) => a + x.amount, 0);
 
   return (
     <div className="dash-card">
       <h3 className="dash-card__title">{title}</h3>
       <div className="dash-pie">
-        <DonutChart items={chartItems} emptyLabel="Нет категорий" />
+        <DonutChart items={chartItems} emptyLabel={emptyLabel} />
         {!chartItems.length ? (
           <p className="empty" style={{ margin: 0 }}>
-            Категории не заданы
+            {emptyLabel}
           </p>
         ) : (
           <ul className="dash-legend">
@@ -209,7 +209,7 @@ function CategoryPieBlock({ title, items }) {
                 <span className="dash-legend__swatch" style={{ background: it.color }} />
                 <span className="dash-legend__name">{it.label}</span>
                 <span className="dash-legend__meta">
-                  {eur(it.amount)} · {pct(it.amount, chartItems.reduce((a, x) => a + x.amount, 0))}%
+                  {eur(it.amount)} · {pct(it.amount, total)}%
                 </span>
               </li>
             ))}
@@ -218,6 +218,32 @@ function CategoryPieBlock({ title, items }) {
       </div>
     </div>
   );
+}
+
+function BrandPieBlock({ items }) {
+  const mapped = useMemo(
+    () =>
+      (items || []).map((it) => ({
+        key: it.brand_id,
+        label: it.brand_name,
+        amount: it.amount_eur,
+      })),
+    [items],
+  );
+  return <PieBlock title="Бренды" items={mapped} emptyLabel="Нет заказов" />;
+}
+
+function CategoryPieBlock({ title, items }) {
+  const mapped = useMemo(
+    () =>
+      (items || []).map((it) => ({
+        key: it.category_id,
+        label: it.category_name,
+        amount: it.amount_eur,
+      })),
+    [items],
+  );
+  return <PieBlock title={title} items={mapped} emptyLabel="Категории не заданы" />;
 }
 
 export default function Dashboard() {
@@ -270,6 +296,8 @@ export default function Dashboard() {
         <h3 className="dash-card__title">Заказ: муж / жен</h3>
         <GenderProgress byGender={data.by_gender} />
       </section>
+
+      <BrandPieBlock items={data.by_brand} />
 
       <CategoryPieBlock title="Категории · муж" items={data.by_category_men} />
       <CategoryPieBlock title="Категории · жен" items={data.by_category_women} />
