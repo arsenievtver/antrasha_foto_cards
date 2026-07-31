@@ -34,3 +34,8 @@ dist-ssr
 # Кладёт его update.sh / tls-enable.sh. Не отслеживается, чтобы git pull
 # не конфликтовал с локальным состоянием на сервере (TLS-overlay).
 deploy/nginx/templates/default.conf.template
+
+# Локальные выгрузки (Excel и т.п.) — не коммитить
+exports/
+*.xlsx
+*.xls
