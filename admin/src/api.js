@@ -1016,3 +1016,21 @@ export async function clearHomeV2GenderImage(slot) {
   if (!res.ok) throw new Error(detail(data, res.statusText));
   return data;
 }
+
+export async function fetchPushStats() {
+  const res = await fetch(apiUrl("/admin/push/stats"), { headers: headersJson() });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
+export async function broadcastPush(payload) {
+  const res = await fetch(apiUrl("/admin/push/broadcast"), {
+    method: "POST",
+    headers: headersJson(),
+    body: JSON.stringify(payload),
+  });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}

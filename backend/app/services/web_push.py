@@ -254,20 +254,115 @@ def maybe_notify_after_photo_sync(
     rows_added_male: int,
     rows_added_female: int,
 ) -> None:
-    if rows_added_male <= 0 and rows_added_female <= 0:
-        return
-    from app.database import SessionLocal
+    """
+    Авто-рассылка после синка фото отключена: партии загрузок дают лишний спам.
+    Рассылка — вручную из админки (broadcast_admin_push).
+    """
+    _ = (settings, rows_added_male, rows_added_female)
+    return
 
-    db = SessionLocal()
-    try:
-        notify_new_photos_if_due(
-            db,
-            settings=settings,
-            rows_added_male=rows_added_male,
-            rows_added_female=rows_added_female,
+
+def push_subscription_stats(db: Session) -> dict[str, int]:
+    rows = list(
+        db.execute(
+            select(PushSubscription).where(PushSubscription.is_active.is_(True))
+        ).scalars()
+    )
+    male = sum(1 for r in rows if r.gender_scope == PUSH_GENDER_MALE)
+    female = sum(1 for r in rows if r.gender_scope == PUSH_GENDER_FEMALE)
+    both = sum(1 for r in rows if r.gender_scope == PUSH_GENDER_BOTH)
+    return {
+        "active_total": len(rows),
+        "active_male": male,
+        "active_female": female,
+        "active_both": both,
+    }
+
+
+def _audience_matches(row_scope: str, audience: str) -> bool:
+    if audience == "all":
+        return True
+    if audience == PUSH_GENDER_MALE:
+        return row_scope in (PUSH_GENDER_MALE, PUSH_GENDER_BOTH)
+    if audience == PUSH_GENDER_FEMALE:
+        return row_scope in (PUSH_GENDER_FEMALE, PUSH_GENDER_BOTH)
+    if audience == PUSH_GENDER_BOTH:
+        return row_scope == PUSH_GENDER_BOTH
+    return False
+
+
+def broadcast_admin_push(
+    db: Session,
+    *,
+    settings: Settings,
+    title: str,
+    body: str,
+    url: str | None = None,
+    audience: str = "all",
+    respect_cooldown: bool = False,
+    tag: str = "antrasha-admin",
+) -> dict[str, int]:
+    """Ручная рассылка из админки. audience: all | male | female | both."""
+    if not web_push_configured(settings):
+        return {"eligible": 0, "sent": 0, "failed": 0, "skipped": 0}
+
+    now = datetime.now(timezone.utc)
+    cutoff = now - NOTIFY_COOLDOWN
+    rows = list(
+        db.execute(
+            select(PushSubscription).where(PushSubscription.is_active.is_(True))
+        ).scalars()
+    )
+
+    target_url = (url or "").strip() or f"{settings.public_app_url.rstrip('/')}/"
+    if target_url.startswith("/"):
+        target_url = f"{settings.public_app_url.rstrip('/')}{target_url}"
+
+    sent = 0
+    failed = 0
+    skipped = 0
+    eligible = 0
+
+    for row in rows:
+        if not _audience_matches(row.gender_scope, audience):
+            skipped += 1
+            continue
+        if respect_cooldown and row.last_notified_at is not None:
+            last = row.last_notified_at
+            if last.tzinfo is None:
+                last = last.replace(tzinfo=timezone.utc)
+            if last >= cutoff:
+                skipped += 1
+                continue
+
+        eligible += 1
+        link = target_url if (url or "").strip() else _notification_url_for_scope(
+            settings, row.gender_scope
         )
-    except Exception:
-        db.rollback()
-        log.exception("web_push: ошибка рассылки после синка фото")
-    finally:
-        db.close()
+        payload = {
+            "title": title.strip() or "ANTRASHA",
+            "body": body.strip() or "Новинки — загляните",
+            "url": link,
+            "tag": tag,
+        }
+        if _send_one(row, settings=settings, payload=payload):
+            row.last_notified_at = now
+            sent += 1
+        else:
+            failed += 1
+
+    db.commit()
+    log.info(
+        "web_push admin broadcast audience=%s eligible=%s sent=%s failed=%s skipped=%s",
+        audience,
+        eligible,
+        sent,
+        failed,
+        skipped,
+    )
+    return {
+        "eligible": eligible,
+        "sent": sent,
+        "failed": failed,
+        "skipped": skipped,
+    }

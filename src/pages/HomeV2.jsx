@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { fetchActiveHeroBanners } from "../api/client.js";
 import { useAuth } from "../context/AuthContext";
@@ -11,6 +11,7 @@ import HeroBanner from "../components/home-v2/HeroBanner";
 import HomeBottomBar from "../components/home-v2/HomeBottomBar";
 import LeadRequestModal from "../components/home-v2/LeadRequestModal";
 import NotifySettingsModal from "../components/home-v2/NotifySettingsModal";
+import PwaInstallPrompt from "../components/home-v2/PwaInstallPrompt";
 import { HOME_V2_DEFAULT_HERO } from "../components/home-v2/homeV2Constants";
 import logoMark from "../assets/image/logo-a-transparent.png";
 import "./HomeV2.css";
@@ -51,6 +52,10 @@ export default function HomeV2() {
 	useEffect(() => {
 		if (!notifyOpen) setHasPush(isPushSubscribedLocally());
 	}, [notifyOpen]);
+
+	const onPwaInstalled = useCallback(() => {
+		if (!isPushSubscribedLocally()) setNotifyOpen(true);
+	}, []);
 
 	const userInitial =
 		profile?.display_name?.trim()?.[0] ||
@@ -102,6 +107,8 @@ export default function HomeV2() {
 					onAboutClick={() => navigate("/about")}
 				/>
 			</div>
+
+			<PwaInstallPrompt onInstalled={onPwaInstalled} />
 
 			<UserMenu
 				hideTrigger

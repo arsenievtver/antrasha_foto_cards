@@ -14,6 +14,7 @@ import Campaigns from "./pages/Campaigns.jsx";
 import PromoBanners from "./pages/PromoBanners.jsx";
 import HeroBanners from "./pages/HeroBanners.jsx";
 import HomeV2GenderCards from "./pages/HomeV2GenderCards.jsx";
+import PushNotifications from "./pages/PushNotifications.jsx";
 import Seasons from "./pages/Seasons.jsx";
 import Brands from "./pages/Brands.jsx";
 import BrandOrders from "./pages/BrandOrders.jsx";
@@ -171,6 +172,14 @@ export default function App() {
             element={
               <PermissionRoute permission="ads">
                 <HomeV2GenderCards />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/push"
+            element={
+              <PermissionRoute permission="ads">
+                <PushNotifications />
               </PermissionRoute>
             }
           />

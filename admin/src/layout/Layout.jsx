@@ -93,6 +93,7 @@ export default function Layout() {
             {can("ads") && <NavItem to="/promo-banners">Баннеры на главной</NavItem>}
             {can("ads") && <NavItem to="/hero-banners">Hero-баннеры (/v2)</NavItem>}
             {can("ads") && <NavItem to="/home-v2-gender-cards">MEN / WOMEN (/v2)</NavItem>}
+            {can("ads") && <NavItem to="/push">Push-уведомления</NavItem>}
           </NavGroup>
 
           <NavGroup title="Товар">

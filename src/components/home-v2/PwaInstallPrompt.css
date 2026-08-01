@@ -1,0 +1,128 @@
+.hv2-pwa {
+	position: absolute;
+	z-index: 40;
+	left: 12px;
+	right: 12px;
+	bottom: calc(58px + env(safe-area-inset-bottom, 0px));
+	pointer-events: none;
+}
+
+.hv2-pwa__inner {
+	pointer-events: auto;
+	padding: 14px 16px 12px;
+	border-radius: 14px;
+	border: 1px solid rgba(201, 169, 110, 0.35);
+	background: rgba(14, 13, 12, 0.94);
+	box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5);
+	backdrop-filter: blur(10px);
+	-webkit-backdrop-filter: blur(10px);
+	color: #f5f0e8;
+}
+
+.hv2-pwa__title {
+	margin: 0;
+	font-family: var(--hv2-serif, "Cormorant Garamond", serif);
+	font-size: 1.2rem;
+	font-weight: 400;
+	letter-spacing: 0.02em;
+}
+
+.hv2-pwa__text {
+	margin: 0.35rem 0 0;
+	font-family: var(--hv2-sans, Manrope, system-ui, sans-serif);
+	font-size: 0.78rem;
+	line-height: 1.4;
+	color: rgba(245, 240, 232, 0.78);
+}
+
+.hv2-pwa__steps {
+	margin: 0.65rem 0 0;
+	padding-left: 1.15rem;
+	font-family: var(--hv2-sans, Manrope, system-ui, sans-serif);
+	font-size: 0.74rem;
+	line-height: 1.45;
+	color: rgba(245, 240, 232, 0.88);
+}
+
+.hv2-pwa__steps--icons {
+	list-style: none;
+	padding-left: 0;
+}
+
+.hv2-pwa__steps--icons li {
+	display: flex;
+	align-items: flex-start;
+	gap: 10px;
+}
+
+.hv2-pwa__steps li + li {
+	margin-top: 0.55rem;
+}
+
+.hv2-pwa__steps strong {
+	font-weight: 600;
+	color: #f5f0e8;
+}
+
+.hv2-pwa__step-icon {
+	flex: 0 0 auto;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 28px;
+	height: 28px;
+	margin-top: 1px;
+	border-radius: 8px;
+	border: 1px solid rgba(201, 169, 110, 0.4);
+	background: rgba(201, 169, 110, 0.12);
+	color: var(--hv2-gold, #c9a96e);
+}
+
+.hv2-pwa__glyph {
+	width: 16px;
+	height: 16px;
+	display: block;
+}
+
+.hv2-pwa__actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-top: 0.75rem;
+}
+
+.hv2-pwa__btn {
+	border: none;
+	border-radius: 999px;
+	padding: 9px 14px;
+	font-family: var(--hv2-sans, Manrope, system-ui, sans-serif);
+	font-size: 0.78rem;
+	letter-spacing: 0.04em;
+	cursor: pointer;
+	-webkit-tap-highlight-color: transparent;
+}
+
+.hv2-pwa__btn:disabled {
+	opacity: 0.65;
+	cursor: wait;
+}
+
+.hv2-pwa__btn--primary {
+	background: var(--hv2-gold, #c9a96e);
+	color: #1a1510;
+	font-weight: 600;
+}
+
+.hv2-pwa__btn--ghost {
+	background: transparent;
+	color: rgba(245, 240, 232, 0.65);
+	border: 1px solid rgba(245, 240, 232, 0.22);
+}
+
+@media (min-width: 720px) {
+	.hv2-pwa {
+		left: 18px;
+		right: 18px;
+		bottom: calc(66px + env(safe-area-inset-bottom, 0px));
+	}
+}
