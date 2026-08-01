@@ -26,6 +26,8 @@ services:
       - ./env/.env.postgres.prod
     volumes:
       - antrasha_promo_media:/app/data/promo-banners
+      - antrasha_hero_media:/app/data/hero-banners
+      - antrasha_home_v2_media:/app/data/home-v2
       - antrasha_ai_ingest_tmp:/app/var/ai_ingest_tmp
       - antrasha_try_on_tmp:/app/var/try_on_tmp
     depends_on:
@@ -157,6 +159,8 @@ services:
 volumes:
   antrasha_pg_data:
   antrasha_promo_media:
+  antrasha_hero_media:
+  antrasha_home_v2_media:
   antrasha_ai_ingest_tmp:
   antrasha_vton_weights:
   antrasha_vton_hf_cache:
