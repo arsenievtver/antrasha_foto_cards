@@ -24,10 +24,23 @@ body {
 	margin: 0 auto;
 	height: 100%;
 	min-height: 100dvh;
+	min-height: 100lvh;
+	min-height: -webkit-fill-available;
 	box-sizing: border-box;
 	display: flex;
 	flex-direction: column;
 	overflow: hidden;
+}
+
+/* /v2: тёмный фон (status bar / козырёк браузера тоже тёмный) */
+html.hv2-edge,
+html.hv2-edge body {
+	background: #0c0b0a;
+}
+
+html.hv2-edge #root {
+	overflow: visible;
+	background: #0c0b0a;
 }
 
 .app-shell {
@@ -45,10 +58,18 @@ body {
 	padding-left: env(safe-area-inset-left, 0px);
 }
 
-/* About: контент edge-to-edge, safe-area только внутри страницы */
+/* About /v2: контент edge-to-edge, safe-area только внутри страницы */
 .app-shell--immersive {
 	padding: 0;
 	background: transparent;
+}
+
+.app-shell--hv2 {
+	overflow: visible;
+}
+
+.app-shell--hv2 .app-main {
+	overflow: visible;
 }
 
 .app-main {

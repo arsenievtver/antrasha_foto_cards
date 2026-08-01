@@ -1327,6 +1327,30 @@ button.switch-toggle:not(:disabled):hover {
   object-fit: contain;
 }
 
+.hero-crop-preview {
+  max-width: 220px;
+  max-height: none;
+  padding: 0;
+}
+
+.hero-crop-preview--mobile {
+  aspect-ratio: 6 / 5;
+  width: 220px;
+}
+
+.hero-crop-preview--desktop {
+  aspect-ratio: 16 / 9;
+  width: 280px;
+  max-width: 280px;
+}
+
+.hero-crop-preview img {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  object-fit: cover;
+}
+
 .tagging-group-modal-overlay {
   position: fixed;
   inset: 0;

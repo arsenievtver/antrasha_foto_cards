@@ -1,0 +1,50 @@
+.hv2-lead-backdrop {
+	position: fixed;
+	inset: 0;
+	z-index: 220;
+	display: flex;
+	align-items: flex-end;
+	justify-content: center;
+	padding: 16px;
+	padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+	box-sizing: border-box;
+	background: rgba(0, 0, 0, 0.58);
+}
+
+.hv2-lead-modal {
+	position: relative;
+	width: 100%;
+	max-width: 400px;
+	padding: 28px 14px 14px;
+	border-radius: 14px;
+	background: #171614;
+	border: 1px solid rgba(245, 240, 232, 0.16);
+	color: #f5f0e8;
+	box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
+}
+
+.hv2-lead-close {
+	position: absolute;
+	top: 8px;
+	right: 10px;
+	z-index: 1;
+	border: none;
+	background: transparent;
+	color: rgba(245, 240, 232, 0.7);
+	font-size: 1.4rem;
+	line-height: 1;
+	cursor: pointer;
+}
+
+.hv2-lead-fitting {
+	border-color: rgba(255, 255, 255, 0.18);
+	background: rgba(255, 255, 255, 0.035);
+}
+
+.hv2-lead-modal .thank-button {
+	background: rgba(10, 10, 9, 0.65);
+}
+
+.hv2-lead-modal .privacy-consent__link {
+	color: rgba(201, 169, 110, 0.95);
+}

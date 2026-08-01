@@ -1,0 +1,119 @@
+.hv2-page {
+	--hv2-serif: "Cormorant Garamond", "Times New Roman", Times, serif;
+	--hv2-sans: "Manrope", system-ui, "Helvetica Neue", Helvetica, Arial, sans-serif;
+	--hv2-gold: #c9a96e;
+	--hv2-bg: #0c0b0a;
+
+	width: 100%;
+	height: 100%;
+	min-height: 100dvh;
+	min-height: 100lvh;
+	min-height: -webkit-fill-available;
+	max-height: none;
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+	background: var(--hv2-bg);
+	color: #f5f0e8;
+	box-sizing: border-box;
+}
+
+.hv2-header {
+	position: absolute;
+	z-index: 5;
+	top: 0;
+	left: 0;
+	right: 0;
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	padding: calc(10px + env(safe-area-inset-top, 0px)) 14px 0;
+	pointer-events: none;
+}
+
+.hv2-brand,
+.hv2-bell {
+	pointer-events: auto;
+}
+
+.hv2-brand {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 5px;
+}
+
+.hv2-brand__mark {
+	width: 48px;
+	height: 48px;
+	object-fit: contain;
+	background: transparent;
+}
+
+.hv2-brand__text {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 2px;
+	text-align: center;
+}
+
+.hv2-brand__name {
+	font-family: var(--hv2-serif);
+	font-size: 0.72rem;
+	letter-spacing: 0.28em;
+	line-height: 1.1;
+	color: #f5f0e8;
+	/* компенсируем letter-spacing у последней буквы для визуального центра */
+	padding-left: 0.28em;
+}
+
+.hv2-brand__tag {
+	font-family: var(--hv2-sans);
+	font-size: 0.4rem;
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
+	color: var(--hv2-gold);
+}
+
+.hv2-bell {
+	position: relative;
+	width: 36px;
+	height: 36px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0;
+	border: 1px solid rgba(201, 169, 110, 0.55);
+	border-radius: 50%;
+	background: transparent;
+	color: var(--hv2-gold);
+	cursor: pointer;
+	-webkit-tap-highlight-color: transparent;
+}
+
+.hv2-bell__icon {
+	width: 16px;
+	height: 16px;
+}
+
+.hv2-bell__dot {
+	position: absolute;
+	top: 7px;
+	right: 8px;
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: #c45c3e;
+	border: 1px solid #0c0b0a;
+}
+
+.hv2-below {
+	position: relative;
+	z-index: 1;
+	flex: 0 0 auto;
+	display: flex;
+	flex-direction: column;
+	background: var(--hv2-bg);
+	min-height: 0;
+}

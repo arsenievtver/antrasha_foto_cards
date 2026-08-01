@@ -187,6 +187,33 @@ export async function fetchActivePromoBanner() {
 	return res.json();
 }
 
+export async function fetchActiveHeroBanners() {
+	const res = await fetch(apiUrl("/hero-banners/active"));
+	if (!res.ok) {
+		const text = await res.text();
+		throw new Error(text || `hero-banners ${res.status}`);
+	}
+	return res.json();
+}
+
+export async function fetchHomeV2GenderCards() {
+	const res = await fetch(apiUrl("/home-v2/gender-cards"));
+	if (!res.ok) {
+		const text = await res.text();
+		throw new Error(text || `home-v2 gender-cards ${res.status}`);
+	}
+	return res.json();
+}
+
+export async function fetchPublicBrands() {
+	const res = await fetch(apiUrl("/brands"));
+	if (!res.ok) {
+		const text = await res.text();
+		throw new Error(text || `brands ${res.status}`);
+	}
+	return res.json();
+}
+
 export async function markPromoBannerSeen(bannerId) {
 	const headers = await sessionAuthHeaders();
 	const res = await fetch(apiUrl(`/promo-banners/${bannerId}/seen`), {

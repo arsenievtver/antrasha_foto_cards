@@ -926,3 +926,93 @@ export async function uploadPromoBannerImage(id, file) {
   if (!res.ok) throw new Error(detail(data, res.statusText));
   return data;
 }
+
+export async function fetchHeroBanners() {
+  const res = await fetch(apiUrl("/admin/hero-banners"), { headers: headersJson() });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
+export async function createHeroBanner(body) {
+  const res = await fetch(apiUrl("/admin/hero-banners"), {
+    method: "POST",
+    headers: headersJson(),
+    body: JSON.stringify(body),
+  });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
+export async function updateHeroBanner(id, body) {
+  const res = await fetch(apiUrl(`/admin/hero-banners/${id}`), {
+    method: "PATCH",
+    headers: headersJson(),
+    body: JSON.stringify(body),
+  });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
+export async function deleteHeroBanner(id) {
+  const res = await fetch(apiUrl(`/admin/hero-banners/${id}`), {
+    method: "DELETE",
+    headers: headersAuthOnly(),
+  });
+  if (!res.ok && res.status !== 204) {
+    const data = await parseResponseJson(res);
+    throw new Error(detail(data, res.statusText));
+  }
+}
+
+export async function uploadHeroBannerImage(id, file, variant = "mobile") {
+  const fd = new FormData();
+  fd.append("file", file);
+  fd.append("variant", variant);
+  const res = await fetch(apiUrl(`/admin/hero-banners/${id}/image`), {
+    method: "POST",
+    headers: headersAuthOnly(),
+    body: fd,
+  });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
+export async function fetchHomeV2Settings() {
+  const res = await fetch(apiUrl("/admin/home-v2/settings"), { headers: headersJson() });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
+export async function uploadHomeV2GenderImage(slot, file) {
+  const fd = new FormData();
+  fd.append("file", file);
+  fd.append("slot", slot);
+  const res = await fetch(apiUrl("/admin/home-v2/settings/image"), {
+    method: "POST",
+    headers: headersAuthOnly(),
+    body: fd,
+  });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
+export async function clearHomeV2GenderImage(slot) {
+  const body =
+    slot === "female"
+      ? { clear_image_female: true }
+      : { clear_image_male: true };
+  const res = await fetch(apiUrl("/admin/home-v2/settings"), {
+    method: "PATCH",
+    headers: headersJson(),
+    body: JSON.stringify(body),
+  });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}

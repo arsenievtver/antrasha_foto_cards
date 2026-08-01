@@ -1,0 +1,78 @@
+.hv2-brands {
+	padding: 4px 0 2px;
+	overflow: hidden;
+	flex: 0 0 auto;
+}
+
+.hv2-brands__track-wrap {
+	position: relative;
+	overflow: hidden;
+}
+
+/* Эталон ширины одного цикла брендов — вне потока, невидимый */
+.hv2-brands__measure {
+	position: absolute;
+	left: 0;
+	top: 0;
+	visibility: hidden;
+	pointer-events: none;
+	display: flex;
+	width: max-content;
+	white-space: nowrap;
+}
+
+.hv2-brands__track {
+	display: flex;
+	width: max-content;
+	transform: translate3d(0, 0, 0);
+	backface-visibility: hidden;
+	will-change: transform;
+}
+
+.hv2-brands__track--run {
+	animation: hv2-marquee var(--hv2-marquee-duration, 70s) linear infinite;
+}
+
+.hv2-brands__group {
+	display: flex;
+	flex-shrink: 0;
+	align-items: center;
+}
+
+.hv2-brands__item {
+	display: inline-flex;
+	align-items: center;
+	flex-shrink: 0;
+}
+
+.hv2-brands__name {
+	padding: 0 0.7rem;
+	font-family: var(--hv2-serif);
+	font-size: 0.9rem;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	white-space: nowrap;
+	color: rgba(245, 240, 232, 0.88);
+}
+
+.hv2-brands__sep {
+	flex-shrink: 0;
+	color: rgba(201, 169, 110, 0.45);
+	font-size: 0.8rem;
+}
+
+@keyframes hv2-marquee {
+	from {
+		transform: translate3d(0, 0, 0);
+	}
+	to {
+		/* Ровно одна группа (вторая идентична) */
+		transform: translate3d(-50%, 0, 0);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.hv2-brands__track--run {
+		animation: none;
+	}
+}

@@ -14,11 +14,16 @@ from app.database import SessionLocal
 from app.routers import (
     admin,
     admin_ai_ingest,
+    admin_hero_banners,
+    admin_home_v2,
     admin_procurement,
     admin_promo_banners,
     auth,
+    brands,
     feed,
     guest,
+    hero_banners,
+    home_v2,
     interactions,
     internal_sync,
     promo_banners,
@@ -103,14 +108,19 @@ app.add_middleware(
 
 app.include_router(sessions.router)
 app.include_router(guest.router)
+app.include_router(brands.router)
 app.include_router(feed.router)
 app.include_router(interactions.router)
 app.include_router(auth.router)
 app.include_router(admin.router)
 app.include_router(admin_promo_banners.router)
+app.include_router(admin_hero_banners.router)
+app.include_router(admin_home_v2.router)
 app.include_router(admin_ai_ingest.router)
 app.include_router(admin_procurement.router)
 app.include_router(promo_banners.router)
+app.include_router(hero_banners.router)
+app.include_router(home_v2.router)
 app.include_router(push.router)
 app.include_router(internal_sync.router)
 app.include_router(ximilar.router)
@@ -124,6 +134,22 @@ app.mount(
     "/media/promo-banners",
     StaticFiles(directory=str(_promo_media)),
     name="promo-banner-media",
+)
+
+_hero_media = settings.hero_banner_media_path
+_hero_media.mkdir(parents=True, exist_ok=True)
+app.mount(
+    "/media/hero-banners",
+    StaticFiles(directory=str(_hero_media)),
+    name="hero-banner-media",
+)
+
+_home_v2_media = settings.home_v2_media_path
+_home_v2_media.mkdir(parents=True, exist_ok=True)
+app.mount(
+    "/media/home-v2",
+    StaticFiles(directory=str(_home_v2_media)),
+    name="home-v2-media",
 )
 
 

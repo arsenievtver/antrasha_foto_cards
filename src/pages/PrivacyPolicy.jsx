@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import "./PrivacyPolicy.css";
 
-const SITE = "https://new.antrasha.ru";
+const SITE = "https://antrasha.ru";
 const POLICY_URL = `${SITE}/privacy`;
 const CONTACT_EMAIL = "info@antrasha.ru";
 const OPERATOR_NAME = "Индивидуальный предприниматель Богданова Т. О.";

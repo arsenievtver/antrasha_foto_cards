@@ -1,0 +1,32 @@
+.crop-modal-backdrop {
+  z-index: 80;
+  align-items: center;
+}
+
+.crop-modal {
+  width: min(560px, 96vw);
+  max-height: 92vh;
+  overflow: auto;
+}
+
+.crop-modal__stage {
+  position: relative;
+  width: 100%;
+  height: min(52vh, 420px);
+  background: #111;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.crop-modal__zoom {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: 0.85rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.crop-modal__zoom input[type="range"] {
+  width: 100%;
+}

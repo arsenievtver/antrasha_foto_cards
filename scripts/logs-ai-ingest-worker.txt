@@ -1,1 +1,1 @@
-2026-07-25 12:10:33 | INFO  | app.jobs.ai_ingest_worker | ai_ingest_worker start: concurrency=2 fashn=True yc=True
+2026-08-01 15:43:38 | INFO  | app.jobs.ai_ingest_worker | ai_ingest_worker start: concurrency=2 fashn=True yc=True

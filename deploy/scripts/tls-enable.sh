@@ -26,12 +26,21 @@ mkdir -p "$DEPLOY_DIR/nginx/letsencrypt" "$DEPLOY_DIR/nginx/acme"
 echo "[step] ensuring stack is up in HTTP mode"
 compose up -d nginx
 
-echo "[step] issuing cert for ${APP_DOMAIN}"
+echo "[step] issuing cert for ${APP_DOMAIN}${APP_DOMAIN_ALIASES:+ (+ aliases: $APP_DOMAIN_ALIASES)}"
+# shellcheck disable=SC2206
+_app_cert_args=(-d "$APP_DOMAIN")
+if [[ -n "${APP_DOMAIN_ALIASES:-}" ]]; then
+  # shellcheck disable=SC2086
+  for _d in $APP_DOMAIN_ALIASES; do
+    _app_cert_args+=(-d "$_d")
+  done
+fi
 compose run --rm certbot certonly \
   --webroot -w /var/www/certbot \
-  -d "$APP_DOMAIN" \
+  "${_app_cert_args[@]}" \
   --email "$LETSENCRYPT_EMAIL" \
-  --agree-tos --no-eff-email --non-interactive
+  --agree-tos --no-eff-email --non-interactive \
+  --expand
 
 echo "[step] issuing cert for ${ADMIN_DOMAIN}"
 compose run --rm certbot certonly \

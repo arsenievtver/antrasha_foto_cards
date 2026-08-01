@@ -116,6 +116,12 @@ class Settings(BaseSettings):
     promo_banner_max_file_bytes: int = 8 * 1024 * 1024
     # Локальные файлы баннеров (1–3 шт., без Object Storage). Пусто = backend/data/promo-banners
     promo_banner_media_dir: str | None = None
+    hero_banner_max_file_bytes: int = 8 * 1024 * 1024
+    # Полноэкранные hero-баннеры. Пусто = backend/data/hero-banners
+    hero_banner_media_dir: str | None = None
+    home_v2_max_file_bytes: int = 8 * 1024 * 1024
+    # Фото MEN/WOMEN на /v2. Пусто = backend/data/home-v2
+    home_v2_media_dir: str | None = None
     ai_ingest_max_pending_jobs: int = 400
     ai_ingest_worker_concurrency: int = 2
     # Пусто = backend/var/ai_ingest_tmp (создаётся при старте загрузки)
@@ -149,6 +155,18 @@ class Settings(BaseSettings):
         if self.promo_banner_media_dir and str(self.promo_banner_media_dir).strip():
             return Path(self.promo_banner_media_dir).expanduser().resolve()
         return (_BACKEND_DIR / "data" / "promo-banners").resolve()
+
+    @property
+    def hero_banner_media_path(self) -> Path:
+        if self.hero_banner_media_dir and str(self.hero_banner_media_dir).strip():
+            return Path(self.hero_banner_media_dir).expanduser().resolve()
+        return (_BACKEND_DIR / "data" / "hero-banners").resolve()
+
+    @property
+    def home_v2_media_path(self) -> Path:
+        if self.home_v2_media_dir and str(self.home_v2_media_dir).strip():
+            return Path(self.home_v2_media_dir).expanduser().resolve()
+        return (_BACKEND_DIR / "data" / "home-v2").resolve()
 
     @property
     def web_push_configured(self) -> bool:

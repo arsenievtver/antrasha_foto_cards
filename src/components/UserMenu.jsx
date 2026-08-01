@@ -14,7 +14,11 @@ import { useAuth } from "../context/AuthContext";
 import PrivacyConsent from "./PrivacyConsent";
 import "./UserMenu.css";
 
-export default function UserMenu() {
+export default function UserMenu({
+	hideTrigger = false,
+	open: controlledOpen,
+	onOpenChange,
+} = {}) {
 	const {
 		profile,
 		loading,
@@ -23,7 +27,13 @@ export default function UserMenu() {
 		loginWithToken,
 		refreshProfile,
 	} = useAuth();
-	const [open, setOpen] = useState(false);
+	const [internalOpen, setInternalOpen] = useState(false);
+	const isControlled = controlledOpen !== undefined;
+	const open = isControlled ? controlledOpen : internalOpen;
+	const setOpen = (next) => {
+		if (!isControlled) setInternalOpen(next);
+		onOpenChange?.(next);
+	};
 	const [phone, setPhone] = useState(() => getRememberedPhone());
 	const [pin, setPin] = useState("");
 	const [loginErr, setLoginErr] = useState("");
@@ -77,14 +87,16 @@ export default function UserMenu() {
 
 	return (
 		<>
-			<button
-				type="button"
-				className="user-menu-trigger"
-				onClick={() => setOpen(true)}
-				aria-label="Меню пользователя"
-			>
-				<span className="user-menu-avatar">{showInitial}</span>
-			</button>
+			{hideTrigger ? null : (
+				<button
+					type="button"
+					className="user-menu-trigger"
+					onClick={() => setOpen(true)}
+					aria-label="Меню пользователя"
+				>
+					<span className="user-menu-avatar">{showInitial}</span>
+				</button>
+			)}
 
 			{open && (
 				<div

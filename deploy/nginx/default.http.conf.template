@@ -25,7 +25,7 @@ server {
 
 server {
   listen 80;
-  server_name ${APP_DOMAIN};
+  server_name ${APP_DOMAIN} ${APP_DOMAIN_ALIASES};
 
   client_max_body_size 25m;
 
