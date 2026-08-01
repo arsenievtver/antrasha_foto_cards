@@ -31,6 +31,21 @@
 	pointer-events: none;
 }
 
+@media (min-width: 720px) {
+	.hv2-header {
+		padding: calc(14px + env(safe-area-inset-top, 0px)) 22px 0;
+	}
+
+	.hv2-brand__mark {
+		width: 56px;
+		height: 56px;
+	}
+
+	.hv2-brand__name {
+		font-size: 0.82rem;
+	}
+}
+
 .hv2-brand,
 .hv2-bell {
 	pointer-events: auto;

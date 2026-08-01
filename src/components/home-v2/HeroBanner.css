@@ -116,6 +116,28 @@
 	max-width: min(15.5rem, 52%);
 }
 
+@media (min-width: 720px) {
+	.hv2-hero__content {
+		padding: calc(100px + env(safe-area-inset-top, 0px)) 28px 22px;
+	}
+
+	.hv2-hero__copy {
+		max-width: min(22rem, 48%);
+	}
+
+	.hv2-hero__title {
+		font-size: clamp(2.2rem, 4.2vw, 3rem);
+	}
+
+	.hv2-hero__subtitle {
+		font-size: 0.72rem;
+	}
+
+	.hv2-hero__body {
+		font-size: 0.68rem;
+	}
+}
+
 .hv2-hero__title {
 	margin: 0;
 	font-family: var(--hv2-serif);
