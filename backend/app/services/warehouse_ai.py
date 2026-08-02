@@ -174,11 +174,19 @@ def chat_with_warehouse_mcp(
         "anthropic-beta": MCP_BETA,
     }
 
+    proxy = (
+        str(settings.anthropic_https_proxy).strip()
+        if settings.anthropic_https_proxy and str(settings.anthropic_https_proxy).strip()
+        else None
+    )
+    proxies = {"http": proxy, "https": proxy} if proxy else None
+
     log.info(
-        "warehouse_ai request model=%s messages=%s mcp=%s",
+        "warehouse_ai request model=%s messages=%s mcp=%s proxy=%s",
         model,
         len(messages),
         server_name,
+        bool(proxy),
     )
 
     try:
@@ -187,6 +195,7 @@ def chat_with_warehouse_mcp(
             headers=headers,
             json=payload,
             timeout=timeout,
+            proxies=proxies,
         )
     except requests.RequestException as e:
         log.exception("warehouse_ai network error")
@@ -204,7 +213,13 @@ def chat_with_warehouse_mcp(
         else:
             msg = str(detail)
         log.warning("warehouse_ai Anthropic HTTP %s: %s", res.status_code, msg)
-        raise RuntimeError(f"Anthropic HTTP {res.status_code}: {msg}")
+        hint = ""
+        if res.status_code == 403 and "not allowed" in str(msg).lower():
+            hint = (
+                " — часто блок по региону/IP сервера. Задайте ANTHROPIC_HTTPS_PROXY "
+                "(выход в supported country) в .env.backend.prod и перезапустите backend."
+            )
+        raise RuntimeError(f"Anthropic HTTP {res.status_code}: {msg}{hint}")
 
     content = data.get("content") if isinstance(data, dict) else None
     reply, tools_used = _extract_text_and_tools(content if isinstance(content, list) else [])

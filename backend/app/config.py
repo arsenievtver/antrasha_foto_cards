@@ -115,6 +115,12 @@ class Settings(BaseSettings):
         default=180.0,
         validation_alias=AliasChoices("ANTHROPIC_HTTP_TIMEOUT", "anthropic_http_timeout"),
     )
+    # Если api.anthropic.com режет IP сервера (часто РФ) — HTTPS/SOCKS прокси с выходом в supported region.
+    # Пример: http://127.0.0.1:7890 или socks5://user:pass@host:1080 (для SOCKS нужен PySocks).
+    anthropic_https_proxy: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("ANTHROPIC_HTTPS_PROXY", "anthropic_https_proxy"),
+    )
     moysklad_mcp_url: str | None = Field(
         default=None,
         validation_alias=AliasChoices("MOYSKLAD_MCP_URL", "moysklad_mcp_url"),
