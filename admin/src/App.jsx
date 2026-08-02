@@ -15,6 +15,7 @@ import PromoBanners from "./pages/PromoBanners.jsx";
 import HeroBanners from "./pages/HeroBanners.jsx";
 import HomeV2GenderCards from "./pages/HomeV2GenderCards.jsx";
 import PushNotifications from "./pages/PushNotifications.jsx";
+import WarehouseAi from "./pages/WarehouseAi.jsx";
 import Seasons from "./pages/Seasons.jsx";
 import Brands from "./pages/Brands.jsx";
 import BrandOrders from "./pages/BrandOrders.jsx";
@@ -229,6 +230,14 @@ export default function App() {
               <PermissionRoute permission="product">
                 <FxRates />
               </PermissionRoute>
+            }
+          />
+          <Route
+            path="/warehouse-ai"
+            element={
+              <RoleRoute roles={["superuser"]}>
+                <WarehouseAi />
+              </RoleRoute>
             }
           />
           <Route

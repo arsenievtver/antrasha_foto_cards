@@ -98,6 +98,51 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("VAPID_CLAIMS_SUB", "vapid_claims_sub"),
     )
 
+    # Anthropic + remote MCP МойСклад (админка: ИИ-аналитика склада)
+    anthropic_api_key: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("ANTHROPIC_API_KEY", "anthropic_api_key"),
+    )
+    anthropic_model: str = Field(
+        default="claude-sonnet-4-6",
+        validation_alias=AliasChoices("ANTHROPIC_MODEL", "anthropic_model"),
+    )
+    anthropic_max_tokens: int = Field(
+        default=8192,
+        validation_alias=AliasChoices("ANTHROPIC_MAX_TOKENS", "anthropic_max_tokens"),
+    )
+    anthropic_http_timeout: float = Field(
+        default=180.0,
+        validation_alias=AliasChoices("ANTHROPIC_HTTP_TIMEOUT", "anthropic_http_timeout"),
+    )
+    moysklad_mcp_url: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("MOYSKLAD_MCP_URL", "moysklad_mcp_url"),
+    )
+    moysklad_mcp_auth_token: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("MOYSKLAD_MCP_AUTH_TOKEN", "moysklad_mcp_auth_token"),
+    )
+    moysklad_mcp_server_name: str = Field(
+        default="moysklad",
+        validation_alias=AliasChoices("MOYSKLAD_MCP_SERVER_NAME", "moysklad_mcp_server_name"),
+    )
+    # Через запятую: если задано — только эти tools (allowlist). Иначе все, минус denylist.
+    moysklad_mcp_allowed_tools: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "MOYSKLAD_MCP_ALLOWED_TOOLS",
+            "moysklad_mcp_allowed_tools",
+        ),
+    )
+    moysklad_mcp_denied_tools: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "MOYSKLAD_MCP_DENIED_TOOLS",
+            "moysklad_mcp_denied_tools",
+        ),
+    )
+
     # Fashn AI (product-to-model) — в .env: FASHN_API_KEY
     fashn_api_key: str | None = None
     # Если api.fashn.ai недоступен с IP сервера (например РФ), задайте HTTPS-прокси только для Fashn.
@@ -194,6 +239,15 @@ class Settings(BaseSettings):
     @property
     def ximilar_configured(self) -> bool:
         return bool(self.api_ximilar and str(self.api_ximilar).strip())
+
+    @property
+    def warehouse_ai_configured(self) -> bool:
+        return bool(
+            self.anthropic_api_key
+            and str(self.anthropic_api_key).strip()
+            and self.moysklad_mcp_url
+            and str(self.moysklad_mcp_url).strip()
+        )
 
 
 settings = Settings()

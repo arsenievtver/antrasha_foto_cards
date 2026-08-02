@@ -104,6 +104,12 @@ export default function Layout() {
             {can("product") && <NavItem to="/shipments">Поставки</NavItem>}
             {can("product") && <NavItem to="/fx-rates">Курс EUR</NavItem>}
           </NavGroup>
+
+          {isSuperuser && (
+            <NavGroup title="AI">
+              <NavItem to="/warehouse-ai">AI ассистент ANTRASHA</NavItem>
+            </NavGroup>
+          )}
         </nav>
 
         <div className="meta">

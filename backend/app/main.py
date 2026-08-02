@@ -19,6 +19,7 @@ from app.routers import (
     admin_procurement,
     admin_promo_banners,
     admin_push,
+    admin_warehouse_ai,
     auth,
     brands,
     feed,
@@ -120,6 +121,7 @@ app.include_router(admin_home_v2.router)
 app.include_router(admin_ai_ingest.router)
 app.include_router(admin_procurement.router)
 app.include_router(admin_push.router)
+app.include_router(admin_warehouse_ai.router)
 app.include_router(promo_banners.router)
 app.include_router(hero_banners.router)
 app.include_router(home_v2.router)

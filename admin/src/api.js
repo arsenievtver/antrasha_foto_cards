@@ -1034,3 +1034,35 @@ export async function broadcastPush(payload) {
   if (!res.ok) throw new Error(detail(data, res.statusText));
   return data;
 }
+
+export async function fetchWarehouseAiStatus() {
+  const res = await fetch(apiUrl("/admin/warehouse-ai/status"), {
+    headers: headersJson(),
+  });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
+export async function fetchWarehouseAiPresets() {
+  const res = await fetch(apiUrl("/admin/warehouse-ai/presets"), {
+    headers: headersJson(),
+  });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
+export async function postWarehouseAiChat({ messages, preset_id } = {}) {
+  const res = await fetch(apiUrl("/admin/warehouse-ai/chat"), {
+    method: "POST",
+    headers: headersJson(),
+    body: JSON.stringify({
+      messages,
+      preset_id: preset_id || null,
+    }),
+  });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
