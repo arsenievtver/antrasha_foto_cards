@@ -23,6 +23,8 @@ class OutletPhotoLookupOut(BaseModel):
     barcode: str
     entity_type: str
     variant_id: str | None = None
+    path_name: str | None = None
+    gender: str | None = None
 
 
 class OutletPhotoGenerateOut(BaseModel):

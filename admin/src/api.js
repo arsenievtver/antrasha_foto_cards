@@ -9,6 +9,7 @@ export const ADMIN_PERMISSIONS = [
   { key: "photos", label: "Фото" },
   { key: "ads", label: "Реклама" },
   { key: "product", label: "Товар" },
+  { key: "outlet", label: "Аутлет" },
 ];
 
 export const DEFAULT_WORKER_PERMISSIONS = ["photos"];

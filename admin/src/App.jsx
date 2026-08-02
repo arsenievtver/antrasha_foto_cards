@@ -48,6 +48,7 @@ function PermissionRoute({ children, permission, roles = ["superuser", "worker"]
 const HOME_FALLBACKS = [
   ["stats", "/"],
   ["photos", "/photos"],
+  ["outlet", "/outlet-photo"],
   ["clients", "/fitting-requests"],
   ["ads", "/campaigns"],
   ["product", "/seasons"],
@@ -252,7 +253,7 @@ export default function App() {
           <Route
             path="/outlet-photo"
             element={
-              <PermissionRoute permission="photos">
+              <PermissionRoute permission="outlet">
                 <OutletPhoto />
               </PermissionRoute>
             }

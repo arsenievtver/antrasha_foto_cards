@@ -71,7 +71,7 @@ def _require_fashn() -> str:
 
 @router.get("/status", response_model=OutletPhotoStatusOut)
 def outlet_photo_status(
-    _p: AdminPrincipal = Depends(require_permission("photos")),
+    _p: AdminPrincipal = Depends(require_permission("outlet")),
 ) -> OutletPhotoStatusOut:
     ms = bool(_moysklad_token())
     fashn = bool(_fashn_key())
@@ -85,7 +85,7 @@ def outlet_photo_status(
 @router.post("/lookup", response_model=OutletPhotoLookupOut)
 async def outlet_photo_lookup(
     body: OutletPhotoLookupIn,
-    _p: AdminPrincipal = Depends(require_permission("photos")),
+    _p: AdminPrincipal = Depends(require_permission("outlet")),
 ) -> OutletPhotoLookupOut:
     token = _require_moysklad()
     barcode = body.barcode.strip()
@@ -120,6 +120,8 @@ async def outlet_photo_lookup(
         barcode=ref.barcode,
         entity_type=ref.entity_type,
         variant_id=ref.variant_id,
+        path_name=ref.path_name,
+        gender=ref.gender,
     )
 
 
@@ -127,7 +129,7 @@ async def outlet_photo_lookup(
 async def outlet_photo_generate(
     gender: str = Form(...),
     image: UploadFile = File(...),
-    _p: AdminPrincipal = Depends(require_permission("photos")),
+    _p: AdminPrincipal = Depends(require_permission("outlet")),
 ) -> OutletPhotoGenerateOut:
     _require_moysklad()  # flow always needs MS later; fail early if misconfigured
     api_key = _require_fashn()
@@ -184,7 +186,7 @@ async def outlet_photo_generate(
 @router.post("/upload", response_model=OutletPhotoUploadOut)
 async def outlet_photo_upload(
     body: OutletPhotoUploadIn,
-    _p: AdminPrincipal = Depends(require_permission("photos")),
+    _p: AdminPrincipal = Depends(require_permission("outlet")),
 ) -> OutletPhotoUploadOut:
     token = _require_moysklad()
     product_id = body.product_id.strip()

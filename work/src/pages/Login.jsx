@@ -1,6 +1,12 @@
 import { useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { hasProductAccess, hasValidSession, loginWorker, setSession } from "../api.js";
+import {
+  hasValidSession,
+  hasWorkAccess,
+  loginWorker,
+  setSession,
+  workHomePath,
+} from "../api.js";
 import {
   formatPhoneMask,
   formatPinMask,
@@ -15,8 +21,8 @@ export default function Login() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  if (hasValidSession() && hasProductAccess()) {
-    return <Navigate to="/dashboard" replace />;
+  if (hasValidSession() && hasWorkAccess()) {
+    return <Navigate to={workHomePath()} replace />;
   }
 
   async function onSubmit(e) {
@@ -38,7 +44,7 @@ export default function Login() {
       }
       const data = await loginWorker(norm, p);
       setSession(data.access_token, data.role, data.permissions);
-      nav("/dashboard", { replace: true });
+      nav(workHomePath(), { replace: true });
     } catch (err) {
       setError(err.message || "Ошибка входа");
     } finally {
@@ -50,7 +56,7 @@ export default function Login() {
     <div className="login-wrap">
       <div className="login-card">
         <h1>Рабочее</h1>
-        <p className="lead">Заказы, оплаты и поставки</p>
+        <p className="lead">Закупки и аутлет</p>
         <form className="form-stack" onSubmit={onSubmit}>
           <label>
             Телефон

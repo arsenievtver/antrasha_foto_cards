@@ -1,17 +1,26 @@
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
-import { clearSession } from "../api.js";
+import { clearSession, hasOutletAccess, hasProductAccess } from "../api.js";
 
-const TABS = [
-  { to: "/dashboard", label: "Дашборд", ico: "▣" },
-  { to: "/for-order", label: "Для заказа", ico: "▤" },
-  { to: "/orders", label: "Заказы", ico: "◇" },
-  { to: "/payments", label: "Оплаты", ico: "◎" },
-  { to: "/shipments", label: "Поставки", ico: "▢" },
-];
+function buildTabs() {
+  if (!hasProductAccess() && hasOutletAccess()) {
+    return [{ to: "/outlet", label: "Аутлет", ico: "◎" }];
+  }
+  if (hasProductAccess()) {
+    return [
+      { to: "/dashboard", label: "Дашборд", ico: "▣" },
+      { to: "/orders", label: "Заказы", ico: "◇" },
+      { to: "/payments", label: "Оплаты", ico: "◎" },
+      { to: "/shipments", label: "Поставки", ico: "▢" },
+      { to: "/menu", label: "Меню", ico: "☰" },
+    ];
+  }
+  return [];
+}
 
 export default function Shell() {
   const { pathname } = useLocation();
   const page = getPageMeta(pathname);
+  const tabs = buildTabs();
 
   return (
     <div className="app-shell">
@@ -33,31 +42,35 @@ export default function Shell() {
       <main className="app-main">
         <Outlet />
       </main>
-      {page.addTo ? (
+      {page.addTo && hasProductAccess() ? (
         <Link to={page.addTo} className="fab-add" aria-label={page.addLabel}>
           +
         </Link>
       ) : null}
-      <nav className="bottom-nav" aria-label="Разделы">
-        {TABS.map((t) => (
-          <NavLink
-            key={t.to}
-            to={t.to}
-            className={({ isActive }) => (isActive ? "active" : undefined)}
-          >
-            <span className="nav-ico" aria-hidden>
-              {t.ico}
-            </span>
-            {t.label}
-          </NavLink>
-        ))}
-      </nav>
+      {tabs.length > 0 ? (
+        <nav className="bottom-nav" aria-label="Разделы">
+          {tabs.map((t) => (
+            <NavLink
+              key={t.to}
+              to={t.to}
+              className={({ isActive }) => (isActive ? "active" : undefined)}
+            >
+              <span className="nav-ico" aria-hidden>
+                {t.ico}
+              </span>
+              {t.label}
+            </NavLink>
+          ))}
+        </nav>
+      ) : null}
     </div>
   );
 }
 
 function getPageMeta(pathname) {
   if (pathname === "/dashboard") return { title: "Дашборд" };
+  if (pathname === "/menu") return { title: "Меню" };
+  if (pathname === "/outlet") return { title: "Аутлет: фото" };
   if (pathname === "/orders") return { title: "Заказы", addTo: "/orders/new", addLabel: "Добавить заказ" };
   if (pathname === "/for-order") return { title: "Для заказа" };
   if (pathname === "/payments") return { title: "Оплаты", addTo: "/payments/new", addLabel: "Добавить оплату" };
@@ -71,5 +84,5 @@ function getPageMeta(pathname) {
   if (pathname.startsWith("/orders/")) return { title: "Заказ" };
   if (pathname.startsWith("/payments/")) return { title: "Оплата" };
   if (pathname.startsWith("/shipments/")) return { title: "Поставка" };
-  return { title: "Товар" };
+  return { title: "Рабочее" };
 }

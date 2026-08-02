@@ -84,7 +84,7 @@ export function getRole() {
 }
 
 export function getPermissions() {
-  if (getRole() === "superuser") return ["product"];
+  if (getRole() === "superuser") return ["product", "outlet"];
   try {
     const raw = localStorage.getItem(PERMS_KEY);
     if (!raw) return [];
@@ -95,9 +95,28 @@ export function getPermissions() {
   }
 }
 
-export function hasProductAccess() {
+export function hasPermission(key) {
   if (getRole() === "superuser") return true;
-  return getPermissions().includes("product");
+  return getPermissions().includes(key);
+}
+
+export function hasProductAccess() {
+  return hasPermission("product");
+}
+
+export function hasOutletAccess() {
+  return hasPermission("outlet");
+}
+
+/** Вход в work PWA: закупки и/или аутлет. */
+export function hasWorkAccess() {
+  return hasProductAccess() || hasOutletAccess();
+}
+
+export function workHomePath() {
+  if (hasProductAccess()) return "/dashboard";
+  if (hasOutletAccess()) return "/outlet";
+  return "/login";
 }
 
 function detail(data, fallback) {
@@ -114,6 +133,13 @@ function headersJson() {
   return h;
 }
 
+function headersAuthOnly() {
+  const h = {};
+  const t = getToken();
+  if (t) h.Authorization = `Bearer ${t}`;
+  return h;
+}
+
 export async function loginWorker(phone, pin) {
   const res = await fetch(apiUrl("/auth/login"), {
     method: "POST",
@@ -123,11 +149,15 @@ export async function loginWorker(phone, pin) {
   const data = await parseResponseJson(res);
   if (!res.ok) throw new Error(detail(data, res.statusText));
   if (data.role !== "worker" && data.role !== "superuser") {
-    throw new Error("Нет доступа: только сотрудники с правом «Товар».");
+    throw new Error("Нет доступа: только сотрудники.");
   }
   const perms = Array.isArray(data.permissions) ? data.permissions.map(String) : [];
-  if (data.role === "worker" && !perms.includes("product")) {
-    throw new Error("Нет доступа: включите право «Товар» в админке.");
+  if (
+    data.role === "worker" &&
+    !perms.includes("product") &&
+    !perms.includes("outlet")
+  ) {
+    throw new Error("Нет доступа: включите право «Товар» или «Аутлет» в админке.");
   }
   return data;
 }
@@ -218,4 +248,51 @@ export function createShipment(body) {
 
 export function updateShipment(shipmentId, body) {
   return request(`/admin/shipments/${shipmentId}`, { method: "PATCH", body });
+}
+
+export async function fetchOutletPhotoStatus() {
+  const res = await fetch(apiUrl("/admin/outlet-photo/status"), { headers: headersJson() });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
+export async function lookupOutletPhotoBarcode(barcode) {
+  const res = await fetch(apiUrl("/admin/outlet-photo/lookup"), {
+    method: "POST",
+    headers: headersJson(),
+    body: JSON.stringify({ barcode }),
+  });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
+export async function generateOutletPhoto(gender, file) {
+  const fd = new FormData();
+  fd.append("gender", gender);
+  fd.append("image", file);
+  const res = await fetch(apiUrl("/admin/outlet-photo/generate"), {
+    method: "POST",
+    headers: headersAuthOnly(),
+    body: fd,
+  });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
+export async function uploadOutletPhotoToMoySklad({ productId, filename, content }) {
+  const res = await fetch(apiUrl("/admin/outlet-photo/upload"), {
+    method: "POST",
+    headers: headersJson(),
+    body: JSON.stringify({
+      product_id: productId,
+      filename,
+      content,
+    }),
+  });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
 }

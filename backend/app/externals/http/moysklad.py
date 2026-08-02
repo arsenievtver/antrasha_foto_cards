@@ -28,6 +28,45 @@ class MoySkladProductRef:
     barcode: str
     entity_type: str  # product | variant
     variant_id: str | None = None
+    path_name: str | None = None
+    gender: str | None = None  # male | female | None
+
+
+_LEAF_FEMALE_RE = re.compile(r"(^|[\s/(])жен(\.|$|[\s)])", re.IGNORECASE)
+_LEAF_MALE_RE = re.compile(r"(^|[\s/(])муж(\.|$|[\s)])", re.IGNORECASE)
+_FEMALE_TYPE_RE = re.compile(
+    r"\b(блуз|плать|сарафан|юбк|топ|туник|леггинс)\w*",
+    re.IGNORECASE,
+)
+
+
+def infer_gender(
+    path_name: str | None = None,
+    *,
+    folder_name: str | None = None,
+    product_name: str | None = None,
+) -> str | None:
+    """Infer male/female from MoySklad folder path (Мужская/Женская коллекция)."""
+    blob = " ".join(x for x in (path_name, folder_name) if x).casefold()
+    if "женск" in blob:
+        return "female"
+    if "мужск" in blob:
+        return "male"
+    if blob.rstrip().endswith(" жен") or _LEAF_FEMALE_RE.search(blob):
+        return "female"
+    if blob.rstrip().endswith(" муж") or _LEAF_MALE_RE.search(blob):
+        return "male"
+
+    name = (product_name or "").casefold()
+    if not name:
+        return None
+    if "женск" in name or _LEAF_FEMALE_RE.search(name) or name.rstrip().endswith(" жен."):
+        return "female"
+    if "мужск" in name or _LEAF_MALE_RE.search(name) or name.rstrip().endswith(" муж."):
+        return "male"
+    if _FEMALE_TYPE_RE.search(name):
+        return "female"
+    return None
 
 
 def _id_from_href(href: str | None) -> str | None:
@@ -131,6 +170,15 @@ class MoySkladClient(BaseApiClient):
         article_raw = row.get("article")
         code_raw = row.get("code")
         found_barcode = _first_barcode_value(row, preferred=code) or code
+        path_raw = row.get("pathName")
+        path_name = str(path_raw).strip() if path_raw is not None and str(path_raw).strip() else None
+        folder_name: str | None = None
+        pf = row.get("productFolder")
+        if isinstance(pf, dict):
+            fn = pf.get("name")
+            if fn is not None and str(fn).strip():
+                folder_name = str(fn).strip()
+        gender = infer_gender(path_name, folder_name=folder_name, product_name=name)
 
         return MoySkladProductRef(
             product_id=product_id,
@@ -140,6 +188,8 @@ class MoySkladClient(BaseApiClient):
             barcode=found_barcode,
             entity_type=entity_type,
             variant_id=variant_id,
+            path_name=path_name,
+            gender=gender,
         )
 
     async def upload_product_image(
