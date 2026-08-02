@@ -738,6 +738,53 @@ export async function deleteAiIngestJob(jobId) {
   }
 }
 
+export async function fetchOutletPhotoStatus() {
+  const res = await fetch(apiUrl("/admin/outlet-photo/status"), { headers: headersJson() });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
+export async function lookupOutletPhotoBarcode(barcode) {
+  const res = await fetch(apiUrl("/admin/outlet-photo/lookup"), {
+    method: "POST",
+    headers: headersJson(),
+    body: JSON.stringify({ barcode }),
+  });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
+export async function generateOutletPhoto(gender, file) {
+  const fd = new FormData();
+  fd.append("gender", gender);
+  fd.append("image", file);
+  const res = await fetch(apiUrl("/admin/outlet-photo/generate"), {
+    method: "POST",
+    headers: headersAuthOnly(),
+    body: fd,
+  });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
+export async function uploadOutletPhotoToMoySklad({ productId, filename, content }) {
+  const res = await fetch(apiUrl("/admin/outlet-photo/upload"), {
+    method: "POST",
+    headers: headersJson(),
+    body: JSON.stringify({
+      product_id: productId,
+      filename,
+      content,
+    }),
+  });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
 export async function fetchPromoBanners() {
   const res = await fetch(apiUrl("/admin/promo-banners"), { headers: headersJson() });
   const data = await parseResponseJson(res);

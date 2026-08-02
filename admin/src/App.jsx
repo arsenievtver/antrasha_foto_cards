@@ -9,6 +9,7 @@ import Tagging from "./pages/Tagging.jsx";
 import Users from "./pages/Users.jsx";
 import UserDetail from "./pages/UserDetail.jsx";
 import AiIngest from "./pages/AiIngest.jsx";
+import OutletPhoto from "./pages/OutletPhoto.jsx";
 import FittingRequests from "./pages/FittingRequests.jsx";
 import Campaigns from "./pages/Campaigns.jsx";
 import PromoBanners from "./pages/PromoBanners.jsx";
@@ -245,6 +246,14 @@ export default function App() {
             element={
               <PermissionRoute permission="photos">
                 <AiIngest />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/outlet-photo"
+            element={
+              <PermissionRoute permission="photos">
+                <OutletPhoto />
               </PermissionRoute>
             }
           />

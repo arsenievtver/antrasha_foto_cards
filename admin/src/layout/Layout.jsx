@@ -86,6 +86,7 @@ export default function Layout() {
             {can("photos") && <NavItem to="/tags">Справочник тегов</NavItem>}
             {can("photos") && <NavItem to="/tagging">Разметка тегов</NavItem>}
             {can("photos") && <NavItem to="/ai-ingest">ИИ: телефон → каталог</NavItem>}
+            {can("photos") && <NavItem to="/outlet-photo">Аутлет: фото</NavItem>}
           </NavGroup>
 
           <NavGroup title="Реклама">

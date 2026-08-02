@@ -142,6 +142,11 @@ class Settings(BaseSettings):
             "moysklad_mcp_denied_tools",
         ),
     )
+    # REST API МойСклад (аутлет: штрихкод → товар, загрузка изображений)
+    moysklad_token: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("MOYSKLAD_TOKEN", "moysklad_token"),
+    )
 
     # Fashn AI (product-to-model) — в .env: FASHN_API_KEY
     fashn_api_key: str | None = None

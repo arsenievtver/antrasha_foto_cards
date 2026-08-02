@@ -23,12 +23,18 @@ SEED = 42
 
 SOURCE_MODE_FLATLAY = "flatlay"
 SOURCE_MODE_ON_MODEL = "on_model"
-VALID_SOURCE_MODES = frozenset({SOURCE_MODE_FLATLAY, SOURCE_MODE_ON_MODEL})
+SOURCE_MODE_OUTLET_CATALOG = "outlet_catalog"
+# AI ingest UI / очередь — только эти режимы.
+VALID_INGEST_SOURCE_MODES = frozenset({SOURCE_MODE_FLATLAY, SOURCE_MODE_ON_MODEL})
+VALID_SOURCE_MODES = frozenset(
+    {*VALID_INGEST_SOURCE_MODES, SOURCE_MODE_OUTLET_CATALOG}
+)
 
-# on_model: tighter garment fidelity; costs more credits / slower.
+# on_model / outlet_catalog: tighter garment fidelity; costs more credits / slower.
 GENERATION_MODE_BY_SOURCE = {
     SOURCE_MODE_FLATLAY: "balanced",
     SOURCE_MODE_ON_MODEL: "quality",
+    SOURCE_MODE_OUTLET_CATALOG: "quality",
 }
 
 _PROMPTS_DIR = Path(__file__).resolve().parent.parent.parent / "prompts"
@@ -38,7 +44,9 @@ _PROMPT_CACHE: dict[str, str] = {}
 def normalize_source_mode(source_mode: str | None) -> str:
     mode = (source_mode or SOURCE_MODE_FLATLAY).strip().lower()
     if mode not in VALID_SOURCE_MODES:
-        raise ValueError("source_mode must be flatlay or on_model")
+        raise ValueError(
+            "source_mode must be flatlay, on_model, or outlet_catalog"
+        )
     return mode
 
 

@@ -23,7 +23,7 @@ from app.schemas.ai_ingest import (
     AiIngestQueueStatsOut,
     AiIngestUploadResponse,
 )
-from app.externals.http.fashn import VALID_SOURCE_MODES, normalize_source_mode
+from app.externals.http.fashn import VALID_INGEST_SOURCE_MODES, normalize_source_mode
 from app.services.ai_ingest_worker import count_pending_jobs
 from app.services.yc_storage import public_object_url
 
@@ -220,8 +220,13 @@ async def upload_batch(
     except ValueError:
         raise HTTPException(
             status_code=400,
-            detail=f"source_mode: укажите {' или '.join(sorted(VALID_SOURCE_MODES))}",
+            detail=f"source_mode: укажите {' или '.join(sorted(VALID_INGEST_SOURCE_MODES))}",
         ) from None
+    if mode not in VALID_INGEST_SOURCE_MODES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"source_mode: укажите {' или '.join(sorted(VALID_INGEST_SOURCE_MODES))}",
+        )
     badge_on = _form_bool(show_badge)
 
     db_brand = SessionLocal()
