@@ -16,16 +16,6 @@ const SCANNER_CONFIG = {
   useBarCodeDetectorIfSupported: true,
 };
 
-const SCAN_CONFIG = {
-  fps: 12,
-  qrbox: (viewW, viewH) => {
-    const w = Math.min(Math.floor(viewW * 0.92), 420);
-    const h = Math.min(Math.floor(viewH * 0.32), 160);
-    return { width: Math.max(180, w), height: Math.max(80, h) };
-  },
-  aspectRatio: 1.777,
-};
-
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
@@ -33,20 +23,17 @@ function sleep(ms) {
 function cameraErrorMessage(e) {
   const name = e?.name || "";
   const msg = String(e?.message || e || "");
+  if (/already under transition/i.test(msg)) {
+    return "Сканер ещё запускается — подождите секунду и откройте снова.";
+  }
   if (name === "NotAllowedError" || /permission|denied|not allowed/i.test(msg)) {
-    return "Нет доступа к камере. Разрешите камеру для work.antrasha.ru в настройках браузера/сайта.";
+    return "Нет доступа к камере. Разрешите камеру для work.antrasha.ru в настройках сайта.";
   }
   if (name === "NotFoundError" || /not found|no camera/i.test(msg)) {
     return "Камера не найдена на устройстве.";
   }
   if (name === "NotReadableError" || /in use|track/i.test(msg)) {
     return "Камера занята другим приложением. Закройте его и повторите.";
-  }
-  if (name === "OverconstrainedError" || /constraint/i.test(msg)) {
-    return "Камера не приняла настройки. Нажмите «Включить камеру» ещё раз.";
-  }
-  if (/secure|https|only/i.test(msg)) {
-    return "Камера доступна только по HTTPS.";
   }
   return msg || "Не удалось открыть камеру";
 }
@@ -72,56 +59,9 @@ async function decodeBarcodeFromFile(file) {
   }
 }
 
-async function startWithFallback(scanner, onSuccess, onError) {
-  /** Сначала простой facingMode — HD constraints в start() часто ломают iOS Safari. */
-  const attempts = [
-    { facingMode: { ideal: "environment" } },
-    { facingMode: "environment" },
-    true, // любая камера
-  ];
-  let lastErr = null;
-  for (const cam of attempts) {
-    try {
-      await scanner.start(cam, SCAN_CONFIG, onSuccess, onError);
-      return;
-    } catch (e) {
-      lastErr = e;
-      try {
-        if (scanner.isScanning) await scanner.stop();
-      } catch {
-        /* ignore */
-      }
-    }
-  }
-  throw lastErr || new Error("Не удалось открыть камеру");
-}
-
-async function enhanceRunningCamera(scanner) {
-  await sleep(350);
-  try {
-    const caps = scanner.getRunningTrackCapabilities?.() || {};
-    const next = {};
-    if (
-      (Array.isArray(caps.focusMode) && caps.focusMode.includes("continuous")) ||
-      typeof caps.focusMode === "string"
-    ) {
-      next.focusMode = "continuous";
-    }
-    // Мягкий апгрейд разрешения — ideal, без Overconstrained на старте.
-    if (caps.width || caps.height) {
-      next.width = { ideal: 1920 };
-      next.height = { ideal: 1080 };
-    }
-    if (Object.keys(next).length) {
-      await scanner.applyVideoConstraints(next);
-    }
-  } catch {
-    /* ignore — зум/фокус ниже важнее */
-  }
-}
-
 /**
- * @param {{ onDetected: (code: string) => void, onClose: () => void }} props
+ * Как в первой рабочей версии: один start({ facingMode }), без stop/start-циклов.
+ * Зум/фонарик/HD — только apply после успешного старта.
  */
 export default function BarcodeScanner({ onDetected, onClose }) {
   const regionId = useRef(`bc-scan-${Math.random().toString(36).slice(2, 9)}`).current;
@@ -131,11 +71,9 @@ export default function BarcodeScanner({ onDetected, onClose }) {
   const fileRef = useRef(null);
   const zoomFeatureRef = useRef(null);
   const torchFeatureRef = useRef(null);
-  const startingRef = useRef(false);
 
   const [err, setErr] = useState("");
-  const [starting, setStarting] = useState(false);
-  const [running, setRunning] = useState(false);
+  const [starting, setStarting] = useState(true);
   const [fileBusy, setFileBusy] = useState(false);
   const [torchOn, setTorchOn] = useState(false);
   const [torchSupported, setTorchSupported] = useState(false);
@@ -155,96 +93,117 @@ export default function BarcodeScanner({ onDetected, onClose }) {
     onDetectedRef.current?.(code);
   }, []);
 
-  const stopScanner = useCallback(async () => {
-    const s = scannerRef.current;
-    scannerRef.current = null;
-    zoomFeatureRef.current = null;
-    torchFeatureRef.current = null;
-    if (s) {
-      try {
-        if (s.isScanning) await s.stop();
-      } catch {
-        /* ignore */
-      }
-      try {
-        s.clear();
-      } catch {
-        /* ignore */
-      }
-    }
-    setRunning(false);
-    setTorchOn(false);
-    setTorchSupported(false);
-    setZoomSupported(false);
-  }, []);
-
   useEffect(() => {
-    return () => {
-      void stopScanner();
-    };
-  }, [stopScanner]);
-
-  /** Старт по клику — на iOS getUserMedia требует user gesture. */
-  async function startCamera() {
-    if (startingRef.current || running) return;
-    startingRef.current = true;
-    setStarting(true);
-    setErr("");
-    await stopScanner();
-
+    let cancelled = false;
     const scanner = new Html5Qrcode(regionId, SCANNER_CONFIG);
     scannerRef.current = scanner;
 
-    try {
-      await startWithFallback(
-        scanner,
-        (decoded) => emitCode(decoded),
-        () => {},
-      );
+    const startPromise = scanner.start(
+      { facingMode: "environment" },
+      {
+        fps: 10,
+        qrbox: (viewW, viewH) => {
+          const w = Math.min(Math.floor(viewW * 0.88), 360);
+          const h = Math.min(Math.floor(viewH * 0.28), 140);
+          return { width: w, height: h };
+        },
+        aspectRatio: 1.777,
+      },
+      (decoded) => {
+        if (cancelled) return;
+        emitCode(decoded);
+      },
+      () => {},
+    );
 
-      await enhanceRunningCamera(scanner);
-
+    (async () => {
       try {
-        const camCaps = scanner.getRunningTrackCameraCapabilities();
-        const zf = camCaps.zoomFeature();
-        const tf = camCaps.torchFeature();
-        zoomFeatureRef.current = zf;
-        torchFeatureRef.current = tf;
+        await startPromise;
+        if (cancelled) return;
 
-        if (zf?.isSupported?.()) {
-          const min = Number(zf.min?.() ?? 1);
-          const max = Number(zf.max?.() ?? min);
-          const step = Number(zf.step?.() || 0.1) || 0.1;
-          const preferred = Math.min(max, Math.max(min, min + (max - min) * 0.35));
-          const startZoom = Math.round(preferred / step) * step;
+        // После стабильного старта — мягкие улучшения, без повторного start/stop.
+        await sleep(500);
+        if (cancelled) return;
+
+        try {
+          const caps = scanner.getRunningTrackCapabilities?.() || {};
+          if (
+            (Array.isArray(caps.focusMode) && caps.focusMode.includes("continuous")) ||
+            typeof caps.focusMode === "string"
+          ) {
+            await scanner.applyVideoConstraints({ focusMode: "continuous" });
+          }
+        } catch {
+          /* optional */
+        }
+
+        if (cancelled) return;
+
+        try {
+          const camCaps = scanner.getRunningTrackCameraCapabilities();
+          const zf = camCaps.zoomFeature();
+          const tf = camCaps.torchFeature();
+          zoomFeatureRef.current = zf;
+          torchFeatureRef.current = tf;
+
+          if (zf?.isSupported?.()) {
+            const min = Number(zf.min?.() ?? 1);
+            const max = Number(zf.max?.() ?? min);
+            const step = Number(zf.step?.() || 0.1) || 0.1;
+            const preferred = Math.min(max, Math.max(min, min + (max - min) * 0.35));
+            const startZoom = Math.round(preferred / step) * step;
+            try {
+              await zf.apply(startZoom);
+            } catch {
+              /* ignore */
+            }
+            if (!cancelled) {
+              setZoomSupported(true);
+              setZoomMin(min);
+              setZoomMax(max);
+              setZoomStep(step);
+              setZoom(startZoom);
+            }
+          }
+
+          if (tf?.isSupported?.() && !cancelled) {
+            setTorchSupported(true);
+          }
+        } catch {
+          /* optional */
+        }
+
+        if (!cancelled) setStarting(false);
+      } catch (e) {
+        if (!cancelled) {
+          setStarting(false);
+          setErr(cameraErrorMessage(e));
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      scannerRef.current = null;
+      zoomFeatureRef.current = null;
+      torchFeatureRef.current = null;
+      // Ждём завершения start, иначе html5-qrcode: "already under transition"
+      void startPromise
+        .catch(() => {})
+        .then(async () => {
           try {
-            await zf.apply(startZoom);
+            if (scanner.isScanning) await scanner.stop();
           } catch {
             /* ignore */
           }
-          setZoomSupported(true);
-          setZoomMin(min);
-          setZoomMax(max);
-          setZoomStep(step);
-          setZoom(startZoom);
-        }
-
-        if (tf?.isSupported?.()) {
-          setTorchSupported(true);
-        }
-      } catch {
-        /* capabilities optional */
-      }
-
-      setRunning(true);
-    } catch (e) {
-      setErr(cameraErrorMessage(e));
-      await stopScanner();
-    } finally {
-      startingRef.current = false;
-      setStarting(false);
-    }
-  }
+          try {
+            scanner.clear();
+          } catch {
+            /* ignore */
+          }
+        });
+    };
+  }, [emitCode, regionId]);
 
   async function onZoomChange(value) {
     const next = Number(value);
@@ -301,19 +260,11 @@ export default function BarcodeScanner({ onDetected, onClose }) {
           </button>
         </div>
         <p className="scanner-modal__hint">
-          Нажмите «Включить камеру», держите телефон в 20–40 см. Для мелких кодов — зум или «С фото».
+          Держите телефон в 20–40 см. Для мелких кодов — зум или «С фото».
         </p>
         <div id={regionId} className="scanner-modal__view" />
 
-        {!running ? (
-          <div className="scanner-controls">
-            <button type="button" disabled={starting} onClick={() => void startCamera()}>
-              {starting ? "Открываем…" : "Включить камеру"}
-            </button>
-          </div>
-        ) : null}
-
-        {running && (zoomSupported || torchSupported) ? (
+        {!starting && (zoomSupported || torchSupported) ? (
           <div className="scanner-controls">
             {zoomSupported ? (
               <label className="scanner-controls__zoom">
@@ -344,7 +295,7 @@ export default function BarcodeScanner({ onDetected, onClose }) {
           <button
             type="button"
             className="secondary"
-            disabled={fileBusy}
+            disabled={fileBusy || starting}
             onClick={() => fileRef.current?.click()}
           >
             {fileBusy ? "Распознаём…" : "С фото / галереи"}
@@ -359,6 +310,7 @@ export default function BarcodeScanner({ onDetected, onClose }) {
           />
         </div>
 
+        {starting ? <p className="muted">Запуск камеры…</p> : null}
         {err ? <p className="error">{err}</p> : null}
       </div>
     </div>
