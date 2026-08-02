@@ -180,6 +180,9 @@ server {
 
   client_max_body_size 25m;
 
+  # Камера/сканер штрихкода в PWA (Safari/Chrome Feature Policy)
+  add_header Permissions-Policy "camera=(self), microphone=()" always;
+
   location /api/ {
     proxy_pass http://backend_upstream/;
     proxy_http_version 1.1;
