@@ -105,8 +105,8 @@ def warehouse_ai_chat(
 
     log.info(
         "warehouse_ai chat role=%s user=%s tools=%s",
-        _su.role,
-        _su.user.id if _su.user else "superuser",
+        _p.role,
+        _p.user.id if _p.user else "superuser",
         result.get("tools_used"),
     )
     return WarehouseAiChatResponse(**result)
