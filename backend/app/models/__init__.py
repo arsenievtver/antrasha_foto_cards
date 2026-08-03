@@ -1,4 +1,5 @@
 from app.models.ai_ingest_job import AiIngestJob
+from app.models.outlet_photo_upload import OutletPhotoUpload
 from app.models.try_on_job import TryOnJob
 from app.models.brand import Brand
 from app.models.brand_order import (
@@ -38,6 +39,7 @@ __all__ = [
     "Shipment",
     "FxRate",
     "AiIngestJob",
+    "OutletPhotoUpload",
     "TryOnJob",
     "FeedSettings",
     "FittingRequest",

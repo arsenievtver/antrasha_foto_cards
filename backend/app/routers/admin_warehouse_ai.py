@@ -7,7 +7,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.config import settings
-from app.deps import AdminPrincipal, require_superuser
+from app.deps import AdminPrincipal, require_permission
 from app.schemas.warehouse_ai import (
     WarehouseAiChatRequest,
     WarehouseAiChatResponse,
@@ -29,9 +29,9 @@ router = APIRouter(prefix="/admin/warehouse-ai", tags=["admin-warehouse-ai"])
 
 @router.get("/status", response_model=WarehouseAiStatusResponse)
 def warehouse_ai_status(
-    _su: AdminPrincipal = Depends(require_superuser),
+    _p: AdminPrincipal = Depends(require_permission("ai_assistant")),
 ) -> WarehouseAiStatusResponse:
-    _ = _su
+    _ = _p
     key_set = bool(settings.anthropic_api_key and str(settings.anthropic_api_key).strip())
     url_set = bool(settings.moysklad_mcp_url and str(settings.moysklad_mcp_url).strip())
     auth_set = bool(settings.moysklad_mcp_auth_token and str(settings.moysklad_mcp_auth_token).strip())
@@ -48,9 +48,9 @@ def warehouse_ai_status(
 
 @router.get("/presets", response_model=WarehouseAiPresetsResponse)
 def warehouse_ai_presets(
-    _su: AdminPrincipal = Depends(require_superuser),
+    _p: AdminPrincipal = Depends(require_permission("ai_assistant")),
 ) -> WarehouseAiPresetsResponse:
-    _ = _su
+    _ = _p
     return WarehouseAiPresetsResponse(
         items=[WarehouseAiPreset(**p) for p in WAREHOUSE_AI_PRESETS],
     )
@@ -59,8 +59,9 @@ def warehouse_ai_presets(
 @router.post("/chat", response_model=WarehouseAiChatResponse)
 def warehouse_ai_chat(
     body: WarehouseAiChatRequest,
-    _su: AdminPrincipal = Depends(require_superuser),
+    _p: AdminPrincipal = Depends(require_permission("ai_assistant")),
 ) -> WarehouseAiChatResponse:
+    _ = _p
     if not warehouse_ai_configured(settings):
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,

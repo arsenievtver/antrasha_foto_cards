@@ -1,10 +1,13 @@
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
-import { clearSession, hasOutletAccess, hasProductAccess } from "../api.js";
+import {
+  clearSession,
+  hasAiAssistantAccess,
+  hasOutletAccess,
+  hasOutletTransferAccess,
+  hasProductAccess,
+} from "../api.js";
 
 function buildTabs() {
-  if (!hasProductAccess() && hasOutletAccess()) {
-    return [{ to: "/outlet", label: "Аутлет", ico: "◎" }];
-  }
   if (hasProductAccess()) {
     return [
       { to: "/dashboard", label: "Дашборд", ico: "▣" },
@@ -14,7 +17,18 @@ function buildTabs() {
       { to: "/menu", label: "Меню", ico: "☰" },
     ];
   }
-  return [];
+
+  const tabs = [];
+  if (hasOutletAccess()) {
+    tabs.push({ to: "/outlet", label: "Съёмка", ico: "◎" });
+  }
+  if (hasOutletTransferAccess()) {
+    tabs.push({ to: "/outlet-transfer", label: "Перенос", ico: "→" });
+  }
+  if (hasAiAssistantAccess()) {
+    tabs.push({ to: "/ai-assistant", label: "AI", ico: "✦" });
+  }
+  return tabs;
 }
 
 export default function Shell() {
@@ -71,6 +85,8 @@ function getPageMeta(pathname) {
   if (pathname === "/dashboard") return { title: "Дашборд" };
   if (pathname === "/menu") return { title: "Меню" };
   if (pathname === "/outlet") return { title: "Аутлет: фото" };
+  if (pathname === "/outlet-transfer") return { title: "Аутлет: перенос" };
+  if (pathname === "/ai-assistant") return { title: "AI помощник" };
   if (pathname === "/orders") return { title: "Заказы", addTo: "/orders/new", addLabel: "Добавить заказ" };
   if (pathname === "/for-order") return { title: "Для заказа" };
   if (pathname === "/payments") return { title: "Оплаты", addTo: "/payments/new", addLabel: "Добавить оплату" };

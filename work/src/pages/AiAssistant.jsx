@@ -24,7 +24,7 @@ function MessageBubble({ role, content, meta }) {
   );
 }
 
-export default function WarehouseAi() {
+export default function AiAssistant() {
   const [status, setStatus] = useState(null);
   const [presets, setPresets] = useState([]);
   const [activePresetId, setActivePresetId] = useState(null);
@@ -88,12 +88,10 @@ export default function WarehouseAi() {
         preset_id: presetId || undefined,
       });
       const tools =
-        data.tools_used?.length > 0
-          ? `tools: ${data.tools_used.join(", ")}`
-          : null;
+        data.tools_used?.length > 0 ? `tools: ${data.tools_used.join(", ")}` : null;
       const usage =
         data.usage?.input_tokens != null
-          ? `tokens in/out: ${data.usage.input_tokens}/${data.usage.output_tokens ?? "—"}`
+          ? `tokens ${data.usage.input_tokens}/${data.usage.output_tokens ?? "—"}`
           : null;
       const meta = [data.model, tools, usage].filter(Boolean).join(" · ");
       setMessages((prev) => [
@@ -130,82 +128,55 @@ export default function WarehouseAi() {
     setActivePresetId(null);
   }
 
-  if (loading) return <p>Загрузка…</p>;
+  if (loading) return <p className="muted">Загрузка…</p>;
 
   return (
     <div className="wh-ai">
-      <div className="wh-ai__header">
-        <div>
-          <h1>AI помощник</h1>
-          <p className="muted" style={{ maxWidth: "42rem", margin: "0.35rem 0 0" }}>
-            Claude + MCP МойСклад: чтение и аналитика. Табы — готовые вопросы; ниже —
-            свободный ввод.
-          </p>
-        </div>
-        <button type="button" className="secondary" disabled={busy || !messages.length} onClick={clearChat}>
-          Очистить чат
+      <div className="wh-ai__toolbar">
+        <p className="muted small" style={{ margin: 0, flex: 1 }}>
+          Claude + МойСклад. Табы — готовые вопросы.
+        </p>
+        <button
+          type="button"
+          className="secondary"
+          disabled={busy || !messages.length}
+          onClick={clearChat}
+        >
+          Очистить
         </button>
       </div>
 
-      {err ? (
-        <p className="error" style={{ marginTop: "1rem" }}>
-          {err}
-        </p>
+      {err ? <p className="error">{err}</p> : null}
+
+      {!status?.configured ? (
+        <div className="outlet-card">
+          <p className="error" style={{ margin: 0 }}>
+            ИИ не настроен на сервере (ANTHROPIC_API_KEY / MOYSKLAD_MCP_URL).
+          </p>
+        </div>
       ) : null}
 
-      <section className="card" style={{ marginTop: "1.25rem" }}>
-        <h2 style={{ marginTop: 0, fontSize: "1.05rem" }}>Статус</h2>
-        {!status?.configured ? (
-          <p className="error" style={{ marginBottom: 0 }}>
-            Не настроено. В .env нужны{" "}
-            <code>ANTHROPIC_API_KEY</code> и <code>MOYSKLAD_MCP_URL</code>
-            {status?.mcp_auth_set === false
-              ? " (при необходимости — MOYSKLAD_MCP_AUTH_TOKEN)."
-              : "."}
-          </p>
-        ) : (
-          <ul style={{ margin: 0, paddingLeft: "1.2rem", lineHeight: 1.6 }}>
-            <li>
-              Модель: <strong>{status.model || "—"}</strong>
-            </li>
-            <li>
-              MCP URL: {status.mcp_url_set ? "задан" : "нет"}
-              {status.mcp_auth_set ? " · токен задан" : " · без токена"}
-            </li>
-            <li>
-              Allowlist tools: {status.allowlist_count || "все (пока)"}
-              {status.denylist_count
-                ? ` · denylist: ${status.denylist_count}`
-                : ""}
-            </li>
-          </ul>
-        )}
-      </section>
+      <div className="wh-ai__presets" role="tablist">
+        {presets.map((p) => (
+          <button
+            key={p.id}
+            type="button"
+            role="tab"
+            className={activePresetId === p.id ? undefined : "secondary"}
+            title={p.description}
+            disabled={busy || !status?.configured}
+            onClick={() => onPresetClick(p)}
+          >
+            {p.title}
+          </button>
+        ))}
+      </div>
 
-      <section style={{ marginTop: "1.25rem" }}>
-        <div className="tabs wh-ai__presets" role="tablist">
-          {presets.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              role="tab"
-              className={activePresetId === p.id ? "active" : ""}
-              title={p.description}
-              disabled={busy || !status?.configured}
-              onClick={() => onPresetClick(p)}
-            >
-              {p.title}
-            </button>
-          ))}
-        </div>
-      </section>
-
-      <section className="card wh-ai__chat" style={{ marginTop: "1rem" }}>
+      <section className="outlet-card wh-ai__chat">
         <div className="wh-ai__thread">
           {messages.length === 0 ? (
             <p className="muted" style={{ margin: 0 }}>
-              Выберите таб с готовым вопросом или напишите свой запрос про остатки,
-              продажи, заказы.
+              Выберите таб или напишите вопрос про остатки, продажи, заказы.
             </p>
           ) : (
             messages.map((m, i) => (
@@ -228,10 +199,10 @@ export default function WarehouseAi() {
 
         <form className="wh-ai__composer" onSubmit={onSubmit}>
           <textarea
-            rows={3}
+            rows={2}
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Свободный вопрос, например: сколько единиц Brand X на основном складе?"
+            placeholder="Свой вопрос…"
             disabled={busy || !status?.configured}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {

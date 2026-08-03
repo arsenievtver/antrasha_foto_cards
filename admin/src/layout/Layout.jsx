@@ -90,6 +90,9 @@ export default function Layout() {
 
           <NavGroup title="Аутлет">
             {can("outlet") && <NavItem to="/outlet-photo">Аутлет: фото</NavItem>}
+            {can("outlet_transfer") && (
+              <NavItem to="/outlet-transfer">Аутлет: перенос</NavItem>
+            )}
           </NavGroup>
 
           <NavGroup title="Реклама">
@@ -109,11 +112,11 @@ export default function Layout() {
             {can("product") && <NavItem to="/fx-rates">Курс EUR</NavItem>}
           </NavGroup>
 
-          {isSuperuser && (
-            <NavGroup title="AI">
-              <NavItem to="/warehouse-ai">AI ассистент ANTRASHA</NavItem>
-            </NavGroup>
-          )}
+          <NavGroup title="AI">
+            {can("ai_assistant") && (
+              <NavItem to="/warehouse-ai">AI помощник</NavItem>
+            )}
+          </NavGroup>
         </nav>
 
         <div className="meta">

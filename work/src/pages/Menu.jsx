@@ -1,5 +1,9 @@
 import { Link } from "react-router-dom";
-import { hasOutletAccess } from "../api.js";
+import {
+  hasAiAssistantAccess,
+  hasOutletAccess,
+  hasOutletTransferAccess,
+} from "../api.js";
 
 export default function Menu() {
   return (
@@ -13,6 +17,18 @@ export default function Menu() {
           <Link to="/outlet" className="menu-list__item">
             <span className="menu-list__title">Аутлет: фото</span>
             <span className="menu-list__hint">Штрихкод → Fashn → МойСклад</span>
+          </Link>
+        ) : null}
+        {hasOutletTransferAccess() ? (
+          <Link to="/outlet-transfer" className="menu-list__item">
+            <span className="menu-list__title">Аутлет: перенос</span>
+            <span className="menu-list__hint">Очередь отфотканных → перенос в аутлет</span>
+          </Link>
+        ) : null}
+        {hasAiAssistantAccess() ? (
+          <Link to="/ai-assistant" className="menu-list__item">
+            <span className="menu-list__title">AI помощник</span>
+            <span className="menu-list__hint">Чат и табы по остаткам и продажам</span>
           </Link>
         ) : null}
       </nav>

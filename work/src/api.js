@@ -84,7 +84,9 @@ export function getRole() {
 }
 
 export function getPermissions() {
-  if (getRole() === "superuser") return ["product", "outlet"];
+  if (getRole() === "superuser") {
+    return ["product", "outlet", "outlet_transfer", "ai_assistant"];
+  }
   try {
     const raw = localStorage.getItem(PERMS_KEY);
     if (!raw) return [];
@@ -108,14 +110,29 @@ export function hasOutletAccess() {
   return hasPermission("outlet");
 }
 
-/** Вход в work PWA: закупки и/или аутлет. */
+export function hasOutletTransferAccess() {
+  return hasPermission("outlet_transfer");
+}
+
+export function hasAiAssistantAccess() {
+  return hasPermission("ai_assistant");
+}
+
+/** Вход в work PWA: закупки, аутлет, перенос и/или AI. */
 export function hasWorkAccess() {
-  return hasProductAccess() || hasOutletAccess();
+  return (
+    hasProductAccess() ||
+    hasOutletAccess() ||
+    hasOutletTransferAccess() ||
+    hasAiAssistantAccess()
+  );
 }
 
 export function workHomePath() {
   if (hasProductAccess()) return "/dashboard";
   if (hasOutletAccess()) return "/outlet";
+  if (hasOutletTransferAccess()) return "/outlet-transfer";
+  if (hasAiAssistantAccess()) return "/ai-assistant";
   return "/login";
 }
 
@@ -155,9 +172,13 @@ export async function loginWorker(phone, pin) {
   if (
     data.role === "worker" &&
     !perms.includes("product") &&
-    !perms.includes("outlet")
+    !perms.includes("outlet") &&
+    !perms.includes("outlet_transfer") &&
+    !perms.includes("ai_assistant")
   ) {
-    throw new Error("Нет доступа: включите право «Товар» или «Аутлет» в админке.");
+    throw new Error(
+      "Нет доступа: включите нужное право сотрудника в админке (Товар / Аутлет / AI помощник).",
+    );
   }
   return data;
 }
@@ -282,7 +303,17 @@ export async function generateOutletPhoto(gender, file) {
   return data;
 }
 
-export async function uploadOutletPhotoToMoySklad({ productId, filename, content }) {
+export async function uploadOutletPhotoToMoySklad({
+  productId,
+  filename,
+  content,
+  name,
+  article,
+  code,
+  barcode,
+  pathName,
+  gender,
+}) {
   const res = await fetch(apiUrl("/admin/outlet-photo/upload"), {
     method: "POST",
     headers: headersJson(),
@@ -290,6 +321,70 @@ export async function uploadOutletPhotoToMoySklad({ productId, filename, content
       product_id: productId,
       filename,
       content,
+      name: name || null,
+      article: article || null,
+      code: code || null,
+      barcode: barcode || null,
+      path_name: pathName || null,
+      gender: gender || null,
+    }),
+  });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
+/** @param {"pending"|"transferred"|"all"} [filter] */
+export async function fetchOutletPhotoUploads({ filter = "pending", skip = 0, limit = 50 } = {}) {
+  const q = new URLSearchParams({
+    filter,
+    skip: String(skip),
+    limit: String(limit),
+  });
+  const res = await fetch(apiUrl(`/admin/outlet-photo/uploads?${q}`), {
+    headers: headersJson(),
+  });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
+export async function setOutletPhotoUploadTransferred(uploadId, transferred) {
+  const res = await fetch(apiUrl(`/admin/outlet-photo/uploads/${uploadId}`), {
+    method: "PATCH",
+    headers: headersJson(),
+    body: JSON.stringify({ transferred: Boolean(transferred) }),
+  });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
+export async function fetchWarehouseAiStatus() {
+  const res = await fetch(apiUrl("/admin/warehouse-ai/status"), {
+    headers: headersJson(),
+  });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
+export async function fetchWarehouseAiPresets() {
+  const res = await fetch(apiUrl("/admin/warehouse-ai/presets"), {
+    headers: headersJson(),
+  });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
+export async function postWarehouseAiChat({ messages, preset_id } = {}) {
+  const res = await fetch(apiUrl("/admin/warehouse-ai/chat"), {
+    method: "POST",
+    headers: headersJson(),
+    body: JSON.stringify({
+      messages,
+      preset_id: preset_id || null,
     }),
   });
   const data = await parseResponseJson(res);

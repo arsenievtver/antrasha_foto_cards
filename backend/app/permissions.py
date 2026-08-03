@@ -9,7 +9,9 @@ ADMIN_PERMISSIONS: dict[str, str] = {
     "photos": "Фото",
     "ads": "Реклама",
     "product": "Товар",
-    "outlet": "Аутлет",
+    "outlet": "Аутлет: фото",
+    "outlet_transfer": "Аутлет: перенос",
+    "ai_assistant": "AI помощник",
 }
 
 ADMIN_PERMISSION_KEYS: frozenset[str] = frozenset(ADMIN_PERMISSIONS)

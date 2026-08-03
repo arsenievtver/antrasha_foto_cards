@@ -4,6 +4,8 @@ import Login from "./pages/Login.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import Menu from "./pages/Menu.jsx";
 import OutletPhoto from "./pages/OutletPhoto.jsx";
+import OutletTransfer from "./pages/OutletTransfer.jsx";
+import AiAssistant from "./pages/AiAssistant.jsx";
 import OrdersList from "./pages/OrdersList.jsx";
 import OrderDetail from "./pages/OrderDetail.jsx";
 import OrderCreate from "./pages/OrderCreate.jsx";
@@ -19,7 +21,9 @@ import ShipmentCreate from "./pages/ShipmentCreate.jsx";
 import ShipmentEdit from "./pages/ShipmentEdit.jsx";
 import {
   clearSession,
+  hasAiAssistantAccess,
   hasOutletAccess,
+  hasOutletTransferAccess,
   hasProductAccess,
   hasValidSession,
   hasWorkAccess,
@@ -44,6 +48,20 @@ function RequireProduct({ children }) {
 
 function RequireOutlet({ children }) {
   if (!hasOutletAccess()) {
+    return <Navigate to={workHomePath()} replace />;
+  }
+  return children;
+}
+
+function RequireOutletTransfer({ children }) {
+  if (!hasOutletTransferAccess()) {
+    return <Navigate to={workHomePath()} replace />;
+  }
+  return children;
+}
+
+function RequireAiAssistant({ children }) {
+  if (!hasAiAssistantAccess()) {
     return <Navigate to={workHomePath()} replace />;
   }
   return children;
@@ -88,6 +106,22 @@ export default function App() {
               <RequireOutlet>
                 <OutletPhoto />
               </RequireOutlet>
+            }
+          />
+          <Route
+            path="/outlet-transfer"
+            element={
+              <RequireOutletTransfer>
+                <OutletTransfer />
+              </RequireOutletTransfer>
+            }
+          />
+          <Route
+            path="/ai-assistant"
+            element={
+              <RequireAiAssistant>
+                <AiAssistant />
+              </RequireAiAssistant>
             }
           />
           <Route

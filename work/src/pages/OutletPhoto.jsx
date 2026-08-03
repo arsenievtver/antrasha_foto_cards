@@ -205,6 +205,12 @@ export default function OutletPhoto() {
         productId: product.product_id,
         filename: resultFilename || `outlet-${Date.now()}.png`,
         content: resultB64,
+        name: product.name,
+        article: product.article,
+        code: product.code,
+        barcode: product.barcode,
+        pathName: product.path_name,
+        gender: product.gender || gender,
       });
       setStep(STEPS.SUCCESS);
     } catch (ex) {

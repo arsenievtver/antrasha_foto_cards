@@ -9,7 +9,9 @@ export const ADMIN_PERMISSIONS = [
   { key: "photos", label: "Фото" },
   { key: "ads", label: "Реклама" },
   { key: "product", label: "Товар" },
-  { key: "outlet", label: "Аутлет" },
+  { key: "outlet", label: "Аутлет: фото" },
+  { key: "outlet_transfer", label: "Аутлет: перенос" },
+  { key: "ai_assistant", label: "AI помощник" },
 ];
 
 export const DEFAULT_WORKER_PERMISSIONS = ["photos"];
@@ -771,7 +773,17 @@ export async function generateOutletPhoto(gender, file) {
   return data;
 }
 
-export async function uploadOutletPhotoToMoySklad({ productId, filename, content }) {
+export async function uploadOutletPhotoToMoySklad({
+  productId,
+  filename,
+  content,
+  name,
+  article,
+  code,
+  barcode,
+  pathName,
+  gender,
+}) {
   const res = await fetch(apiUrl("/admin/outlet-photo/upload"), {
     method: "POST",
     headers: headersJson(),
@@ -779,7 +791,39 @@ export async function uploadOutletPhotoToMoySklad({ productId, filename, content
       product_id: productId,
       filename,
       content,
+      name: name || null,
+      article: article || null,
+      code: code || null,
+      barcode: barcode || null,
+      path_name: pathName || null,
+      gender: gender || null,
     }),
+  });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
+/** @param {"pending"|"transferred"|"all"} [filter] */
+export async function fetchOutletPhotoUploads({ filter = "pending", skip = 0, limit = 50 } = {}) {
+  const q = new URLSearchParams({
+    filter,
+    skip: String(skip),
+    limit: String(limit),
+  });
+  const res = await fetch(apiUrl(`/admin/outlet-photo/uploads?${q}`), {
+    headers: headersJson(),
+  });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
+export async function setOutletPhotoUploadTransferred(uploadId, transferred) {
+  const res = await fetch(apiUrl(`/admin/outlet-photo/uploads/${uploadId}`), {
+    method: "PATCH",
+    headers: headersJson(),
+    body: JSON.stringify({ transferred: Boolean(transferred) }),
   });
   const data = await parseResponseJson(res);
   if (!res.ok) throw new Error(detail(data, res.statusText));

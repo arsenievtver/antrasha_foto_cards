@@ -10,6 +10,7 @@ import Users from "./pages/Users.jsx";
 import UserDetail from "./pages/UserDetail.jsx";
 import AiIngest from "./pages/AiIngest.jsx";
 import OutletPhoto from "./pages/OutletPhoto.jsx";
+import OutletTransfer from "./pages/OutletTransfer.jsx";
 import FittingRequests from "./pages/FittingRequests.jsx";
 import Campaigns from "./pages/Campaigns.jsx";
 import PromoBanners from "./pages/PromoBanners.jsx";
@@ -49,6 +50,8 @@ const HOME_FALLBACKS = [
   ["stats", "/"],
   ["photos", "/photos"],
   ["outlet", "/outlet-photo"],
+  ["outlet_transfer", "/outlet-transfer"],
+  ["ai_assistant", "/warehouse-ai"],
   ["clients", "/fitting-requests"],
   ["ads", "/campaigns"],
   ["product", "/seasons"],
@@ -237,9 +240,9 @@ export default function App() {
           <Route
             path="/warehouse-ai"
             element={
-              <RoleRoute roles={["superuser"]}>
+              <PermissionRoute permission="ai_assistant">
                 <WarehouseAi />
-              </RoleRoute>
+              </PermissionRoute>
             }
           />
           <Route
@@ -255,6 +258,14 @@ export default function App() {
             element={
               <PermissionRoute permission="outlet">
                 <OutletPhoto />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/outlet-transfer"
+            element={
+              <PermissionRoute permission="outlet_transfer">
+                <OutletTransfer />
               </PermissionRoute>
             }
           />
