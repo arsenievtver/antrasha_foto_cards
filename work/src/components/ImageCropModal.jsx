@@ -1,5 +1,7 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import Cropper from "react-easy-crop";
+import ReactCrop, { centerCrop, convertToPixelCrop, makeAspectCrop } from "react-image-crop";
+import "react-image-crop/dist/ReactCrop.css";
 
 async function createCroppedBlob(imageSrc, pixelCrop, mime = "image/jpeg") {
   const image = await new Promise((resolve, reject) => {
@@ -40,6 +42,19 @@ async function createCroppedBlob(imageSrc, pixelCrop, mime = "image/jpeg") {
   return blob;
 }
 
+function initialFreeCrop(mediaWidth, mediaHeight) {
+  return centerCrop(
+    makeAspectCrop(
+      { unit: "%", width: 90 },
+      mediaWidth / mediaHeight,
+      mediaWidth,
+      mediaHeight,
+    ),
+    mediaWidth,
+    mediaHeight,
+  );
+}
+
 export default function ImageCropModal({
   imageSrc,
   aspect,
@@ -48,9 +63,16 @@ export default function ImageCropModal({
   onCancel,
   onConfirm,
 }) {
+  const free = aspect == null;
+  const imgRef = useRef(null);
+
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
+
+  const [freeCrop, setFreeCrop] = useState();
+  const [completedFreeCrop, setCompletedFreeCrop] = useState(null);
+
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
@@ -58,12 +80,32 @@ export default function ImageCropModal({
     setCroppedAreaPixels(pixels);
   }, []);
 
+  function onFreeImageLoad(e) {
+    const { naturalWidth, naturalHeight } = e.currentTarget;
+    const next = initialFreeCrop(naturalWidth, naturalHeight);
+    setFreeCrop(next);
+    setCompletedFreeCrop(next);
+  }
+
   async function handleConfirm() {
-    if (!croppedAreaPixels) return;
     setBusy(true);
     setErr("");
     try {
-      const blob = await createCroppedBlob(imageSrc, croppedAreaPixels);
+      let pixelCrop = croppedAreaPixels;
+      if (free) {
+        const img = imgRef.current;
+        if (!img || !completedFreeCrop?.width || !completedFreeCrop?.height) {
+          throw new Error("Выделите область обрезки");
+        }
+        pixelCrop = convertToPixelCrop(
+          completedFreeCrop,
+          img.naturalWidth,
+          img.naturalHeight,
+        );
+      }
+      if (!pixelCrop) throw new Error("Выделите область обрезки");
+
+      const blob = await createCroppedBlob(imageSrc, pixelCrop);
       const file = new File([blob], `outlet-crop-${Date.now()}.jpg`, {
         type: "image/jpeg",
       });
@@ -76,6 +118,10 @@ export default function ImageCropModal({
     }
   }
 
+  const canConfirm = free
+    ? Boolean(completedFreeCrop?.width && completedFreeCrop?.height)
+    : Boolean(croppedAreaPixels);
+
   return (
     <div className="scanner-backdrop crop-backdrop" role="presentation" onClick={onCancel}>
       <div
@@ -86,36 +132,55 @@ export default function ImageCropModal({
       >
         <h3 style={{ marginTop: 0 }}>{title}</h3>
         {hint ? <p className="muted" style={{ marginTop: 0 }}>{hint}</p> : null}
-        <div className="crop-modal__stage">
-          <Cropper
-            image={imageSrc}
-            crop={crop}
-            zoom={zoom}
-            aspect={aspect}
-            onCropChange={setCrop}
-            onZoomChange={setZoom}
-            onCropComplete={onCropComplete}
-            showGrid
-            objectFit="contain"
-          />
+        <div className={`crop-modal__stage${free ? " crop-modal__stage--free" : ""}`}>
+          {free ? (
+            <ReactCrop
+              crop={freeCrop}
+              onChange={(c) => setFreeCrop(c)}
+              onComplete={(c) => setCompletedFreeCrop(c)}
+              keepSelection
+            >
+              <img
+                ref={imgRef}
+                src={imageSrc}
+                alt="Исходник"
+                onLoad={onFreeImageLoad}
+                style={{ maxHeight: "min(48vh, 380px)", width: "auto", maxWidth: "100%" }}
+              />
+            </ReactCrop>
+          ) : (
+            <Cropper
+              image={imageSrc}
+              crop={crop}
+              zoom={zoom}
+              aspect={aspect}
+              onCropChange={setCrop}
+              onZoomChange={setZoom}
+              onCropComplete={onCropComplete}
+              showGrid
+              objectFit="contain"
+            />
+          )}
         </div>
-        <label className="crop-modal__zoom">
-          <span>Масштаб</span>
-          <input
-            type="range"
-            min={1}
-            max={3}
-            step={0.01}
-            value={zoom}
-            onChange={(e) => setZoom(Number(e.target.value))}
-          />
-        </label>
+        {!free ? (
+          <label className="crop-modal__zoom">
+            <span>Масштаб</span>
+            <input
+              type="range"
+              min={1}
+              max={3}
+              step={0.01}
+              value={zoom}
+              onChange={(e) => setZoom(Number(e.target.value))}
+            />
+          </label>
+        ) : null}
         {err ? <p className="error">{err}</p> : null}
         <div className="row-actions" style={{ marginTop: "0.75rem" }}>
           <button type="button" className="secondary" onClick={onCancel} disabled={busy}>
             Отмена
           </button>
-          <button type="button" onClick={handleConfirm} disabled={busy || !croppedAreaPixels}>
+          <button type="button" onClick={handleConfirm} disabled={busy || !canConfirm}>
             {busy ? "Обрезаем…" : "Применить кадр"}
           </button>
         </div>
