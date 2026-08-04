@@ -1236,19 +1236,6 @@ button.switch-toggle:disabled {
   overflow: hidden;
 }
 
-.crop-modal__stage--free {
-  height: auto;
-  min-height: min(48vh, 380px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.5rem;
-}
-
-.crop-modal__stage--free .ReactCrop {
-  max-width: 100%;
-}
-
 .crop-modal__zoom {
   display: flex;
   flex-direction: column;

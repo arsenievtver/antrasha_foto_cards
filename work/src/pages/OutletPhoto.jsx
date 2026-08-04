@@ -16,6 +16,8 @@ const STEPS = {
   SUCCESS: "success",
 };
 
+const CROP_ASPECT = 4 / 5;
+
 function revokeUrl(url) {
   if (url && String(url).startsWith("blob:")) {
     try {
@@ -365,7 +367,7 @@ export default function OutletPhoto() {
 
       {step === STEPS.PREVIEW_CROP && (
         <div className="outlet-card">
-          <p style={{ marginTop: 0 }}>Кадр — отправить в Fashn?</p>
+          <p style={{ marginTop: 0 }}>Кадр 4:5 — отправить в Fashn?</p>
           {croppedPreview ? (
             <img src={croppedPreview} alt="Кадр" className="outlet-preview" />
           ) : null}
@@ -424,8 +426,9 @@ export default function OutletPhoto() {
       {cropOpen && rawSrc ? (
         <ImageCropModal
           imageSrc={rawSrc}
-          title="Обрезка кадра"
-          hint="Тяните стороны рамки — в кадре только товар. Соотношение сторон свободное."
+          aspect={CROP_ASPECT}
+          title="Кадр 4:5"
+          hint="Уберите лишнее — в рамке только товар."
           onCancel={onCropCancel}
           onConfirm={onCropConfirm}
         />
