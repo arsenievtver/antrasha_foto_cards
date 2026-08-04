@@ -19,6 +19,12 @@ function fmtDate(iso) {
   }
 }
 
+function genderLabel(g) {
+  if (g === "female") return "жен";
+  if (g === "male") return "муж";
+  return "—";
+}
+
 async function copyText(text) {
   if (!text) return false;
   try {
@@ -92,8 +98,11 @@ export default function OutletUploadsPanel({ refreshKey = 0 }) {
   }
 
   async function onCopyArticle(row) {
-    const text = row.article || row.code || "";
-    if (!text) return;
+    const text = (row.article || "").trim();
+    if (!text) {
+      setErr("У позиции нет артикула в МойСклад");
+      return;
+    }
     const ok = await copyText(text);
     if (ok) {
       setCopiedId(row.id);
@@ -106,9 +115,9 @@ export default function OutletUploadsPanel({ refreshKey = 0 }) {
   return (
     <section className="outlet-uploads">
       <h2 style={{ marginTop: 0, marginBottom: "0.35rem" }}>Аутлет: перенос</h2>
-      <p style={{ color: "var(--muted)", marginTop: 0, marginBottom: "0.85rem", maxWidth: 640 }}>
+      <p style={{ color: "var(--muted)", marginTop: 0, marginBottom: "0.85rem", maxWidth: 720 }}>
         Отфотканные модели. Перенесите позицию в раздел аутлета в МойСклад, снизьте цену и отметьте
-        «Перенесено».
+        «Перенесено». Кнопка копирует именно артикул (не код МС и не штрихкод).
       </p>
 
       <div className="flex-gap" style={{ flexWrap: "wrap", marginBottom: "0.75rem", gap: "0.5rem" }}>
@@ -145,13 +154,17 @@ export default function OutletUploadsPanel({ refreshKey = 0 }) {
                 <th>Когда</th>
                 <th>Сотрудник</th>
                 <th>Артикул</th>
+                <th>Штрихкод</th>
+                <th>Код МС</th>
                 <th>Товар</th>
+                <th>Пол</th>
+                <th>Папка</th>
                 <th>Перенесено</th>
               </tr>
             </thead>
             <tbody>
               {items.map((row) => {
-                const article = row.article || row.code || "";
+                const article = (row.article || "").trim();
                 return (
                   <tr key={row.id}>
                     <td style={{ whiteSpace: "nowrap" }}>{fmtDate(row.created_at)}</td>
@@ -169,16 +182,23 @@ export default function OutletUploadsPanel({ refreshKey = 0 }) {
                           >
                             {copiedId === row.id ? "✓" : "Копировать"}
                           </button>
-                        ) : null}
+                        ) : (
+                          <span style={{ fontSize: "0.8rem", color: "var(--muted)" }}>
+                            нет артикула
+                          </span>
+                        )}
                       </span>
                     </td>
                     <td>
-                      <div>{row.product_name || "—"}</div>
-                      {row.barcode ? (
-                        <div style={{ fontSize: "0.8rem", color: "var(--muted)" }}>
-                          {row.barcode}
-                        </div>
-                      ) : null}
+                      <code style={{ fontSize: "0.85rem" }}>{row.barcode || "—"}</code>
+                    </td>
+                    <td>
+                      <code style={{ fontSize: "0.85rem" }}>{row.code || "—"}</code>
+                    </td>
+                    <td>{row.product_name || "—"}</td>
+                    <td>{genderLabel(row.gender)}</td>
+                    <td style={{ maxWidth: 220, fontSize: "0.85rem", color: "var(--muted)" }}>
+                      {row.path_name || "—"}
                     </td>
                     <td>
                       <button

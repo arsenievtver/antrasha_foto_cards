@@ -144,6 +144,12 @@ label {
   margin: 0 auto;
 }
 
+@media (min-width: 900px) {
+  .app-main:has(.outlet-uploads) {
+    max-width: 1120px;
+  }
+}
+
 .bottom-nav {
   position: fixed;
   left: 0;
@@ -1065,6 +1071,10 @@ label {
   gap: 0.65rem;
 }
 
+.outlet-uploads__table-wrap {
+  display: none;
+}
+
 .outlet-uploads__item {
   padding: 0.7rem 0.75rem;
   border-radius: 12px;
@@ -1083,7 +1093,25 @@ label {
 
 .outlet-uploads__name {
   font-weight: 600;
-  margin-bottom: 0.35rem;
+  margin-bottom: 0.45rem;
+}
+
+.outlet-uploads__fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 0.55rem;
+}
+
+.outlet-uploads__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  font-size: 0.85rem;
+}
+
+.outlet-uploads__field > .muted {
+  font-size: 0.75rem;
 }
 
 .outlet-uploads__article-row {
@@ -1091,7 +1119,6 @@ label {
   align-items: center;
   gap: 0.5rem;
   flex-wrap: wrap;
-  margin-bottom: 0.55rem;
 }
 
 .outlet-uploads__article-row code {
@@ -1103,12 +1130,69 @@ label {
   font-size: 0.8rem;
 }
 
+.outlet-uploads__path {
+  font-size: 0.82rem;
+  word-break: break-word;
+}
+
 .outlet-uploads__switch-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
   font-size: 0.9rem;
+}
+
+@media (min-width: 900px) {
+  .outlet-uploads__list--cards {
+    display: none;
+  }
+
+  .outlet-uploads__table-wrap {
+    display: block;
+    overflow-x: auto;
+    margin: 0 -0.25rem;
+  }
+
+  .outlet-uploads__table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+  }
+
+  .outlet-uploads__table th,
+  .outlet-uploads__table td {
+    text-align: left;
+    padding: 0.55rem 0.45rem;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+
+  .outlet-uploads__table th {
+    color: var(--muted);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .outlet-uploads__table .nowrap {
+    white-space: nowrap;
+  }
+
+  .outlet-uploads__table code {
+    font-size: 0.85rem;
+  }
+
+  .outlet-uploads__path-cell {
+    max-width: 200px;
+    font-size: 0.8rem;
+    color: var(--muted);
+    word-break: break-word;
+  }
+
+  .outlet-uploads__table .outlet-uploads__article-row > button {
+    padding: 0.2rem 0.45rem;
+    font-size: 0.75rem;
+  }
 }
 
 button.switch-toggle {

@@ -122,6 +122,24 @@ class MoySkladClient(BaseApiClient):
             "Content-Type": "application/json",
         }
 
+    async def _product_article(self, product_id: str) -> str | None:
+        """Артикул часто живёт на родительском товаре, а не на модификации."""
+        try:
+            resp = await self.get(f"/entity/product/{product_id}")
+        except ApiClientAbortableException as e:
+            log.warning(
+                "moysklad product article product=%s HTTP %s",
+                product_id,
+                e.response.status,
+            )
+            return None
+        data = resp.parsed_response if isinstance(resp.parsed_response, dict) else {}
+        raw = data.get("article")
+        if raw is None:
+            return None
+        text = str(raw).strip()
+        return text or None
+
     async def find_by_barcode(self, barcode: str) -> MoySkladProductRef:
         code = barcode.strip()
         if not code:
@@ -130,7 +148,11 @@ class MoySkladClient(BaseApiClient):
         try:
             resp = await self.get(
                 "/entity/assortment",
-                params={"filter": f"barcode={code}", "limit": 1},
+                params={
+                    "filter": f"barcode={code}",
+                    "limit": 1,
+                    "expand": "product",
+                },
             )
         except ApiClientAbortableException as e:
             log.warning(
@@ -158,16 +180,27 @@ class MoySkladClient(BaseApiClient):
 
         product_id = entity_id
         variant_id: str | None = None
+        parent_product = row.get("product") if isinstance(row.get("product"), dict) else {}
         if entity_type == "variant":
             variant_id = entity_id
-            product_meta = row.get("product") if isinstance(row.get("product"), dict) else {}
-            p_meta = product_meta.get("meta") if isinstance(product_meta.get("meta"), dict) else {}
-            product_id = _id_from_href(p_meta.get("href")) or str(product_meta.get("id") or "").strip().lower()
+            p_meta = parent_product.get("meta") if isinstance(parent_product.get("meta"), dict) else {}
+            product_id = _id_from_href(p_meta.get("href")) or str(parent_product.get("id") or "").strip().lower()
             if not product_id:
                 raise RuntimeError("MoySklad: variant without parent product id")
 
         name = str(row.get("name") or "").strip() or "Без названия"
         article_raw = row.get("article")
+        if (article_raw is None or not str(article_raw).strip()) and parent_product:
+            article_raw = parent_product.get("article")
+        article = (
+            str(article_raw).strip()
+            if article_raw is not None and str(article_raw).strip()
+            else None
+        )
+        # У модификаций артикул часто только у родителя — дотягиваем отдельно.
+        if not article and product_id and entity_type == "variant":
+            article = await self._product_article(product_id)
+
         code_raw = row.get("code")
         found_barcode = _first_barcode_value(row, preferred=code) or code
         path_raw = row.get("pathName")
@@ -183,7 +216,7 @@ class MoySkladClient(BaseApiClient):
         return MoySkladProductRef(
             product_id=product_id,
             name=name,
-            article=str(article_raw).strip() if article_raw is not None and str(article_raw).strip() else None,
+            article=article,
             code=str(code_raw).strip() if code_raw is not None and str(code_raw).strip() else None,
             barcode=found_barcode,
             entity_type=entity_type,

@@ -25,6 +25,12 @@ function fmtDate(iso) {
   }
 }
 
+function genderLabel(g) {
+  if (g === "female") return "жен";
+  if (g === "male") return "муж";
+  return "";
+}
+
 async function copyText(text) {
   if (!text) return false;
   try {
@@ -46,6 +52,39 @@ async function copyText(text) {
       return false;
     }
   }
+}
+
+function CopyArticleButton({ row, copiedId, onCopy }) {
+  const article = (row.article || "").trim();
+  if (!article) {
+    return <span className="muted">нет артикула</span>;
+  }
+  return (
+    <button
+      type="button"
+      className="secondary"
+      title="Скопировать артикул"
+      onClick={() => onCopy(row)}
+    >
+      {copiedId === row.id ? "Скопировано" : "Копировать"}
+    </button>
+  );
+}
+
+function TransferSwitch({ row, busyId, onToggle }) {
+  return (
+    <button
+      type="button"
+      className="switch-toggle"
+      role="switch"
+      aria-checked={row.transferred}
+      aria-label="Перенесено"
+      disabled={busyId === row.id}
+      onClick={() => onToggle(row)}
+    >
+      <span className="switch-thumb" aria-hidden />
+    </button>
+  );
 }
 
 export default function OutletUploadsPanel({ refreshKey = 0 }) {
@@ -98,14 +137,17 @@ export default function OutletUploadsPanel({ refreshKey = 0 }) {
   }
 
   async function onCopyArticle(row) {
-    const text = row.article || row.code || "";
-    if (!text) return;
+    const text = (row.article || "").trim();
+    if (!text) {
+      setErr("У позиции нет артикула в МойСклад");
+      return;
+    }
     const ok = await copyText(text);
     if (ok) {
       setCopiedId(row.id);
       window.setTimeout(() => setCopiedId((cur) => (cur === row.id ? null : cur)), 1500);
     } else {
-      setErr("Не удалось скопировать");
+      setErr("Не удалось скопировать артикул");
     }
   }
 
@@ -114,7 +156,7 @@ export default function OutletUploadsPanel({ refreshKey = 0 }) {
       <div className="outlet-card">
         <div className="outlet-uploads__title">Очередь переноса</div>
         <p className="muted small" style={{ marginTop: 4, marginBottom: "0.75rem" }}>
-          В МойСклад → аутлет и цену → отметьте «Перенесено».
+          В МойСклад → аутлет и цену → отметьте «Перенесено». Копируется только артикул.
         </p>
 
         <div className="outlet-uploads__filters">
@@ -129,6 +171,9 @@ export default function OutletUploadsPanel({ refreshKey = 0 }) {
               {filter === f.value && !loading ? ` (${total})` : ""}
             </button>
           ))}
+          <button type="button" className="secondary" onClick={load} disabled={loading}>
+            {loading ? "…" : "Обновить"}
+          </button>
         </div>
 
         {err ? <p className="error">{err}</p> : null}
@@ -140,47 +185,116 @@ export default function OutletUploadsPanel({ refreshKey = 0 }) {
             {filter === "pending" ? "Нет позиций к переносу." : "Список пуст."}
           </p>
         ) : (
-          <ul className="outlet-uploads__list">
-            {items.map((row) => {
-              const article = row.article || row.code || "";
-              return (
-                <li key={row.id} className="outlet-uploads__item">
-                  <div className="outlet-uploads__meta">
-                    <span>{fmtDate(row.created_at)}</span>
-                    <span className="muted">·</span>
-                    <span>{row.uploaded_by_label || "—"}</span>
-                  </div>
-                  <div className="outlet-uploads__name">{row.product_name || "—"}</div>
-                  <div className="outlet-uploads__article-row">
-                    <code>{article || "—"}</code>
-                    {article ? (
-                      <button
-                        type="button"
-                        className="secondary"
-                        onClick={() => onCopyArticle(row)}
-                      >
-                        {copiedId === row.id ? "Скопировано" : "Копировать"}
-                      </button>
-                    ) : null}
-                  </div>
-                  <div className="outlet-uploads__switch-row">
-                    <span>Перенесено</span>
-                    <button
-                      type="button"
-                      className="switch-toggle"
-                      role="switch"
-                      aria-checked={row.transferred}
-                      aria-label="Перенесено"
-                      disabled={busyId === row.id}
-                      onClick={() => onToggle(row)}
-                    >
-                      <span className="switch-thumb" aria-hidden />
-                    </button>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+          <>
+            <ul className="outlet-uploads__list outlet-uploads__list--cards">
+              {items.map((row) => {
+                const article = (row.article || "").trim();
+                const g = genderLabel(row.gender);
+                return (
+                  <li key={row.id} className="outlet-uploads__item">
+                    <div className="outlet-uploads__meta">
+                      <span>{fmtDate(row.created_at)}</span>
+                      <span className="muted">·</span>
+                      <span>{row.uploaded_by_label || "—"}</span>
+                      {g ? (
+                        <>
+                          <span className="muted">·</span>
+                          <span>{g}</span>
+                        </>
+                      ) : null}
+                    </div>
+                    <div className="outlet-uploads__name">{row.product_name || "—"}</div>
+                    <div className="outlet-uploads__fields">
+                      <div className="outlet-uploads__field">
+                        <span className="muted">Артикул</span>
+                        <div className="outlet-uploads__article-row">
+                          <code>{article || "—"}</code>
+                          <CopyArticleButton
+                            row={row}
+                            copiedId={copiedId}
+                            onCopy={onCopyArticle}
+                          />
+                        </div>
+                      </div>
+                      {row.barcode ? (
+                        <div className="outlet-uploads__field">
+                          <span className="muted">Штрихкод</span>
+                          <code>{row.barcode}</code>
+                        </div>
+                      ) : null}
+                      {row.code ? (
+                        <div className="outlet-uploads__field">
+                          <span className="muted">Код МС</span>
+                          <code>{row.code}</code>
+                        </div>
+                      ) : null}
+                      {row.path_name ? (
+                        <div className="outlet-uploads__field">
+                          <span className="muted">Папка</span>
+                          <span className="outlet-uploads__path">{row.path_name}</span>
+                        </div>
+                      ) : null}
+                    </div>
+                    <div className="outlet-uploads__switch-row">
+                      <span>Перенесено</span>
+                      <TransferSwitch row={row} busyId={busyId} onToggle={onToggle} />
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+
+            <div className="outlet-uploads__table-wrap">
+              <table className="outlet-uploads__table">
+                <thead>
+                  <tr>
+                    <th>Когда</th>
+                    <th>Сотрудник</th>
+                    <th>Артикул</th>
+                    <th>Штрихкод</th>
+                    <th>Код МС</th>
+                    <th>Товар</th>
+                    <th>Пол</th>
+                    <th>Папка</th>
+                    <th>Перенесено</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((row) => {
+                    const article = (row.article || "").trim();
+                    return (
+                      <tr key={row.id}>
+                        <td className="nowrap">{fmtDate(row.created_at)}</td>
+                        <td>{row.uploaded_by_label || "—"}</td>
+                        <td>
+                          <div className="outlet-uploads__article-row">
+                            <code>{article || "—"}</code>
+                            <CopyArticleButton
+                              row={row}
+                              copiedId={copiedId}
+                              onCopy={onCopyArticle}
+                            />
+                          </div>
+                        </td>
+                        <td>
+                          <code>{row.barcode || "—"}</code>
+                        </td>
+                        <td>
+                          <code>{row.code || "—"}</code>
+                        </td>
+                        <td>{row.product_name || "—"}</td>
+                        <td>{genderLabel(row.gender) || "—"}</td>
+                        <td className="outlet-uploads__path-cell">{row.path_name || "—"}</td>
+                        <td>
+                          <TransferSwitch row={row} busyId={busyId} onToggle={onToggle} />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
     </section>
