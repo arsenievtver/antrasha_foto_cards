@@ -92,14 +92,7 @@ export default function App() {
               </RequireProduct>
             }
           />
-          <Route
-            path="/menu"
-            element={
-              <RequireProduct>
-                <Menu />
-              </RequireProduct>
-            }
-          />
+          <Route path="/menu" element={<Menu />} />
           <Route
             path="/outlet"
             element={

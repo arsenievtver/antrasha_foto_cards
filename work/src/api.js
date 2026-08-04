@@ -130,10 +130,18 @@ export function hasWorkAccess() {
 
 export function workHomePath() {
   if (hasProductAccess()) return "/dashboard";
-  if (hasOutletAccess()) return "/outlet";
-  if (hasOutletTransferAccess()) return "/outlet-transfer";
-  if (hasAiAssistantAccess()) return "/ai-assistant";
+  if (hasOutletAccess() || hasOutletTransferAccess() || hasAiAssistantAccess()) {
+    return "/menu";
+  }
   return "/login";
+}
+
+/** Актуальные роль/права (как в админке) — без повторного логина. */
+export async function fetchAdminMe() {
+  const res = await fetch(apiUrl("/admin/me"), { headers: headersAuthOnly() });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
 }
 
 function detail(data, fallback) {

@@ -1,32 +1,29 @@
+import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import {
   clearSession,
-  hasAiAssistantAccess,
-  hasOutletAccess,
-  hasOutletTransferAccess,
+  fetchAdminMe,
+  getToken,
   hasProductAccess,
+  hasWorkAccess,
+  setSession,
 } from "../api.js";
 
+const PERMS_REFRESH_THROTTLE_MS = 60_000;
+
+/** Таббар: только закупки (если есть «Товар») + Меню для остального. */
 function buildTabs() {
+  const tabs = [];
   if (hasProductAccess()) {
-    return [
+    tabs.push(
       { to: "/dashboard", label: "Дашборд", ico: "▣" },
       { to: "/orders", label: "Заказы", ico: "◇" },
       { to: "/payments", label: "Оплаты", ico: "◎" },
       { to: "/shipments", label: "Поставки", ico: "▢" },
-      { to: "/menu", label: "Меню", ico: "☰" },
-    ];
+    );
   }
-
-  const tabs = [];
-  if (hasOutletAccess()) {
-    tabs.push({ to: "/outlet", label: "Съёмка", ico: "◎" });
-  }
-  if (hasOutletTransferAccess()) {
-    tabs.push({ to: "/outlet-transfer", label: "Перенос", ico: "→" });
-  }
-  if (hasAiAssistantAccess()) {
-    tabs.push({ to: "/ai-assistant", label: "AI", ico: "✦" });
+  if (hasWorkAccess()) {
+    tabs.push({ to: "/menu", label: "Меню", ico: "☰" });
   }
   return tabs;
 }
@@ -34,7 +31,47 @@ function buildTabs() {
 export default function Shell() {
   const { pathname } = useLocation();
   const page = getPageMeta(pathname);
+  const [, setPermTick] = useState(0);
+  const lastRefreshAt = useRef(0);
   const tabs = buildTabs();
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function refreshPermissions({ force = false } = {}) {
+      const now = Date.now();
+      if (!force && now - lastRefreshAt.current < PERMS_REFRESH_THROTTLE_MS) {
+        return;
+      }
+      lastRefreshAt.current = now;
+      try {
+        const me = await fetchAdminMe();
+        if (cancelled) return;
+        setSession(getToken(), me.role, me.permissions || []);
+        if (!hasWorkAccess()) {
+          clearSession();
+          window.location.replace("/login");
+          return;
+        }
+        setPermTick((n) => n + 1);
+      } catch {
+        /* оставляем права из логина */
+      }
+    }
+
+    refreshPermissions({ force: true });
+
+    function onVisibility() {
+      if (document.visibilityState === "visible") {
+        refreshPermissions();
+      }
+    }
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
 
   return (
     <div className="app-shell">

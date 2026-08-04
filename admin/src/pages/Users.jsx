@@ -251,6 +251,13 @@ export default function Users() {
       <p style={{ color: "var(--muted)", fontSize: "0.9rem" }}>
         Клиенты — приложение (телефон + PIN 4–12 цифр). Сотрудники — админка (PIN 6 цифр) с
         правами по разделам.
+        {isWorkers ? (
+          <>
+            {" "}
+            Чекбоксы прав сохраняются сразу. В work PWA права подтянутся при открытии или
+            возврате во вкладку (без обязательного выхода).
+          </>
+        ) : null}
       </p>
 
       <div className="tabs" style={{ maxWidth: 420, marginBottom: "1rem" }}>

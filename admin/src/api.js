@@ -9,8 +9,8 @@ export const ADMIN_PERMISSIONS = [
   { key: "photos", label: "Фото" },
   { key: "ads", label: "Реклама" },
   { key: "product", label: "Товар" },
-  { key: "outlet", label: "Аутлет: фото" },
-  { key: "outlet_transfer", label: "Аутлет: перенос" },
+  { key: "outlet", label: "Аутлет: съёмка (PWA)" },
+  { key: "outlet_transfer", label: "Аутлет: очередь переноса (PWA)" },
   { key: "ai_assistant", label: "AI помощник" },
 ];
 

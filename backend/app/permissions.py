@@ -9,8 +9,8 @@ ADMIN_PERMISSIONS: dict[str, str] = {
     "photos": "Фото",
     "ads": "Реклама",
     "product": "Товар",
-    "outlet": "Аутлет: фото",
-    "outlet_transfer": "Аутлет: перенос",
+    "outlet": "Аутлет: съёмка (PWA)",
+    "outlet_transfer": "Аутлет: очередь переноса (PWA)",
     "ai_assistant": "AI помощник",
 }
 
