@@ -102,6 +102,11 @@ def build_system_prompt(*, now: datetime | None = None) -> str:
 Если период не указан: для оперативки — текущий календарный месяц или последние 30 дней; для графика — последние 12 полных месяцев + текущий (отметь, что текущий неполный).
 Суммы в ₽, периоды датами ISO. Кратко, с допущениями в одной строке. Не выдумывай цифры и не додумывай префиксы артикулов (PFTTR и т.п.), если не видел их в данных.
 Если вопрос неоднозначен (склад, бренд, розница vs опт) — одно разумное допущение (обычно Антраша / торговая выручка / поставщик бренда) и пометь его, либо один уточняющий вопрос.
+
+## Формат ответа (обязательно)
+- В одном ответе пользователю: данные и выводы. Не останавливайся на фразах «сейчас найду», «давай начнём», «продолжу анализ».
+- Сначала вызови нужные tools, потом сразу итоговый текст с цифрами/таблицами.
+- Не проси пользователя написать «продолжай» — сервер сам продолжит MCP-цикл при необходимости.
 """
 
 
@@ -217,15 +222,94 @@ def parse_tools_csv(raw: str | None) -> list[str]:
     return [p.strip() for p in str(raw).split(",") if p.strip()]
 
 
+# Read-only / аналитика. Без create/update/delete. Режет ~сотни KB схем tools на каждый запрос.
+DEFAULT_MCP_ALLOWED_TOOLS: tuple[str, ...] = (
+    "report_sales_plotseries",
+    "report_dashboard_day",
+    "report_dashboard_week",
+    "report_dashboard_month",
+    "report_profit_byproduct",
+    "report_profit_byvariant",
+    "report_profit_bycounterparty",
+    "report_profit_byemployee",
+    "report_counterparty",
+    "report_counterparty_one",
+    "report_stock_all",
+    "report_stock_bystore",
+    "report_stock_all_current",
+    "report_stock_bystore_current",
+    "report_money_byaccount",
+    "report_money_plotseries",
+    "report_orders_plotseries",
+    "report_turnover_all",
+    "report_turnover_byoperations",
+    "counterparty_list",
+    "counterparty_get",
+    "product_list",
+    "product_get",
+    "assortment_list",
+    "productfolder_list",
+    "productfolder_get",
+    "variant_list",
+    "variant_get",
+    "store_list",
+    "store_get",
+    "customerorder_list",
+    "customerorder_get",
+    "demand_list",
+    "demand_get",
+    "retaildemand_list",
+    "retaildemand_get",
+    "retailshift_list",
+    "retailshift_get",
+    "retailstore_list",
+    "retailstore_get",
+    "organization_list",
+    "organization_get",
+    "invoiceout_list",
+    "paymentin_list",
+    "cashin_list",
+)
+
+_PLANNING_ONLY_RE = (
+    "сейчас найд",
+    "сейчас начн",
+    "давай начн",
+    "начну анализ",
+    "начнём с",
+    "начнем с",
+    "продолжу анализ",
+    "прежде чем начать",
+    "уточню допущение",
+    "let me start",
+    "i'll start",
+    "i will start",
+)
+
+
+def resolved_allowed_tools(settings: Settings) -> list[str] | None:
+    """
+    None = все tools с MCP.
+    list = allowlist.
+    """
+    raw = settings.moysklad_mcp_allowed_tools
+    if raw is not None and str(raw).strip():
+        token = str(raw).strip().lower()
+        if token in ("all", "*", "any"):
+            return None
+        return parse_tools_csv(raw)
+    return list(DEFAULT_MCP_ALLOWED_TOOLS)
+
+
 def build_mcp_toolset(settings: Settings) -> dict[str, Any]:
     name = (settings.moysklad_mcp_server_name or "moysklad").strip() or "moysklad"
     toolset: dict[str, Any] = {
         "type": "mcp_toolset",
         "mcp_server_name": name,
     }
-    allowed = parse_tools_csv(settings.moysklad_mcp_allowed_tools)
+    allowed = resolved_allowed_tools(settings)
     denied = parse_tools_csv(settings.moysklad_mcp_denied_tools)
-    if allowed:
+    if allowed is not None:
         toolset["default_config"] = {"enabled": False}
         toolset["configs"] = {t: {"enabled": True} for t in allowed}
     elif denied:
@@ -242,66 +326,58 @@ def _extract_text_and_tools(content: list[Any]) -> tuple[str, list[str]]:
         btype = block.get("type")
         if btype == "text" and block.get("text"):
             texts.append(str(block["text"]))
-        elif btype == "mcp_tool_use" and block.get("name"):
+        elif btype in ("mcp_tool_use", "server_tool_use", "tool_use") and block.get("name"):
             tools.append(str(block["name"]))
     return "\n\n".join(texts).strip(), tools
 
 
-def chat_with_warehouse_mcp(
-    settings: Settings,
+def _merge_usage(dst: dict[str, int], src: object) -> None:
+    if not isinstance(src, dict):
+        return
+    for key in (
+        "input_tokens",
+        "output_tokens",
+        "cache_creation_input_tokens",
+        "cache_read_input_tokens",
+    ):
+        if key in src and src[key] is not None:
+            try:
+                dst[key] = dst.get(key, 0) + int(src[key])
+            except (TypeError, ValueError):
+                pass
+
+
+def _looks_like_planning_only(text: str, tools_used: list[str]) -> bool:
+    if tools_used:
+        return False
+    low = (text or "").strip().lower()
+    if len(low) > 900:
+        return False
+    return any(p in low for p in _PLANNING_ONLY_RE)
+
+
+def _anthropic_proxies(settings: Settings) -> dict[str, str] | None:
+    proxy = (
+        str(settings.anthropic_https_proxy).strip()
+        if settings.anthropic_https_proxy and str(settings.anthropic_https_proxy).strip()
+        else None
+    )
+    return {"http": proxy, "https": proxy} if proxy else None
+
+
+def _post_anthropic(
     *,
-    messages: list[dict[str, str]],
+    api_key: str,
+    payload: dict[str, Any],
+    timeout: float,
+    proxies: dict[str, str] | None,
 ) -> dict[str, Any]:
-    if not warehouse_ai_configured(settings):
-        raise RuntimeError("Warehouse AI не настроен (ANTHROPIC_API_KEY / MOYSKLAD_MCP_URL)")
-
-    api_key = str(settings.anthropic_api_key).strip()
-    mcp_url = str(settings.moysklad_mcp_url).strip()
-    server_name = (settings.moysklad_mcp_server_name or "moysklad").strip() or "moysklad"
-    model = (settings.anthropic_model or "claude-sonnet-4-6").strip()
-    max_tokens = max(256, int(settings.anthropic_max_tokens or 8192))
-    timeout = max(30.0, float(settings.anthropic_http_timeout or 180.0))
-
-    mcp_server: dict[str, Any] = {
-        "type": "url",
-        "url": mcp_url,
-        "name": server_name,
-    }
-    token = settings.moysklad_mcp_auth_token
-    if token and str(token).strip():
-        mcp_server["authorization_token"] = str(token).strip()
-
-    payload: dict[str, Any] = {
-        "model": model,
-        "max_tokens": max_tokens,
-        "system": build_system_prompt(),
-        "messages": messages,
-        "mcp_servers": [mcp_server],
-        "tools": [build_mcp_toolset(settings)],
-    }
-
     headers = {
         "Content-Type": "application/json",
         "x-api-key": api_key,
         "anthropic-version": ANTHROPIC_VERSION,
         "anthropic-beta": MCP_BETA,
     }
-
-    proxy = (
-        str(settings.anthropic_https_proxy).strip()
-        if settings.anthropic_https_proxy and str(settings.anthropic_https_proxy).strip()
-        else None
-    )
-    proxies = {"http": proxy, "https": proxy} if proxy else None
-
-    log.info(
-        "warehouse_ai request model=%s messages=%s mcp=%s proxy=%s",
-        model,
-        len(messages),
-        server_name,
-        bool(proxy),
-    )
-
     try:
         res = requests.post(
             ANTHROPIC_API_URL,
@@ -334,25 +410,145 @@ def chat_with_warehouse_mcp(
             )
         raise RuntimeError(f"Anthropic HTTP {res.status_code}: {msg}{hint}")
 
-    content = data.get("content") if isinstance(data, dict) else None
-    reply, tools_used = _extract_text_and_tools(content if isinstance(content, list) else [])
+    if not isinstance(data, dict):
+        raise RuntimeError("Anthropic: неожиданный ответ")
+    return data
+
+
+def chat_with_warehouse_mcp(
+    settings: Settings,
+    *,
+    messages: list[dict[str, str]],
+) -> dict[str, Any]:
+    if not warehouse_ai_configured(settings):
+        raise RuntimeError("Warehouse AI не настроен (ANTHROPIC_API_KEY / MOYSKLAD_MCP_URL)")
+
+    api_key = str(settings.anthropic_api_key).strip()
+    mcp_url = str(settings.moysklad_mcp_url).strip()
+    server_name = (settings.moysklad_mcp_server_name or "moysklad").strip() or "moysklad"
+    model = (settings.anthropic_model or "claude-sonnet-4-6").strip()
+    max_tokens = max(256, int(settings.anthropic_max_tokens or 8192))
+    timeout = max(30.0, float(settings.anthropic_http_timeout or 180.0))
+    max_continues = max(0, int(settings.anthropic_mcp_max_continues or 5))
+    proxies = _anthropic_proxies(settings)
+
+    mcp_server: dict[str, Any] = {
+        "type": "url",
+        "url": mcp_url,
+        "name": server_name,
+    }
+    token = settings.moysklad_mcp_auth_token
+    if token and str(token).strip():
+        mcp_server["authorization_token"] = str(token).strip()
+
+    # История для API: строки + при pause_turn — сырые content-блоки ассистента.
+    api_messages: list[dict[str, Any]] = [
+        {"role": m["role"], "content": m["content"]} for m in messages
+    ]
+    base_payload: dict[str, Any] = {
+        "model": model,
+        "max_tokens": max_tokens,
+        "system": build_system_prompt(),
+        "mcp_servers": [mcp_server],
+        "tools": [build_mcp_toolset(settings)],
+    }
+
+    allowed = resolved_allowed_tools(settings)
+    log.info(
+        "warehouse_ai request model=%s messages=%s mcp=%s proxy=%s allowlist=%s",
+        model,
+        len(api_messages),
+        server_name,
+        bool(proxies),
+        "all" if allowed is None else len(allowed),
+    )
+
+    usage: dict[str, int] = {}
+    tools_used: list[str] = []
+    reply = ""
+    stop_reason: str | None = None
+    model_out = model
+    planning_nudge_used = False
+    continues = 0
+
+    while True:
+        data = _post_anthropic(
+            api_key=api_key,
+            payload={**base_payload, "messages": api_messages},
+            timeout=timeout,
+            proxies=proxies,
+        )
+        _merge_usage(usage, data.get("usage"))
+        model_out = str(data.get("model") or model_out)
+        stop_reason = data.get("stop_reason")
+        content = data.get("content") if isinstance(data.get("content"), list) else []
+        text, round_tools = _extract_text_and_tools(content)
+        tools_used.extend(round_tools)
+        if text:
+            reply = text
+
+        log.info(
+            "warehouse_ai round stop=%s tools=%s out_chars=%s continues=%s",
+            stop_reason,
+            round_tools,
+            len(text or ""),
+            continues,
+        )
+
+        # Серверный MCP-цикл упёрся в лимит итераций — продолжаем без «продолжай» от пользователя.
+        if stop_reason == "pause_turn" and continues < max_continues:
+            api_messages = [
+                *api_messages,
+                {"role": "assistant", "content": content},
+            ]
+            continues += 1
+            continue
+
+        # Haiku часто пишет «сейчас начну» и end_turn без tools — один авто-пинок.
+        if (
+            stop_reason == "end_turn"
+            and not planning_nudge_used
+            and _looks_like_planning_only(reply, round_tools)
+            and continues < max_continues
+        ):
+            api_messages = [
+                *api_messages,
+                {"role": "assistant", "content": content if content else reply},
+                {
+                    "role": "user",
+                    "content": (
+                        "Не описывай план. Сразу вызови нужные MCP tools МойСклад "
+                        "и верни итоговый анализ с цифрами и таблицами."
+                    ),
+                },
+            ]
+            planning_nudge_used = True
+            continues += 1
+            continue
+
+        break
+
     if not reply:
         reply = "Модель не вернула текстовый ответ. Попробуйте переформулировать вопрос."
+    elif stop_reason == "pause_turn":
+        reply += (
+            "\n\n_(Ответ оборван: MCP-цикл достиг лимита продолжений. "
+            "Сузьте вопрос или повторите запрос.)_"
+        )
 
-    usage_raw = data.get("usage") if isinstance(data, dict) else None
-    usage: dict[str, int] = {}
-    if isinstance(usage_raw, dict):
-        for key in ("input_tokens", "output_tokens", "cache_creation_input_tokens", "cache_read_input_tokens"):
-            if key in usage_raw and usage_raw[key] is not None:
-                try:
-                    usage[key] = int(usage_raw[key])
-                except (TypeError, ValueError):
-                    pass
+    # Уникальные tools, порядок первого появления
+    seen: set[str] = set()
+    tools_unique: list[str] = []
+    for t in tools_used:
+        if t not in seen:
+            seen.add(t)
+            tools_unique.append(t)
 
     return {
         "reply": reply,
-        "model": str(data.get("model") or model),
-        "tools_used": tools_used,
-        "stop_reason": data.get("stop_reason") if isinstance(data, dict) else None,
+        "model": model_out,
+        "tools_used": tools_unique,
+        "stop_reason": stop_reason,
         "usage": usage,
+        "continues": continues,
     }

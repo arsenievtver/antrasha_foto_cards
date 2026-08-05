@@ -87,15 +87,23 @@ export default function WarehouseAi() {
         messages: payload,
         preset_id: presetId || undefined,
       });
-      const tools =
-        data.tools_used?.length > 0
-          ? `tools: ${data.tools_used.join(", ")}`
+      const ops =
+        (data.operations || data.tools_used)?.length > 0
+          ? `ops: ${(data.operations || data.tools_used).join(", ")}`
           : null;
       const usage =
         data.usage?.input_tokens != null
           ? `tokens in/out: ${data.usage.input_tokens}/${data.usage.output_tokens ?? "—"}`
           : null;
-      const meta = [data.model, tools, usage].filter(Boolean).join(" · ");
+      const cont =
+        data.continues > 0 ? `continues: ${data.continues}` : null;
+      const cache =
+        data.cache_hits > 0 ? `cache: ${data.cache_hits}` : null;
+      const mode = data.mode ? `mode: ${data.mode}` : null;
+      const stop = data.stop_reason ? `stop: ${data.stop_reason}` : null;
+      const meta = [data.model, mode, ops, usage, cache, cont, stop]
+        .filter(Boolean)
+        .join(" · ");
       setMessages((prev) => [
         ...prev,
         { role: "assistant", content: data.reply, display: data.reply, meta },
@@ -136,10 +144,9 @@ export default function WarehouseAi() {
     <div className="wh-ai">
       <div className="wh-ai__header">
         <div>
-          <h1>AI помощник</h1>
+          <h1>AI ассистент ANTRASHA</h1>
           <p className="muted" style={{ maxWidth: "42rem", margin: "0.35rem 0 0" }}>
-            Claude + MCP МойСклад: чтение и аналитика. Табы — готовые вопросы; ниже —
-            свободный ввод.
+            Semantic-аналитика: вопрос → операции МойСклад → ответ. Табы и свободный ввод.
           </p>
         </div>
         <button type="button" className="secondary" disabled={busy || !messages.length} onClick={clearChat}>
@@ -157,26 +164,28 @@ export default function WarehouseAi() {
         <h2 style={{ marginTop: 0, fontSize: "1.05rem" }}>Статус</h2>
         {!status?.configured ? (
           <p className="error" style={{ marginBottom: 0 }}>
-            Не настроено. В .env нужны{" "}
-            <code>ANTHROPIC_API_KEY</code> и <code>MOYSKLAD_MCP_URL</code>
-            {status?.mcp_auth_set === false
-              ? " (при необходимости — MOYSKLAD_MCP_AUTH_TOKEN)."
-              : "."}
+            Не настроено. Нужны <code>ANTHROPIC_API_KEY</code> и{" "}
+            {status?.mode === "legacy_mcp" ? (
+              <code>MOYSKLAD_MCP_URL</code>
+            ) : (
+              <code>MOYSKLAD_TOKEN</code>
+            )}
+            .
           </p>
         ) : (
           <ul style={{ margin: 0, paddingLeft: "1.2rem", lineHeight: 1.6 }}>
             <li>
-              Модель: <strong>{status.model || "—"}</strong>
-            </li>
-            <li>
-              MCP URL: {status.mcp_url_set ? "задан" : "нет"}
-              {status.mcp_auth_set ? " · токен задан" : " · без токена"}
-            </li>
-            <li>
-              Allowlist tools: {status.allowlist_count || "все (пока)"}
-              {status.denylist_count
-                ? ` · denylist: ${status.denylist_count}`
+              Режим: <strong>{status.mode || "semantic"}</strong>
+              {status.operations_count
+                ? ` · операций: ${status.operations_count}`
                 : ""}
+            </li>
+            <li>
+              Router / writer: {status.router_model || "—"} / {status.writer_model || status.model || "—"}
+            </li>
+            <li>
+              МойСклад token: {status.moysklad_token_set ? "задан" : "нет"}
+              {status.mcp_url_set ? " · MCP URL задан" : ""}
             </li>
           </ul>
         )}

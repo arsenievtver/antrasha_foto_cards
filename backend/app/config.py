@@ -98,7 +98,7 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("VAPID_CLAIMS_SUB", "vapid_claims_sub"),
     )
 
-    # Anthropic + remote MCP МойСклад (админка: ИИ-аналитика склада)
+    # Anthropic + warehouse AI
     anthropic_api_key: str | None = Field(
         default=None,
         validation_alias=AliasChoices("ANTHROPIC_API_KEY", "anthropic_api_key"),
@@ -106,6 +106,25 @@ class Settings(BaseSettings):
     anthropic_model: str = Field(
         default="claude-sonnet-4-6",
         validation_alias=AliasChoices("ANTHROPIC_MODEL", "anthropic_model"),
+    )
+    # semantic (default) | legacy_mcp
+    warehouse_ai_mode: str = Field(
+        default="semantic",
+        validation_alias=AliasChoices("WAREHOUSE_AI_MODE", "warehouse_ai_mode"),
+    )
+    warehouse_ai_router_model: str = Field(
+        default="claude-haiku-4-5",
+        validation_alias=AliasChoices(
+            "WAREHOUSE_AI_ROUTER_MODEL",
+            "warehouse_ai_router_model",
+        ),
+    )
+    warehouse_ai_writer_model: str = Field(
+        default="claude-sonnet-4-6",
+        validation_alias=AliasChoices(
+            "WAREHOUSE_AI_WRITER_MODEL",
+            "warehouse_ai_writer_model",
+        ),
     )
     anthropic_max_tokens: int = Field(
         default=8192,
@@ -133,7 +152,8 @@ class Settings(BaseSettings):
         default="moysklad",
         validation_alias=AliasChoices("MOYSKLAD_MCP_SERVER_NAME", "moysklad_mcp_server_name"),
     )
-    # Через запятую: если задано — только эти tools (allowlist). Иначе все, минус denylist.
+    # Через запятую: allowlist tools. Пусто = встроенный read-only набор (см. warehouse_ai.py).
+    # Значение all / * — все tools с MCP (дорого по токенам).
     moysklad_mcp_allowed_tools: str | None = Field(
         default=None,
         validation_alias=AliasChoices(
@@ -146,6 +166,14 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices(
             "MOYSKLAD_MCP_DENIED_TOOLS",
             "moysklad_mcp_denied_tools",
+        ),
+    )
+    # Сколько раз продолжать ответ при stop_reason=pause_turn (серверный MCP-цикл).
+    anthropic_mcp_max_continues: int = Field(
+        default=5,
+        validation_alias=AliasChoices(
+            "ANTHROPIC_MCP_MAX_CONTINUES",
+            "anthropic_mcp_max_continues",
         ),
     )
     # REST API МойСклад (аутлет: штрихкод → товар, загрузка изображений)
@@ -253,12 +281,17 @@ class Settings(BaseSettings):
 
     @property
     def warehouse_ai_configured(self) -> bool:
-        return bool(
-            self.anthropic_api_key
-            and str(self.anthropic_api_key).strip()
-            and self.moysklad_mcp_url
-            and str(self.moysklad_mcp_url).strip()
-        )
+        key = bool(self.anthropic_api_key and str(self.anthropic_api_key).strip())
+        if not key:
+            return False
+        mode = (self.warehouse_ai_mode or "semantic").strip().lower()
+        if mode == "legacy_mcp":
+            return bool(self.moysklad_mcp_url and str(self.moysklad_mcp_url).strip())
+        return bool(self.moysklad_token and str(self.moysklad_token).strip())
+
+    @property
+    def moysklad_configured(self) -> bool:
+        return bool(self.moysklad_token and str(self.moysklad_token).strip())
 
 
 settings = Settings()

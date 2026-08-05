@@ -114,7 +114,7 @@ export default function Layout() {
 
           <NavGroup title="AI">
             {can("ai_assistant") && (
-              <NavItem to="/warehouse-ai">AI помощник</NavItem>
+              <NavItem to="/warehouse-ai">AI ассистент ANTRASHA</NavItem>
             )}
           </NavGroup>
         </nav>
