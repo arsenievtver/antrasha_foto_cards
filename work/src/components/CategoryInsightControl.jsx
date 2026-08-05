@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { fetchCategoryOrderInsight } from "../api.js";
+import SizeSalesChart from "./SizeSalesChart.jsx";
 import { eur } from "../utils/money.js";
 
 /**
@@ -76,6 +77,12 @@ function CategoryInsightModal({ categoryId, seasonId, onClose }) {
   }, [onClose]);
 
   const g = data?.guidance;
+  const rows = g?.size_summary_rows || [];
+  const chart = g?.size_sales_chart || {};
+  const labels = chart.labels || [];
+  const values = chart.sellQuantity || [];
+  const reinforce = new Set(g?.reinforce_sizes || []);
+  const weaken = new Set(g?.weaken_sizes || []);
   const remaining = data?.remaining_eur;
   const remainingTone =
     remaining == null
@@ -148,6 +155,44 @@ function CategoryInsightModal({ categoryId, seasonId, onClose }) {
                 )}
                 {g.comment ? (
                   <p className="guidance-card__comment">{g.comment}</p>
+                ) : null}
+
+                {rows.length ? (
+                  <table className="guidance-table">
+                    <thead>
+                      <tr>
+                        <th>Размер</th>
+                        <th title="Продано ВЛ2025+ВЛ2026 + остатки ВЛ2025+ВЛ2026">
+                          Поступило
+                        </th>
+                        <th>Продано</th>
+                        <th title="Все остатки весна-лето (как в комментарии)">
+                          Остатки
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map((row) => (
+                        <tr key={row.size}>
+                          <td>{row.size}</td>
+                          <td>{row.received_total}</td>
+                          <td>{row.sold_total}</td>
+                          <td>{row.stock_total}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <p className="guidance-card__nochart">Нет данных по размерам</p>
+                )}
+
+                {labels.length ? (
+                  <SizeSalesChart
+                    labels={labels}
+                    values={values}
+                    reinforce={reinforce}
+                    weaken={weaken}
+                  />
                 ) : null}
               </section>
             ) : (
