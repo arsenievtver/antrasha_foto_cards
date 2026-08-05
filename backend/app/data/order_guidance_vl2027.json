@@ -12,7 +12,8 @@
     "fresh_definition": "ВЛ2026 within SS stock",
     "old_definition": "other SS seasons (ВЛ2025 and older SS)",
     "table_rule": "sold_total = ВЛ2025+ВЛ2026 net sales; stock_total = all SS stock (same F+O as comment); received_total = sold_total + stock of ВЛ2025+ВЛ2026 only (two-season intake; may be less than stock_total if old SS tails)",
-    "chart_rule": "per category; X = sizes ascending; Y = sold pcs of ВЛ2025+ВЛ2026 for Feb 2025–now"
+    "chart_rule": "per category; X = sizes ascending; Y = sold pcs of ВЛ2025+ВЛ2026 for Feb 2025–now",
+    "ms_folder_split": "июль 2026: брюки/джинсы ≠ бриджи/шорты; платья ≠ юбки. Sales/stock for split cats from name-heuristic of pre-split dumps (product moved with history in MS; size analytics rebuilt)."
   },
   "categories": [
     {
@@ -283,16 +284,16 @@
     },
     {
       "key": "men_pants",
-      "name": "Брюки, джинсы, бриджи, шорты муж",
+      "name": "Брюки, джинсы муж",
       "gender": "men",
       "moy_sklad_id": "46b4f0d3-5708-11e9-9ff4-315000d079ad",
-      "order_amount_eur": 11230.5,
-      "comment": "Остатки: 282 шт (170;112) 170-ВЛ2026; 112-старые. Усилить: 38/34 (2;5), 40/34 (1;5), 35/34 (2;7), 44/34 (0;1). Ослабить: 33/32 (8;0), 34/32 (7;0), 35/32 (7;0).",
+      "order_amount_eur": 9622.9,
+      "comment": "Остатки: 211 шт (125;86) 125-ВЛ2026; 86-старые. Усилить: 38/34 (2;5), 40/34 (1;5), 35/34 (2;7), 52 (16;5). Ослабить: 33/32 (8;0), 34/32 (7;0), 35/32 (7;0).",
       "reinforce_sizes": [
         "38/34",
         "40/34",
         "35/34",
-        "44/34"
+        "52"
       ],
       "weaken_sizes": [
         "33/32",
@@ -300,9 +301,9 @@
         "35/32"
       ],
       "stock_totals": {
-        "total": 282,
-        "fresh_vl26": 170,
-        "old": 112
+        "total": 211,
+        "fresh_vl26": 125,
+        "old": 86
       },
       "size_summary_rows": [
         {
@@ -324,12 +325,6 @@
           "stock_total": 12
         },
         {
-          "size": "33",
-          "received_total": 1,
-          "sold_total": 1,
-          "stock_total": 0
-        },
-        {
           "size": "33/32",
           "received_total": 8,
           "sold_total": 0,
@@ -340,12 +335,6 @@
           "received_total": 26,
           "sold_total": 14,
           "stock_total": 14
-        },
-        {
-          "size": "34",
-          "received_total": 1,
-          "sold_total": 0,
-          "stock_total": 1
         },
         {
           "size": "34/32",
@@ -360,12 +349,6 @@
           "stock_total": 9
         },
         {
-          "size": "35",
-          "received_total": 1,
-          "sold_total": 0,
-          "stock_total": 1
-        },
-        {
           "size": "35/32",
           "received_total": 8,
           "sold_total": 1,
@@ -378,12 +361,6 @@
           "stock_total": 9
         },
         {
-          "size": "36",
-          "received_total": 1,
-          "sold_total": 0,
-          "stock_total": 1
-        },
-        {
           "size": "36/32",
           "received_total": 8,
           "sold_total": 1,
@@ -394,12 +371,6 @@
           "received_total": 25,
           "sold_total": 16,
           "stock_total": 11
-        },
-        {
-          "size": "38",
-          "received_total": 1,
-          "sold_total": 0,
-          "stock_total": 1
         },
         {
           "size": "38/32",
@@ -453,43 +424,43 @@
           "size": "46",
           "received_total": 2,
           "sold_total": 2,
-          "stock_total": 2
+          "stock_total": 0
         },
         {
           "size": "48",
-          "received_total": 33,
-          "sold_total": 20,
-          "stock_total": 16
+          "received_total": 21,
+          "sold_total": 14,
+          "stock_total": 7
         },
         {
           "size": "50",
-          "received_total": 80,
-          "sold_total": 51,
-          "stock_total": 30
+          "received_total": 53,
+          "sold_total": 32,
+          "stock_total": 21
         },
         {
           "size": "52",
-          "received_total": 94,
-          "sold_total": 59,
-          "stock_total": 37
+          "received_total": 63,
+          "sold_total": 42,
+          "stock_total": 21
         },
         {
           "size": "54",
-          "received_total": 82,
-          "sold_total": 48,
-          "stock_total": 35
+          "received_total": 53,
+          "sold_total": 32,
+          "stock_total": 21
         },
         {
           "size": "56",
-          "received_total": 53,
-          "sold_total": 27,
-          "stock_total": 28
+          "received_total": 35,
+          "sold_total": 21,
+          "stock_total": 15
         },
         {
           "size": "58",
-          "received_total": 16,
-          "sold_total": 10,
-          "stock_total": 7
+          "received_total": 8,
+          "sold_total": 6,
+          "stock_total": 3
         }
       ],
       "size_sales_chart": {
@@ -507,7 +478,6 @@
           "31/34",
           "32/32",
           "32/34",
-          "33",
           "33/34",
           "34/32",
           "34/34",
@@ -533,7 +503,6 @@
           1,
           2,
           13,
-          1,
           14,
           1,
           17,
@@ -548,12 +517,136 @@
           3,
           3,
           2,
-          20,
-          51,
-          59,
-          48,
-          27,
-          10
+          14,
+          32,
+          42,
+          32,
+          21,
+          6
+        ]
+      }
+    },
+    {
+      "key": "men_shorts",
+      "name": "Бриджи, шорты муж",
+      "gender": "men",
+      "moy_sklad_id": "55edd126-8bff-11f1-0a80-142f000aee50",
+      "order_amount_eur": 1607.6,
+      "comment": "Остатки: 71 шт (45;26) 45-ВЛ2026; 26-старые. Усилить: 50 (7;2), 54 (8;6), 52 (10;6), 58 (2;2). Ослабить: нет явных.",
+      "reinforce_sizes": [
+        "50",
+        "54",
+        "52",
+        "58"
+      ],
+      "weaken_sizes": [],
+      "stock_totals": {
+        "total": 71,
+        "fresh_vl26": 45,
+        "old": 26
+      },
+      "size_summary_rows": [
+        {
+          "size": "33",
+          "received_total": 1,
+          "sold_total": 1,
+          "stock_total": 0
+        },
+        {
+          "size": "34",
+          "received_total": 1,
+          "sold_total": 0,
+          "stock_total": 1
+        },
+        {
+          "size": "35",
+          "received_total": 1,
+          "sold_total": 0,
+          "stock_total": 1
+        },
+        {
+          "size": "36",
+          "received_total": 1,
+          "sold_total": 0,
+          "stock_total": 1
+        },
+        {
+          "size": "38",
+          "received_total": 1,
+          "sold_total": 0,
+          "stock_total": 1
+        },
+        {
+          "size": "46",
+          "received_total": 0,
+          "sold_total": 0,
+          "stock_total": 2
+        },
+        {
+          "size": "48",
+          "received_total": 12,
+          "sold_total": 6,
+          "stock_total": 9
+        },
+        {
+          "size": "50",
+          "received_total": 27,
+          "sold_total": 19,
+          "stock_total": 9
+        },
+        {
+          "size": "52",
+          "received_total": 31,
+          "sold_total": 17,
+          "stock_total": 16
+        },
+        {
+          "size": "54",
+          "received_total": 29,
+          "sold_total": 16,
+          "stock_total": 14
+        },
+        {
+          "size": "56",
+          "received_total": 18,
+          "sold_total": 6,
+          "stock_total": 13
+        },
+        {
+          "size": "58",
+          "received_total": 8,
+          "sold_total": 4,
+          "stock_total": 4
+        }
+      ],
+      "size_sales_chart": {
+        "period": {
+          "from": "2025-02-01",
+          "to": "2026-07-29"
+        },
+        "axis_x": "size_asc",
+        "axis_y": "sellQuantity_pcs",
+        "seasons": [
+          "ВЛ2026",
+          "ВЛ2025"
+        ],
+        "labels": [
+          "33",
+          "48",
+          "50",
+          "52",
+          "54",
+          "56",
+          "58"
+        ],
+        "sellQuantity": [
+          1,
+          6,
+          19,
+          17,
+          16,
+          6,
+          4
         ]
       }
     },
@@ -1373,20 +1466,20 @@
     },
     {
       "key": "women_pants",
-      "name": "Брюки, джинсы, бриджи, шорты жен",
+      "name": "Брюки, джинсы жен",
       "gender": "women",
       "moy_sklad_id": "78fabba1-9e44-11e9-9ff4-31500007d6c1",
-      "order_amount_eur": 7951.1,
-      "comment": "Остатки: 296 шт (93;203) 93-ВЛ2026; 203-старые. Усилить: нет явных. Ослабить: 50 (7;20), 52 (0;5).",
+      "order_amount_eur": 7429.1,
+      "comment": "Остатки: 256 шт (77;179) 77-ВЛ2026; 179-старые. Усилить: нет явных. Ослабить: 50 (5;19), 52 (0;5).",
       "reinforce_sizes": [],
       "weaken_sizes": [
         "50",
         "52"
       ],
       "stock_totals": {
-        "total": 296,
-        "fresh_vl26": 93,
-        "old": 203
+        "total": 256,
+        "fresh_vl26": 77,
+        "old": 179
       },
       "size_summary_rows": [
         {
@@ -1427,33 +1520,33 @@
         },
         {
           "size": "42",
-          "received_total": 63,
-          "sold_total": 33,
-          "stock_total": 40
+          "received_total": 54,
+          "sold_total": 28,
+          "stock_total": 33
         },
         {
           "size": "44",
-          "received_total": 92,
-          "sold_total": 54,
-          "stock_total": 73
+          "received_total": 78,
+          "sold_total": 46,
+          "stock_total": 62
         },
         {
           "size": "46",
-          "received_total": 91,
-          "sold_total": 46,
-          "stock_total": 79
+          "received_total": 76,
+          "sold_total": 36,
+          "stock_total": 70
         },
         {
           "size": "48",
-          "received_total": 78,
-          "sold_total": 43,
-          "stock_total": 66
+          "received_total": 64,
+          "sold_total": 36,
+          "stock_total": 56
         },
         {
           "size": "50",
-          "received_total": 18,
+          "received_total": 16,
           "sold_total": 5,
-          "stock_total": 27
+          "stock_total": 24
         },
         {
           "size": "52",
@@ -1482,32 +1575,105 @@
           "52"
         ],
         "sellQuantity": [
-          33,
-          54,
+          28,
           46,
-          43,
+          36,
+          36,
           5,
           2
         ]
       }
     },
     {
-      "key": "women_dresses",
-      "name": "Платья, юбки жен",
+      "key": "women_shorts",
+      "name": "Бриджи, шорты жен",
       "gender": "women",
-      "moy_sklad_id": "26114fa1-a495-11e9-9ff4-3150000fa9a1",
-      "order_amount_eur": 3937.5,
-      "comment": "Остатки: 161 шт (22;139) 22-ВЛ2026; 139-старые. Усилить: 42 (2;17). Ослабить: 50 (1;11).",
+      "moy_sklad_id": "4643b20e-8bfa-11f1-0a80-18830009f9ac",
+      "order_amount_eur": 522.0,
+      "comment": "Остатки: 32 шт (10;22) 10-ВЛ2026; 22-старые. Усилить: 46 (2;5), 42 (0;6), 48 (4;3). Ослабить: нет явных.",
       "reinforce_sizes": [
-        "42"
+        "46",
+        "42",
+        "48"
       ],
+      "weaken_sizes": [],
+      "stock_totals": {
+        "total": 32,
+        "fresh_vl26": 10,
+        "old": 22
+      },
+      "size_summary_rows": [
+        {
+          "size": "42",
+          "received_total": 8,
+          "sold_total": 5,
+          "stock_total": 6
+        },
+        {
+          "size": "44",
+          "received_total": 11,
+          "sold_total": 7,
+          "stock_total": 9
+        },
+        {
+          "size": "46",
+          "received_total": 12,
+          "sold_total": 8,
+          "stock_total": 7
+        },
+        {
+          "size": "48",
+          "received_total": 12,
+          "sold_total": 7,
+          "stock_total": 7
+        },
+        {
+          "size": "50",
+          "received_total": 2,
+          "sold_total": 0,
+          "stock_total": 3
+        }
+      ],
+      "size_sales_chart": {
+        "period": {
+          "from": "2025-02-01",
+          "to": "2026-07-29"
+        },
+        "axis_x": "size_asc",
+        "axis_y": "sellQuantity_pcs",
+        "seasons": [
+          "ВЛ2026",
+          "ВЛ2025"
+        ],
+        "labels": [
+          "42",
+          "44",
+          "46",
+          "48"
+        ],
+        "sellQuantity": [
+          5,
+          7,
+          8,
+          7
+        ]
+      }
+    },
+    {
+      "key": "women_dresses",
+      "name": "Платья жен",
+      "gender": "women",
+      "moy_sklad_id": "65dca14b-8bfd-11f1-0a80-0fbf000a6721",
+      "order_amount_eur": 2825.1,
+      "comment": "Остатки: 91 шт (13;78) 13-ВЛ2026; 78-старые. Усилить: нет явных. Ослабить: 48 (2;17).",
+      "reinforce_sizes": [],
       "weaken_sizes": [
-        "50"
+        "48"
       ],
       "stock_totals": {
-        "total": 161,
-        "fresh_vl26": 22,
-        "old": 139
+        "total": 91,
+        "fresh_vl26": 13,
+        "old": 78
       },
       "size_summary_rows": [
         {
@@ -1530,33 +1696,110 @@
         },
         {
           "size": "42",
-          "received_total": 26,
-          "sold_total": 14,
-          "stock_total": 19
+          "received_total": 14,
+          "sold_total": 7,
+          "stock_total": 11
         },
         {
           "size": "44",
-          "received_total": 40,
-          "sold_total": 17,
-          "stock_total": 38
+          "received_total": 19,
+          "sold_total": 7,
+          "stock_total": 25
         },
         {
           "size": "46",
-          "received_total": 42,
-          "sold_total": 19,
-          "stock_total": 47
+          "received_total": 22,
+          "sold_total": 11,
+          "stock_total": 27
         },
         {
           "size": "48",
-          "received_total": 25,
-          "sold_total": 10,
-          "stock_total": 38
+          "received_total": 8,
+          "sold_total": 4,
+          "stock_total": 19
         },
         {
           "size": "50",
-          "received_total": 4,
+          "received_total": 2,
           "sold_total": 2,
-          "stock_total": 12
+          "stock_total": 4
+        }
+      ],
+      "size_sales_chart": {
+        "period": {
+          "from": "2025-02-01",
+          "to": "2026-07-29"
+        },
+        "axis_x": "size_asc",
+        "axis_y": "sellQuantity_pcs",
+        "seasons": [
+          "ВЛ2026",
+          "ВЛ2025"
+        ],
+        "labels": [
+          "42",
+          "44",
+          "46",
+          "48",
+          "50"
+        ],
+        "sellQuantity": [
+          7,
+          7,
+          11,
+          4,
+          2
+        ]
+      }
+    },
+    {
+      "key": "women_skirts",
+      "name": "Юбки жен",
+      "gender": "women",
+      "moy_sklad_id": "26114fa1-a495-11e9-9ff4-3150000fa9a1",
+      "order_amount_eur": 1112.4,
+      "comment": "Остатки: 70 шт (9;61) 9-ВЛ2026; 61-старые. Усилить: 42 (0;8). Ослабить: 50 (1;7).",
+      "reinforce_sizes": [
+        "42"
+      ],
+      "weaken_sizes": [
+        "50"
+      ],
+      "stock_totals": {
+        "total": 70,
+        "fresh_vl26": 9,
+        "old": 61
+      },
+      "size_summary_rows": [
+        {
+          "size": "42",
+          "received_total": 12,
+          "sold_total": 7,
+          "stock_total": 8
+        },
+        {
+          "size": "44",
+          "received_total": 21,
+          "sold_total": 10,
+          "stock_total": 13
+        },
+        {
+          "size": "46",
+          "received_total": 20,
+          "sold_total": 8,
+          "stock_total": 20
+        },
+        {
+          "size": "48",
+          "received_total": 17,
+          "sold_total": 6,
+          "stock_total": 19
+        },
+        {
+          "size": "50",
+          "received_total": 2,
+          "sold_total": 0,
+          "stock_total": 8
         },
         {
           "size": "52",
@@ -1587,15 +1830,13 @@
           "44",
           "46",
           "48",
-          "50",
           "54"
         ],
         "sellQuantity": [
-          14,
-          17,
-          19,
+          7,
           10,
-          2,
+          8,
+          6,
           1
         ]
       }

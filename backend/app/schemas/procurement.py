@@ -448,8 +448,30 @@ class OrderGuidanceMetaOut(BaseModel):
     fresh_definition: str | None = None
     old_definition: str | None = None
     table_rule: str | None = None
+    ms_folder_split: str | None = None
 
 
 class OrderGuidanceOut(BaseModel):
     meta: OrderGuidanceMetaOut
     categories: list[OrderGuidanceCategoryOut]
+
+
+class CategoryOrderBrandRowOut(BaseModel):
+    brand_id: uuid.UUID
+    brand_name: str
+    amount_eur: Decimal
+    orders_count: int
+
+
+class CategoryOrderInsightOut(BaseModel):
+    """Подсказка по категории при оформлении заказа: guidance + факт заказов сезона."""
+
+    category_id: uuid.UUID
+    category_name: str
+    moy_sklad_id: str | None = None
+    season_id: uuid.UUID
+    budget_eur: Decimal | None = None
+    ordered_eur: Decimal
+    remaining_eur: Decimal | None = None
+    guidance: OrderGuidanceCategoryOut | None = None
+    brands: list[CategoryOrderBrandRowOut] = Field(default_factory=list)

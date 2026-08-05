@@ -377,6 +377,7 @@ label {
 }
 
 .line-card {
+  position: relative;
   padding: 0.75rem;
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -384,6 +385,38 @@ label {
   display: flex;
   flex-direction: column;
   gap: 0.65rem;
+}
+
+.line-card__insight {
+  position: absolute;
+  top: 0.45rem;
+  right: 0.45rem;
+  width: 1.55rem;
+  height: 1.55rem;
+  padding: 0;
+  border-radius: 999px;
+  border: 1.5px solid var(--accent, #c45c26);
+  background: var(--surface);
+  color: var(--accent, #c45c26);
+  font-size: 0.95rem;
+  font-weight: 800;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 2;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.line-card__insight:hover,
+.line-card__insight:focus-visible {
+  background: var(--accent, #c45c26);
+  color: #fff;
+}
+
+.line-card > label:first-of-type {
+  padding-right: 1.85rem;
 }
 
 .check-row {
@@ -548,6 +581,82 @@ label {
 
 .modal-actions button {
   flex: 1;
+}
+
+.insight-modal {
+  max-height: min(85vh, 640px);
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.insight-modal__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.insight-modal__head h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  line-height: 1.3;
+}
+
+.insight-modal__close {
+  flex-shrink: 0;
+  width: auto;
+  padding: 0.35rem 0.7rem;
+}
+
+.insight-modal__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.insight-modal__budget {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.45rem;
+  padding: 0.65rem 0.7rem;
+  border-radius: 12px;
+  background: var(--bg, #f4f2ef);
+  border: 1px solid var(--border);
+}
+
+.insight-modal__budget > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.insight-modal__label {
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+
+.insight-modal__budget strong {
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.insight-modal__remain--ok {
+  color: #1f7a3f;
+}
+
+.insight-modal__remain--over {
+  color: #b42318;
+}
+
+.insight-modal__brands th:nth-child(2),
+.insight-modal__brands td:nth-child(2),
+.insight-modal__brands th:nth-child(3),
+.insight-modal__brands td:nth-child(3) {
+  text-align: right;
+  white-space: nowrap;
 }
 
 /* —— Order guidance («Для заказа») —— */

@@ -16,9 +16,17 @@ const CATEGORY_RULES = {
       names: ["Футболки, поло муж"],
     },
     {
-      label: "Брюки, джинсы, бриджи, шорты муж",
+      label: "Брюки, джинсы муж",
       ids: ["46b4f0d3-5708-11e9-9ff4-315000d079ad"],
-      names: ["Брюки, джинсы, бриджи, шорты муж"],
+      names: [
+        "Брюки, джинсы муж",
+        "Брюки, джинсы, бриджи, шорты муж",
+      ],
+    },
+    {
+      label: "Бриджи, шорты муж",
+      ids: ["55edd126-8bff-11f1-0a80-142f000aee50"],
+      names: ["Бриджи, шорты муж"],
     },
     {
       label: "Трикотаж муж",
@@ -71,20 +79,36 @@ const CATEGORY_RULES = {
       names: ["Трикотаж жен"],
     },
     {
-      label: "Брюки, джинсы, бриджи, шорты жен",
+      label: "Брюки, джинсы жен",
       ids: [
         "78fabba1-9e44-11e9-9ff4-31500007d6c1",
         "8ade28c6-6e3e-11f1-0a80-00b0001171b1",
       ],
       names: [
+        "Брюки, джинсы жен",
         "Брюки, джинсы, бриджи, шорты жен",
         "Брюки, джинсы, бриджи, шорты",
       ],
     },
     {
-      label: "Платья, юбки жен",
+      label: "Бриджи, шорты жен",
+      ids: ["4643b20e-8bfa-11f1-0a80-18830009f9ac"],
+      names: ["Бриджи, шорты жен"],
+    },
+    {
+      label: "Платья жен",
+      ids: ["65dca14b-8bfd-11f1-0a80-0fbf000a6721"],
+      names: ["Платья жен", "Платья"],
+    },
+    {
+      label: "Юбки жен",
       ids: ["26114fa1-a495-11e9-9ff4-3150000fa9a1"],
-      names: ["Платья, юбки", "Платья, юбки жен"],
+      names: [
+        "Юбки жен",
+        "Юбки",
+        "Платья, юбки",
+        "Платья, юбки жен",
+      ],
     },
     {
       label: "Обувь жен",
@@ -112,7 +136,12 @@ export function getFormCategories(allCategories, gender) {
   const defs = CATEGORY_RULES[gender];
   if (!defs) return all;
 
-  const byId = new Map(all.map((c) => [c.id, c]));
+  const byId = new Map();
+  for (const c of all) {
+    byId.set(String(c.id), c);
+    if (c.moy_sklad_id) byId.set(c.moy_sklad_id, c);
+  }
+
   return defs
     .map((def) => {
       const byRuleId = def.ids.find((id) => byId.has(id));

@@ -221,6 +221,10 @@ export function fetchOrderGuidance() {
   return request("/admin/procurement/order-guidance");
 }
 
+export function fetchCategoryOrderInsight(query) {
+  return request("/admin/procurement/category-order-insight", { query });
+}
+
 export function fetchSeasonDashboard(seasonId) {
   return request("/admin/procurement/season-dashboard", {
     query: seasonId ? { season_id: seasonId } : undefined,

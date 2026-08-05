@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { createBrandOrder, fetchProcurementRefs } from "../api.js";
 import BrandSelect from "../components/BrandSelect.jsx";
+import CategoryInsightControl from "../components/CategoryInsightControl.jsx";
 import { eur, num, today } from "../utils/money.js";
 import { getFormCategories, normalizeCategoryId } from "../utils/procurementCategories.js";
 
@@ -155,8 +156,15 @@ export default function OrderCreate() {
             Категории не выбраны — укажите общую сумму заказа ниже.
           </p>
         ) : null}
-        {lines.map((ln) => (
+        {lines.map((ln) => {
+          const selectedCat = formCategories.find((c) => String(c.id) === String(ln.category_id));
+          return (
           <div key={ln.key} className="line-card">
+            <CategoryInsightControl
+              categoryId={ln.category_id}
+              seasonId={form.season_id}
+              categoryName={selectedCat?.name}
+            />
             <label>
               Категория
               <select
@@ -197,7 +205,8 @@ export default function OrderCreate() {
               Убрать
             </button>
           </div>
-        ))}
+          );
+        })}
         <button
           type="button"
           className="secondary"

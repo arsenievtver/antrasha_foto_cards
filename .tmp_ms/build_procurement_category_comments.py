@@ -60,12 +60,13 @@ COLOR_WORDS = {
 }
 
 # Scenario B ~60k EUR from Excel sheet 5. Кат_B_60k
-# Pants = jeans + shorts; dresses = dresses + skirts
+# Aligned with MoySklad folder split (июль 2026).
 ORDER_AMOUNT_EUR = {
     "men_outerwear": 2480.8,
     "men_jackets": 3581.6,
     "men_tshirts": 5629.5,
-    "men_pants": 11230.5,  # 9622.9 + 1607.6
+    "men_pants": 9622.9,
+    "men_shorts": 1607.6,
     "men_knitwear": 1708.6,
     "men_shirts": 2897.6,
     "men_suits": 2418.2,
@@ -75,8 +76,10 @@ ORDER_AMOUNT_EUR = {
     "women_tshirts": 3125.1,
     "women_blouses": 2596.9,
     "women_knitwear": 2746.7,
-    "women_pants": 7951.1,  # 7429.1 + 522.0
-    "women_dresses": 3937.5,  # 2825.1 + 1112.4
+    "women_pants": 7429.1,
+    "women_shorts": 522.0,
+    "women_dresses": 2825.1,
+    "women_skirts": 1112.4,
     "women_shoes": 519.9,
     "accessories": 1223.2,
 }
@@ -103,8 +106,14 @@ CATEGORIES = [
     {
         "key": "men_pants",
         "gender": "men",
-        "name": "Брюки, джинсы, бриджи, шорты муж",
+        "name": "Брюки, джинсы муж",
         "moy_sklad_id": "46b4f0d3-5708-11e9-9ff4-315000d079ad",
+    },
+    {
+        "key": "men_shorts",
+        "gender": "men",
+        "name": "Бриджи, шорты муж",
+        "moy_sklad_id": "55edd126-8bff-11f1-0a80-142f000aee50",
     },
     {
         "key": "men_knitwear",
@@ -163,13 +172,25 @@ CATEGORIES = [
     {
         "key": "women_pants",
         "gender": "women",
-        "name": "Брюки, джинсы, бриджи, шорты жен",
+        "name": "Брюки, джинсы жен",
         "moy_sklad_id": "78fabba1-9e44-11e9-9ff4-31500007d6c1",
+    },
+    {
+        "key": "women_shorts",
+        "gender": "women",
+        "name": "Бриджи, шорты жен",
+        "moy_sklad_id": "4643b20e-8bfa-11f1-0a80-18830009f9ac",
     },
     {
         "key": "women_dresses",
         "gender": "women",
-        "name": "Платья, юбки жен",
+        "name": "Платья жен",
+        "moy_sklad_id": "65dca14b-8bfd-11f1-0a80-0fbf000a6721",
+    },
+    {
+        "key": "women_skirts",
+        "gender": "women",
+        "name": "Юбки жен",
         "moy_sklad_id": "26114fa1-a495-11e9-9ff4-3150000fa9a1",
     },
     {
@@ -575,6 +596,11 @@ def main() -> None:
                 "per category; X = sizes ascending; "
                 "Y = sold pcs of ВЛ2025+ВЛ2026 for Feb 2025–now"
             ),
+            "ms_folder_split": (
+                "июль 2026: брюки/джинсы ≠ бриджи/шорты; платья ≠ юбки. "
+                "Sales/stock for split cats from name-heuristic of pre-split dumps "
+                "(product moved with history in MS; size analytics rebuilt)."
+            ),
         },
         "categories": out_cats,
     }
@@ -586,15 +612,22 @@ def main() -> None:
     print("saved", OUT_TMP)
     print("saved", OUT_BACKEND)
     print("categories", len(out_cats))
-    for key in ("men_outerwear", "men_shirts", "men_pants", "women_pants"):
+    for key in (
+        "men_pants",
+        "men_shorts",
+        "women_pants",
+        "women_shorts",
+        "women_dresses",
+        "women_skirts",
+    ):
         c = next(x for x in out_cats if x["key"] == key)
         st = c["stock_totals"]
         assert st["total"] == st["fresh_vl26"] + st["old"]
         print(
-            f"\n=== {c['name']} ===\n{c['comment']}\n"
+            f"\n=== {c['name']} €{c['order_amount_eur']} ===\n{c['comment']}\n"
             f"reinforce={c['reinforce_sizes']} weaken={c['weaken_sizes']}"
         )
-        for row in c["size_summary_rows"][:8]:
+        for row in c["size_summary_rows"][:6]:
             print(" ", row)
 
 

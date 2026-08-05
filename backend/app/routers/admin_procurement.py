@@ -40,6 +40,7 @@ from app.schemas.procurement import (
     BrandStatsListResponse,
     BrandStatsOut,
     CategoryListResponse,
+    CategoryOrderInsightOut,
     CategoryOut,
     CategoryUpdateRequest,
     FxRateCreateRequest,
@@ -47,6 +48,7 @@ from app.schemas.procurement import (
     FxRateOut,
     FxRateUpdateRequest,
     OrderCreateRequest,
+    OrderGuidanceCategoryOut,
     OrderGuidanceOut,
     OrderLineIn,
     OrderLineOut,
@@ -93,7 +95,8 @@ _CANONICAL_CATEGORY_DISPLAY = {
     "0ebca617-f97a-11e9-0a80-0579004f6022": ("Верхняя одежда муж", "men"),
     "009bd151-b37b-11e9-9ff4-3150003a1bb1": ("Пиджаки, жакеты, бомбер муж", "men"),
     "46a5c5b7-5708-11e9-9ff4-315000d0798d": ("Футболки, поло муж", "men"),
-    "46b4f0d3-5708-11e9-9ff4-315000d079ad": ("Брюки, джинсы, бриджи, шорты муж", "men"),
+    "46b4f0d3-5708-11e9-9ff4-315000d079ad": ("Брюки, джинсы муж", "men"),
+    "55edd126-8bff-11f1-0a80-142f000aee50": ("Бриджи, шорты муж", "men"),
     "7958c78e-9e44-11e9-9ff4-31500007d713": ("Трикотаж муж", "men"),
     "797d0e35-9e44-11e9-9ff4-31500007d733": ("Рубашки", "men"),
     "eec41100-9847-11eb-0a80-0616000ac009": ("Костюмы муж", "men"),
@@ -103,11 +106,10 @@ _CANONICAL_CATEGORY_DISPLAY = {
     "f7b6946e-b37a-11e9-9ff4-3150003a0ff5": ("Футболки, поло, топы жен", "women"),
     "21e1d207-b53f-11e9-9ff4-31500015315b": ("Блузки, рубашки жен", "women"),
     "cd27a401-d3a6-11e9-0a80-02690003e199": ("Трикотаж жен", "women"),
-    "78fabba1-9e44-11e9-9ff4-31500007d6c1": (
-        "Брюки, джинсы, бриджи, шорты жен",
-        "women",
-    ),
-    "26114fa1-a495-11e9-9ff4-3150000fa9a1": ("Платья, юбки жен", "women"),
+    "78fabba1-9e44-11e9-9ff4-31500007d6c1": ("Брюки, джинсы жен", "women"),
+    "4643b20e-8bfa-11f1-0a80-18830009f9ac": ("Бриджи, шорты жен", "women"),
+    "65dca14b-8bfd-11f1-0a80-0fbf000a6721": ("Платья жен", "women"),
+    "26114fa1-a495-11e9-9ff4-3150000fa9a1": ("Юбки жен", "women"),
     "79419e87-9e44-11e9-9ff4-31500007d6fe": ("Обувь жен", "women"),
     "82adf299-8e8b-11e9-9ff4-31500007fc47": ("Аксессуары", "unisex"),
 }
@@ -1699,3 +1701,111 @@ def get_order_guidance(
             detail="Не удалось прочитать подсказки для заказа",
         ) from exc
     return OrderGuidanceOut.model_validate(payload)
+
+
+def _category_ids_for_canonical_ms(
+    db: Session, canonical_ms_id: str | None, fallback_id: uuid.UUID
+) -> list[uuid.UUID]:
+    """Все category.id, которые относятся к той же канонической папке МС (с алиасами)."""
+    if not canonical_ms_id:
+        return [fallback_id]
+    alias_ms_ids = [
+        alias
+        for alias, target in _CATEGORY_ALIAS_TO_CANONICAL_MS_ID.items()
+        if target == canonical_ms_id
+    ]
+    ms_ids = [canonical_ms_id, *alias_ms_ids]
+    rows = db.scalars(
+        select(Category.id).where(Category.moy_sklad_id.in_(ms_ids))
+    ).all()
+    ids = list(rows)
+    if fallback_id not in ids:
+        ids.append(fallback_id)
+    return ids
+
+
+@router.get(
+    "/procurement/category-order-insight",
+    response_model=CategoryOrderInsightOut,
+)
+def get_category_order_insight(
+    category_id: uuid.UUID = Query(...),
+    season_id: uuid.UUID = Query(...),
+    db: Session = Depends(get_db),
+    _su: AdminPrincipal = Depends(require_permission("product")),
+) -> CategoryOrderInsightOut:
+    """Живая сводка по категории для формы заказа: рекомендации + заказы по брендам."""
+    _ = _su
+    category = db.get(Category, category_id)
+    if category is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Категория не найдена"
+        )
+    season = db.get(Season, season_id)
+    if season is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Сезон не найден"
+        )
+
+    canonical_ms_id = _canonical_ms_id(category.moy_sklad_id)
+    display_name, _ = _CANONICAL_CATEGORY_DISPLAY.get(
+        canonical_ms_id, (category.name, category.gender)
+    )
+    related_ids = _category_ids_for_canonical_ms(db, canonical_ms_id, category.id)
+
+    brand_rows = db.execute(
+        select(
+            Brand.id,
+            Brand.name,
+            func.sum(BrandOrderCategoryLine.amount_eur),
+            func.count(func.distinct(BrandOrder.id)),
+        )
+        .join(BrandOrder, BrandOrder.brand_id == Brand.id)
+        .join(
+            BrandOrderCategoryLine,
+            BrandOrderCategoryLine.order_id == BrandOrder.id,
+        )
+        .where(
+            BrandOrder.season_id == season_id,
+            BrandOrderCategoryLine.category_id.in_(related_ids),
+        )
+        .group_by(Brand.id, Brand.name)
+        .order_by(func.sum(BrandOrderCategoryLine.amount_eur).desc())
+    ).all()
+
+    brands = [
+        {
+            "brand_id": brand_id,
+            "brand_name": brand_name,
+            "amount_eur": _money(total),
+            "orders_count": int(cnt or 0),
+        }
+        for brand_id, brand_name, total, cnt in brand_rows
+    ]
+    ordered_eur = _money(sum((row["amount_eur"] for row in brands), ZERO))
+
+    guidance_out: OrderGuidanceCategoryOut | None = None
+    budget_eur: Decimal | None = None
+    remaining_eur: Decimal | None = None
+    try:
+        payload = _load_order_guidance()
+        for cat in payload.get("categories") or []:
+            if _canonical_ms_id(cat.get("moy_sklad_id")) == canonical_ms_id:
+                guidance_out = OrderGuidanceCategoryOut.model_validate(cat)
+                budget_eur = _money(guidance_out.order_amount_eur)
+                remaining_eur = _money(budget_eur - ordered_eur)
+                break
+    except (FileNotFoundError, json.JSONDecodeError, OSError, ValueError):
+        log.exception("category-order-insight guidance load failed")
+
+    return CategoryOrderInsightOut(
+        category_id=category.id,
+        category_name=display_name,
+        moy_sklad_id=canonical_ms_id,
+        season_id=season.id,
+        budget_eur=budget_eur,
+        ordered_eur=ordered_eur,
+        remaining_eur=remaining_eur,
+        guidance=guidance_out,
+        brands=brands,
+    )
