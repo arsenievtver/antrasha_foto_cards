@@ -34,6 +34,76 @@ class SeasonTests(unittest.TestCase):
         self.assertFalse(matches_season_marker("Куртка ВЛ2024", "VL", 2025))
 
 
+class BrandSupplierTests(unittest.TestCase):
+    def test_brand_key_strips_gender_suffix(self):
+        from app.services.warehouse_analytics.operations import _brand_key
+
+        self.assertEqual(_brand_key("DUNO(муж)"), "DUNO")
+        self.assertEqual(_brand_key("TREVI (жен)"), "TREVI")
+
+    def test_gender_from_short_path(self):
+        from app.services.warehouse_analytics.operations import _gender_from_path
+
+        self.assertEqual(_gender_from_path("Брюки, джинсы муж"), "male")
+        self.assertEqual(_gender_from_path("Платья жен"), "female")
+
+    def test_customer_purchases_uses_supplier_not_article(self):
+        client = MagicMock()
+        client.href.side_effect = lambda e, i: f"https://api.moysklad.ru/api/remap/1.2/entity/{e}/{i}"
+        client.get.return_value = {
+            "id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+            "name": "Кирсанов",
+        }
+
+        def get_rows(path, params=None):
+            if path == "/entity/demand":
+                return ([], 0)
+            if path == "/entity/retaildemand":
+                return (
+                    [
+                        {
+                            "moment": "2026-07-03 12:00:00",
+                            "positions": {
+                                "rows": [
+                                    {
+                                        "quantity": 1,
+                                        "sum": 2040000,
+                                        "assortment": {
+                                            "name": "RAS TREVI/274/03.26 брюки 52",
+                                            "article": "RAS TREVI/274/03.26",
+                                            "pathName": "Брюки, джинсы муж",
+                                            "supplier": {
+                                                "id": "dddddddd-dddd-dddd-dddd-dddddddddddd",
+                                                "name": "DUNO(муж)",
+                                            },
+                                        },
+                                    }
+                                ]
+                            },
+                        }
+                    ],
+                    1,
+                )
+            return ([], 0)
+
+        client.get_rows.side_effect = get_rows
+        out = run_operation(
+            client,
+            "customer_purchases",
+            {
+                "counterparty_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+                "date_from": "2026-07-01",
+                "date_to": "2026-07-31",
+            },
+            use_cache=False,
+        )
+        self.assertEqual(out["lines"][0]["brand"], "DUNO")
+        self.assertEqual(out["lines"][0]["supplier"], "DUNO(муж)")
+        self.assertNotIn("TREVI", out["by_brand_sum"])
+        self.assertEqual(out["by_brand_sum"]["DUNO"], 20400.0)
+        self.assertEqual(out["lines"][0]["gender"], "male")
+
+
 class CacheTests(unittest.TestCase):
     def test_roundtrip(self):
         c = TtlCache(default_ttl_sec=60)

@@ -145,7 +145,7 @@ export default function WarehouseAi() {
       <div className="wh-ai__header">
         <div>
           <h1>AI ассистент ANTRASHA</h1>
-          <p className="muted" style={{ maxWidth: "42rem", margin: "0.35rem 0 0" }}>
+          <p className="muted" style={{ margin: "0.35rem 0 0" }}>
             Агент вызывает операции МойСклад по шагам (реальные данные в цикле), затем
             отвечает. Табы — готовые сценарии без свободного планирования.
           </p>

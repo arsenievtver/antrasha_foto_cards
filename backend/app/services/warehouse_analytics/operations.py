@@ -78,10 +78,43 @@ def _assortment_brief(row: dict[str, Any]) -> dict[str, Any]:
 
 def _gender_from_path(path: str | None, name: str | None = None) -> str | None:
     blob = f"{path or ''} {name or ''}".casefold()
-    if "женск" in blob or "(жен" in blob:
+    if "женск" in blob or "(жен" in blob or re.search(r"(?:^|[\s,/(-])жен(?:ск|\b|[)\s,]|$)", blob):
         return "female"
-    if "мужск" in blob or "(муж" in blob:
+    if "мужск" in blob or "(муж" in blob or re.search(r"(?:^|[\s,/(-])муж(?:ск|\b|[)\s,]|$)", blob):
         return "male"
+    return None
+
+
+def _brand_key(supplier_name: str | None) -> str | None:
+    """Нормализация бренда: DUNO(муж) → DUNO (пол у поставщика — суффикс учёта)."""
+    if not supplier_name or not str(supplier_name).strip():
+        return None
+    name = str(supplier_name).strip()
+    cleaned = re.sub(r"\s*[\(（]\s*(муж|жен|м|ж)\s*[\)）]\s*$", "", name, flags=re.I).strip()
+    return cleaned or name
+
+
+def _supplier_from_assortment(ass: dict[str, Any]) -> dict[str, Any] | None:
+    """Бренд ANTRASHA = поле supplier у товара (или у product у модификации)."""
+    candidates: list[dict[str, Any]] = [ass]
+    product = ass.get("product")
+    if isinstance(product, dict):
+        candidates.append(product)
+    for node in candidates:
+        sup = node.get("supplier")
+        if not isinstance(sup, dict):
+            continue
+        name = str(sup.get("name") or "").strip()
+        sid = sup.get("id")
+        if not sid:
+            href = ""
+            meta = sup.get("meta") if isinstance(sup.get("meta"), dict) else {}
+            href = str(meta.get("href") or "")
+            m = re.search(r"/counterparty/([0-9a-f-]{36})", href, re.I)
+            if m:
+                sid = m.group(1)
+        if name or sid:
+            return {"id": sid, "name": name or None, "brand": _brand_key(name)}
     return None
 
 
@@ -628,7 +661,12 @@ def _op_customer_purchases(client: MoySkladAnalyticsClient, args: dict[str, Any]
     )
     rows, size = client.get_rows(
         "/entity/demand",
-        params={"filter": filt, "limit": 50, "expand": "positions.assortment", "order": "moment,desc"},
+        params={
+            "filter": filt,
+            "limit": 50,
+            "expand": "positions.assortment.supplier,positions.assortment.product.supplier",
+            "order": "moment,desc",
+        },
     )
     # also try retaildemand
     retail_rows, retail_size = client.get_rows(
@@ -643,12 +681,21 @@ def _op_customer_purchases(client: MoySkladAnalyticsClient, args: dict[str, Any]
                 ]
             ),
             "limit": 50,
-            "expand": "positions.assortment",
+            "expand": "positions.assortment.supplier,positions.assortment.product.supplier",
             "order": "moment,desc",
         },
     )
 
     lines: list[dict[str, Any]] = []
+
+    def _line_sum(pos: dict[str, Any]) -> float | None:
+        if pos.get("sum") is not None:
+            return money_rub(pos.get("sum"))
+        price = pos.get("price")
+        qty = pos.get("quantity") or 1
+        if price is not None:
+            return money_rub(price * qty)
+        return None
 
     def _consume_docs(docs: list[dict[str, Any]], doc_type: str) -> None:
         for doc in docs:
@@ -662,6 +709,8 @@ def _op_customer_purchases(client: MoySkladAnalyticsClient, args: dict[str, Any]
                 ass = pos.get("assortment") if isinstance(pos.get("assortment"), dict) else {}
                 name = str(ass.get("name") or "")
                 path = str(ass.get("pathName") or "") if ass.get("pathName") else None
+                supplier = _supplier_from_assortment(ass)
+                brand = (supplier or {}).get("brand")
                 lines.append(
                     {
                         "doc_type": doc_type,
@@ -669,10 +718,12 @@ def _op_customer_purchases(client: MoySkladAnalyticsClient, args: dict[str, Any]
                         "name": name,
                         "article": ass.get("article"),
                         "quantity": pos.get("quantity"),
-                        "sum": money_rub(pos.get("price") and (pos.get("price") * (pos.get("quantity") or 1)) or pos.get("sum")),
+                        "sum": _line_sum(pos),
                         "size": _size_from_name(name),
                         "gender": _gender_from_path(path, name),
                         "path": path,
+                        "supplier": (supplier or {}).get("name"),
+                        "brand": brand,
                     }
                 )
 
@@ -682,11 +733,14 @@ def _op_customer_purchases(client: MoySkladAnalyticsClient, args: dict[str, Any]
 
     by_gender: dict[str, float] = {}
     by_size: dict[str, float] = {}
+    by_brand: dict[str, float] = {}
     for ln in lines:
         g = ln.get("gender") or "unknown"
         by_gender[g] = round(by_gender.get(g, 0) + (ln.get("sum") or 0), 2)
         sz = ln.get("size") or "unknown"
         by_size[sz] = round(by_size.get(sz, 0) + (ln.get("sum") or 0), 2)
+        brand = ln.get("brand") or "unknown"
+        by_brand[brand] = round(by_brand.get(brand, 0) + (ln.get("sum") or 0), 2)
 
     return {
         "counterparty": cp,
@@ -696,6 +750,11 @@ def _op_customer_purchases(client: MoySkladAnalyticsClient, args: dict[str, Any]
         "lines_count": len(lines),
         "by_gender_sum": by_gender,
         "by_size_sum": by_size,
+        "by_brand_sum": by_brand,
+        "brand_definition": (
+            "Бренд = марка = поставщик = поле «Поставщик» (supplier) карточки товара. "
+            "Смотри lines[].brand / by_brand_sum."
+        ),
         "lines": lines,
     }
 

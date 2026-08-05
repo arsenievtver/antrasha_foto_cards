@@ -122,8 +122,9 @@ OPERATION_CATALOG: list[dict[str, Any]] = [
         "id": "customer_purchases",
         "description": (
             "Детализация покупок КОНКРЕТНОГО контрагента. "
-            "Вызывай ТОЛЬКО с реальным counterparty_id (UUID) из результата top_counterparties "
-            "или с точным именем из вопроса пользователя. Никаких placeholder."
+            "В ответе: lines с brand/supplier (= поле «Поставщик»), by_brand_sum. "
+            "Вызывай ТОЛЬКО с реальным counterparty_id (UUID) из top_counterparties "
+            "или с точным именем из вопроса. Никаких placeholder."
         ),
         "input_schema": {
             "type": "object",

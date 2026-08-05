@@ -1459,6 +1459,14 @@ button.switch-toggle:not(:disabled):hover {
 }
 
 /* --- ИИ: склад (МойСклад) --- */
+.wh-ai {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  width: 100%;
+  min-height: calc(100vh - 3rem);
+}
+
 .wh-ai__header {
   display: flex;
   align-items: flex-start;
@@ -1484,21 +1492,26 @@ button.switch-toggle:not(:disabled):hover {
   display: flex;
   flex-direction: column;
   gap: 1rem;
-  max-width: 52rem;
-  min-height: 22rem;
+  width: 100%;
+  max-width: none;
+  flex: 1 1 auto;
+  min-height: 28rem;
 }
 
 .wh-ai__thread {
   display: flex;
   flex-direction: column;
   gap: 0.85rem;
-  max-height: min(55vh, 560px);
-  overflow-y: auto;
-  padding-right: 0.25rem;
+  flex: 1 1 auto;
+  min-height: 16rem;
+  overflow: visible;
+  padding-right: 0;
 }
 
 .wh-ai-msg {
-  max-width: 92%;
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
   padding: 0.65rem 0.85rem;
   border-radius: 10px;
   border: 1px solid var(--border);
@@ -1506,13 +1519,13 @@ button.switch-toggle:not(:disabled):hover {
 }
 
 .wh-ai-msg--user {
-  align-self: flex-end;
+  align-self: stretch;
   background: #1a2436;
   border-color: #2c3d5c;
 }
 
 .wh-ai-msg--bot {
-  align-self: flex-start;
+  align-self: stretch;
 }
 
 .wh-ai-msg__role {
