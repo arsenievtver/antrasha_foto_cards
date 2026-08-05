@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import time
 from datetime import datetime
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -28,6 +29,10 @@ _TZ = ZoneInfo("Europe/Moscow")
 ANTHROPIC_URL = "https://api.anthropic.com/v1/messages"
 ANTHROPIC_VERSION = "2023-06-01"
 MAX_PLAN_STEPS = 3
+# 529 Overloaded / 503 — временные; ретраим с backoff.
+_RETRYABLE_HTTP = frozenset({408, 429, 500, 502, 503, 529})
+_MAX_RETRIES = 4
+_RETRY_BASE_SEC = 1.5
 
 # Пресет → готовый план (без router).
 PRESET_PLANS: dict[str, list[dict[str, Any]]] = {
@@ -113,27 +118,76 @@ def _anthropic_messages(
         "x-api-key": api_key,
         "anthropic-version": ANTHROPIC_VERSION,
     }
-    try:
-        res = requests.post(
-            ANTHROPIC_URL,
-            headers=headers,
-            json=payload,
-            timeout=timeout,
-            proxies=_proxies(settings),
-        )
-    except requests.RequestException as e:
-        raise RuntimeError(f"Сеть Anthropic: {e}") from e
-    try:
-        data = res.json()
-    except ValueError:
-        data = {"raw": res.text[:400]}
-    if res.status_code >= 400:
+    proxies = _proxies(settings)
+    data: Any = {}
+    res: requests.Response | None = None
+    last_err = "unknown"
+
+    for attempt in range(_MAX_RETRIES + 1):
+        try:
+            res = requests.post(
+                ANTHROPIC_URL,
+                headers=headers,
+                json=payload,
+                timeout=timeout,
+                proxies=proxies,
+            )
+        except requests.RequestException as e:
+            last_err = str(e)
+            if attempt < _MAX_RETRIES:
+                delay = _RETRY_BASE_SEC * (2**attempt)
+                log.warning(
+                    "anthropic network error attempt=%s/%s sleep=%.1fs: %s",
+                    attempt + 1,
+                    _MAX_RETRIES + 1,
+                    delay,
+                    e,
+                )
+                time.sleep(delay)
+                continue
+            raise RuntimeError(f"Сеть Anthropic: {e}") from e
+
+        try:
+            data = res.json()
+        except ValueError:
+            data = {"raw": (res.text or "")[:400]}
+
+        if res.status_code < 400:
+            break
+
         detail = data.get("error", data) if isinstance(data, dict) else data
         if isinstance(detail, dict):
             msg = detail.get("message") or str(detail)
         else:
             msg = str(detail)
-        raise RuntimeError(f"Anthropic HTTP {res.status_code}: {msg}")
+        last_err = f"Anthropic HTTP {res.status_code}: {msg}"
+
+        if res.status_code in _RETRYABLE_HTTP and attempt < _MAX_RETRIES:
+            delay = _RETRY_BASE_SEC * (2**attempt)
+            # Respect Retry-After if present
+            ra = res.headers.get("retry-after")
+            if ra:
+                try:
+                    delay = max(delay, float(ra))
+                except ValueError:
+                    pass
+            log.warning(
+                "anthropic retryable HTTP %s attempt=%s/%s sleep=%.1fs model=%s",
+                res.status_code,
+                attempt + 1,
+                _MAX_RETRIES + 1,
+                delay,
+                model,
+            )
+            time.sleep(delay)
+            continue
+
+        hint = ""
+        if res.status_code == 529:
+            hint = " — Anthropic перегружен, подождите минуту и повторите запрос."
+        raise RuntimeError(f"{last_err}{hint}")
+
+    assert res is not None and res.status_code < 400
     texts = []
     for block in data.get("content") or []:
         if isinstance(block, dict) and block.get("type") == "text" and block.get("text"):

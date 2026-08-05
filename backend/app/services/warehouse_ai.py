@@ -372,47 +372,74 @@ def _post_anthropic(
     timeout: float,
     proxies: dict[str, str] | None,
 ) -> dict[str, Any]:
+    import time
+
     headers = {
         "Content-Type": "application/json",
         "x-api-key": api_key,
         "anthropic-version": ANTHROPIC_VERSION,
         "anthropic-beta": MCP_BETA,
     }
-    try:
-        res = requests.post(
-            ANTHROPIC_API_URL,
-            headers=headers,
-            json=payload,
-            timeout=timeout,
-            proxies=proxies,
-        )
-    except requests.RequestException as e:
-        log.exception("warehouse_ai network error")
-        raise RuntimeError(f"Сеть Anthropic: {e}") from e
+    retryable = frozenset({408, 429, 500, 502, 503, 529})
+    max_retries = 4
+    base = 1.5
+    data: Any = {}
+    last_msg = "unknown"
 
-    try:
-        data = res.json()
-    except ValueError:
-        data = {"raw": res.text[:500]}
+    for attempt in range(max_retries + 1):
+        try:
+            res = requests.post(
+                ANTHROPIC_API_URL,
+                headers=headers,
+                json=payload,
+                timeout=timeout,
+                proxies=proxies,
+            )
+        except requests.RequestException as e:
+            log.exception("warehouse_ai network error")
+            if attempt < max_retries:
+                time.sleep(base * (2**attempt))
+                continue
+            raise RuntimeError(f"Сеть Anthropic: {e}") from e
 
-    if res.status_code >= 400:
+        try:
+            data = res.json()
+        except ValueError:
+            data = {"raw": res.text[:500]}
+
+        if res.status_code < 400:
+            return data if isinstance(data, dict) else {"raw": data}
+
         detail = data.get("error", data) if isinstance(data, dict) else data
         if isinstance(detail, dict):
             msg = detail.get("message") or detail.get("type") or str(detail)
         else:
             msg = str(detail)
+        last_msg = msg
         log.warning("warehouse_ai Anthropic HTTP %s: %s", res.status_code, msg)
+
+        if res.status_code in retryable and attempt < max_retries:
+            delay = base * (2**attempt)
+            ra = res.headers.get("retry-after")
+            if ra:
+                try:
+                    delay = max(delay, float(ra))
+                except ValueError:
+                    pass
+            time.sleep(delay)
+            continue
+
         hint = ""
         if res.status_code == 403 and "not allowed" in str(msg).lower():
             hint = (
                 " — часто блок по региону/IP сервера. Задайте ANTHROPIC_HTTPS_PROXY "
                 "(выход в supported country) в .env.backend.prod и перезапустите backend."
             )
+        elif res.status_code == 529:
+            hint = " — Anthropic перегружен, подождите минуту и повторите."
         raise RuntimeError(f"Anthropic HTTP {res.status_code}: {msg}{hint}")
 
-    if not isinstance(data, dict):
-        raise RuntimeError("Anthropic: неожиданный ответ")
-    return data
+    raise RuntimeError(f"Anthropic: {last_msg}")
 
 
 def chat_with_warehouse_mcp(
