@@ -22,6 +22,29 @@ class MoneyTests(unittest.TestCase):
         self.assertEqual(money_rub(None), None)
 
 
+class MsReportsFoundationTests(unittest.TestCase):
+    def test_profit_filters_encode_supplier(self):
+        from app.services.warehouse_analytics.ms_reports import ProfitFilters
+
+        parts = ProfitFilters(
+            supplier_ids=["85b76c4f-8e8b-11e9-9ff4-31500007fdb1"],
+            store_ids=["1d4d5f44-7bb1-11e9-9109-f8fc00054224"],
+        ).to_parts()
+        joined = ";".join(parts)
+        self.assertIn("supplier=https://api.moysklad.ru/api/remap/1.2/entity/counterparty/85b76c4f", joined)
+        self.assertIn("store=https://api.moysklad.ru/api/remap/1.2/entity/store/1d4d5f44", joined)
+
+    def test_stock_filters_supplier(self):
+        from app.services.warehouse_analytics.ms_reports import StockFilters
+
+        parts = StockFilters(
+            supplier_ids=["aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"],
+            quantity_mode="positiveOnly",
+        ).to_parts()
+        self.assertTrue(any(p.startswith("supplier=") for p in parts))
+        self.assertIn("quantityMode=positiveOnly", parts)
+
+
 class SeasonTests(unittest.TestCase):
     def test_dates_vl(self):
         a, b = season_dates("VL", 2025)
@@ -107,7 +130,7 @@ class BrandSalesSupplierTests(unittest.TestCase):
             },
             use_cache=False,
         )
-        self.assertEqual(out["method"], "profit_byproduct+supplier")
+        self.assertEqual(out["method"], "report/profit/byproduct+filter=supplier")
         self.assertEqual(out["matched_sales_rows"], 2)
         self.assertAlmostEqual(out["total_sell_sum"], 162779.15 + 44643.60, places=1)
         self.assertEqual(out["total_sell_quantity"], 9)

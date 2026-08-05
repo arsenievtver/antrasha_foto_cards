@@ -10,8 +10,6 @@ from zoneinfo import ZoneInfo
 
 from app.services.warehouse_analytics.cache import ANALYTICS_CACHE, cache_key
 from app.services.warehouse_analytics.constants import (
-    MAX_BRAND_SALES_PAGES,
-    MAX_BRAND_SALES_ROWS,
     MAX_PRODUCTS_BRAND,
     MAX_PURCHASE_LINES,
     MAX_SERIES_POINTS,
@@ -24,6 +22,16 @@ from app.services.warehouse_analytics.ms_client import (
     MoySkladAnalyticsClient,
     encode_filter,
     money_rub,
+)
+from app.services.warehouse_analytics.ms_reports import (
+    ProfitFilters,
+    StockFilters,
+    fetch_dashboard,
+    fetch_profit_rows,
+    fetch_sales_plotseries,
+    fetch_stock_rows,
+    normalize_profit_row,
+    resolve_store_id,
 )
 
 log = logging.getLogger("app.warehouse_analytics.ops")
@@ -199,7 +207,7 @@ def run_operation(
     cache_ttl: float = 600.0,
 ) -> dict[str, Any]:
     args = dict(args or {})
-    key = cache_key(f"{operation}:v2", args)
+    key = cache_key(f"{operation}:v3", args)
     if use_cache:
         hit = ANALYTICS_CACHE.get(key)
         if hit is not None:
@@ -236,17 +244,20 @@ def _op_revenue_series(client: MoySkladAnalyticsClient, args: dict[str, Any]) ->
     interval = str(args.get("interval") or "day").strip().lower()
     if interval not in ("day", "month", "year"):
         interval = "day"
-    data = client.get(
-        "/report/sales/plotseries",
-        params={
-            "momentFrom": _moment(date_from),
-            "momentTo": _moment(date_to, end=True),
-            "interval": interval,
-        },
+    # plotseries API: hour|day|month (year → month)
+    api_interval: Any = "month" if interval == "year" else interval
+    if api_interval not in ("hour", "day", "month"):
+        api_interval = "day"
+    store_id = resolve_store_id(args.get("store") or "antrasha")
+    data = fetch_sales_plotseries(
+        client,
+        date_from=date_from,
+        date_to=date_to,
+        interval=api_interval,
+        store_id=store_id,
     )
     series = []
     raw_series = data.get("series") if isinstance(data, dict) else None
-    # API variants: series as list of {moment, sum/quantity} or nested
     if isinstance(raw_series, list):
         for point in raw_series[:MAX_SERIES_POINTS]:
             if not isinstance(point, dict):
@@ -275,6 +286,7 @@ def _op_revenue_series(client: MoySkladAnalyticsClient, args: dict[str, Any]) ->
         "interval": interval,
         "points": series,
         "total_sum": round(total, 2),
+        "method": "report/sales/plotseries",
         "note": "Торговая выручка отчёта sales/plotseries (не сырые отгрузки).",
     }
 
@@ -283,11 +295,10 @@ def _op_dashboard_period(client: MoySkladAnalyticsClient, args: dict[str, Any]) 
     period = str(args.get("period") or "month").strip().lower()
     if period not in ("day", "week", "month"):
         period = "month"
-    data = client.get(f"/report/dashboard/{period}")
+    data = fetch_dashboard(client, period)  # type: ignore[arg-type]
     if not isinstance(data, dict):
         return {"period": period, "raw_type": type(data).__name__}
-    # compact known fields
-    out: dict[str, Any] = {"period": period}
+    out: dict[str, Any] = {"period": period, "method": f"report/dashboard/{period}"}
     for key in (
         "sales",
         "orders",
@@ -297,19 +308,13 @@ def _op_dashboard_period(client: MoySkladAnalyticsClient, args: dict[str, Any]) 
         if isinstance(block, dict):
             compact = {}
             for k, v in block.items():
-                if isinstance(v, (int, float)):
-                    compact[k] = money_rub(v) if "sum" in k.lower() or "amount" in k.lower() or k in ("sales", "profit") else v
-                elif isinstance(v, dict):
-                    compact[k] = {
-                        sk: (money_rub(sv) if isinstance(sv, (int, float)) and ("sum" in sk.lower() or sk in ("sales", "profit", "amount")) else sv)
-                        for sk, sv in list(v.items())[:20]
-                    }
+                if isinstance(v, (int, float)) and k.lower().endswith(("sum", "amount", "credit", "debit")):
+                    compact[k] = money_rub(v)
                 else:
                     compact[k] = v
             out[key] = compact
-    # fallback slice
-    if len(out) == 1:
-        out["preview"] = {k: data[k] for k in list(data.keys())[:12]}
+        elif block is not None:
+            out[key] = block
     return out
 
 
@@ -319,28 +324,31 @@ def _op_profit_top_products(client: MoySkladAnalyticsClient, args: dict[str, Any
     date_from = _parse_day(args.get("date_from"), default=date(today.year, today.month, 1))
     limit = min(MAX_TOP_ROWS, max(1, int(args.get("limit") or 15)))
     sort = str(args.get("sort") or "sell").strip().lower()
-    order = "profit,desc" if sort == "profit" else "sellSum,desc"
-    params: dict[str, Any] = {
-        "momentFrom": _moment(date_from),
-        "momentTo": _moment(date_to, end=True),
-        "limit": limit,
-        "order": order,
-    }
-    sid = _store_id(args.get("store"))
-    if sid:
-        params["filter"] = encode_filter([f"store={client.href('store', sid)}"])
-    rows, size = client.get_rows("/report/profit/byproduct", params=params)
+    store_id = resolve_store_id(args.get("store") or "antrasha")
+    filt = ProfitFilters(store_ids=[store_id] if store_id else [])
+    rows, size = fetch_profit_rows(
+        client,
+        date_from=date_from,
+        date_to=date_to,
+        filters=filt,
+        limit=max(limit, 50),
+        max_pages=1,
+    )
+    # API order param unreliable — sort locally
+    key_fn = (lambda r: float(r.get("profit") or 0)) if sort == "profit" else (lambda r: float(r.get("sellSum") or 0))
+    rows = sorted(rows, key=key_fn, reverse=True)
     items = []
     for row in rows[:limit]:
-        brief = _assortment_brief(row)
+        fields = normalize_profit_row(row)
         items.append(
             {
-                **brief,
-                "sell_quantity": row.get("sellQuantity"),
-                "sell_sum": money_rub(row.get("sellSum")),
-                "profit": money_rub(row.get("profit")),
+                **fields,
+                "category": _category_from_path(fields.get("path") if isinstance(fields.get("path"), str) else None),
+                "gender": _gender_from_path(
+                    fields.get("path") if isinstance(fields.get("path"), str) else None,
+                    fields.get("name") if isinstance(fields.get("name"), str) else None,
+                ),
                 "margin": row.get("margin"),
-                "gender": _gender_from_path(brief.get("path"), brief.get("name")),
             }
         )
     return {
@@ -350,24 +358,37 @@ def _op_profit_top_products(client: MoySkladAnalyticsClient, args: dict[str, Any
         "sort": sort,
         "total_rows": size,
         "items": items,
+        "method": "report/profit/byproduct",
     }
 
 
 def _op_stock_snapshot(client: MoySkladAnalyticsClient, args: dict[str, Any]) -> dict[str, Any]:
     limit = min(MAX_TOP_ROWS, max(1, int(args.get("limit") or 20)))
     mode = str(args.get("mode") or "positive").strip().lower()
-    sid = _store_id(args.get("store")) or STORE_ANTRASHA_ID
-    filters = [f"store={client.href('store', sid)}"]
+    store_id = resolve_store_id(args.get("store") or "antrasha")
+    qmode = None
     if mode in ("positive", "positiveonly", "gt0"):
-        filters.append("quantityMode=positiveOnly")
+        qmode = "positiveOnly"
     elif mode in ("low", "underminimum", "under"):
-        filters.append("quantityMode=underMinimum")
-    params = {
-        "filter": encode_filter(filters),
-        "limit": limit,
-        "order": "stock,asc" if mode in ("low", "underminimum", "under") else "stock,desc",
-    }
-    rows, size = client.get_rows("/report/stock/all", params=params)
+        qmode = "underMinimum"
+    supplier_ids: list[str] = []
+    brand = str(args.get("brand") or "").strip()
+    if brand:
+        for sup in _find_suppliers(client, brand, None):
+            if sup.get("id"):
+                supplier_ids.append(str(sup["id"]))
+    filt = StockFilters(
+        store_ids=[store_id] if store_id else [],
+        supplier_ids=supplier_ids,
+        quantity_mode=qmode,  # type: ignore[arg-type]
+    )
+    rows, size = fetch_stock_rows(
+        client,
+        filters=filt,
+        group_by="product",
+        limit=limit,
+        order="stock,asc" if mode in ("low", "underminimum", "under") else "stock,desc",
+    )
     items = []
     for row in rows[:limit]:
         brief = _assortment_brief(row)
@@ -382,10 +403,12 @@ def _op_stock_snapshot(client: MoySkladAnalyticsClient, args: dict[str, Any]) ->
             }
         )
     return {
-        "store": "stock" if sid == STORE_STOCK_ID else "antrasha",
+        "store": "stock" if store_id == STORE_STOCK_ID else ("all" if not store_id else "antrasha"),
         "mode": mode,
+        "brand": brand or None,
         "total_rows": size,
         "items": items,
+        "method": "report/stock/all",
     }
 
 
@@ -486,78 +509,11 @@ def _op_brand_products(client: MoySkladAnalyticsClient, args: dict[str, Any]) ->
     }
 
 
-def _profit_row_fields(row: dict[str, Any]) -> dict[str, Any]:
-    """Нормализация строки profit/byproduct: Remap (assortment) или flat."""
-    brief = _assortment_brief(row)
-    name = brief.get("name") or row.get("name")
-    article = brief.get("article") or row.get("article") or row.get("code")
-    path = brief.get("path") or row.get("pathName")
-    href = brief.get("href")
-    pid = None
-    if href:
-        m = re.search(r"/entity/(?:product|variant)/([0-9a-f-]{36})", str(href), re.I)
-        if m:
-            pid = m.group(1).lower()
-    ass = row.get("assortment") if isinstance(row.get("assortment"), dict) else {}
-    if not pid and ass.get("id"):
-        pid = str(ass.get("id")).lower()
-    sell_sum = row.get("sellSum")
-    # Remap отдаёт копейки; если значение уже «похоже на рубли» (мало), money_rub всё равно /100 —
-    # в MS API sellSum всегда в копейках.
-    return {
-        "name": name,
-        "article": article,
-        "path": path,
-        "href": href,
-        "product_id": pid,
-        "sell_quantity": row.get("sellQuantity") or 0,
-        "sell_sum": money_rub(sell_sum),
-        "sell_cost_sum": money_rub(row.get("sellCostSum")),
-        "profit": money_rub(row.get("profit")),
-        "category": _category_from_path(path if isinstance(path, str) else None),
-        "gender": _gender_from_path(path if isinstance(path, str) else None, name if isinstance(name, str) else None),
-    }
-
-
-def _iter_profit_by_supplier(
-    client: MoySkladAnalyticsClient,
-    *,
-    supplier_href: str,
-    date_from: date,
-    date_to: date,
-    store: str | None,
-) -> list[dict[str, Any]]:
-    filters = [f"supplier={supplier_href}"]
-    store_key = (store or "antrasha").strip().lower()
-    if store_key not in ("all", "any", "*"):
-        sid = _store_id(store_key)
-        if sid:
-            filters.append(f"store={client.href('store', sid)}")
-
-    out: list[dict[str, Any]] = []
-    offset = 0
-    for _ in range(MAX_BRAND_SALES_PAGES):
-        rows, size = client.get_rows(
-            "/report/profit/byproduct",
-            params={
-                "momentFrom": _moment(date_from),
-                "momentTo": _moment(date_to, end=True),
-                "limit": MAX_BRAND_SALES_ROWS,
-                "offset": offset,
-                "filter": encode_filter(filters),
-            },
-        )
-        out.extend(rows)
-        offset += len(rows)
-        if not rows or offset >= size or len(out) >= MAX_BRAND_SALES_ROWS * MAX_BRAND_SALES_PAGES:
-            break
-    return out
-
-
 def _op_brand_sales(client: MoySkladAnalyticsClient, args: dict[str, Any]) -> dict[str, Any]:
     """
-    Как UI «Прибыльность»: период + filter=supplier (+ опционально склад).
-    Сезон коллекции — пост-фильтр по маркеру ВЛ/ОЗ или дате в артикуле (/02.26).
+    Как UI «Прибыльность» (Remap report-pnl):
+    GET /report/profit/byproduct?momentFrom&momentTo&filter=supplier=…[;store=…]
+    Сезон коллекции — пост-фильтр (в API отдельного filter «сезон» нет).
     """
     brand = str(args.get("brand") or "").strip()
     if not brand:
@@ -567,8 +523,6 @@ def _op_brand_sales(client: MoySkladAnalyticsClient, args: dict[str, Any]) -> di
     year = args.get("year")
     if season:
         y = int(year or today.year)
-        # Период продаж по умолчанию = календарное окно сезона, но для ВЛ текущего года
-        # можно сузить date_to «сегодня», если сезон ещё идёт.
         date_from, date_to = season_dates(str(season), y)
         if date_to > today:
             date_to = today
@@ -577,9 +531,7 @@ def _op_brand_sales(client: MoySkladAnalyticsClient, args: dict[str, Any]) -> di
         date_to = _parse_day(args.get("date_to"), default=today)
         date_from = _parse_day(args.get("date_from"), default=date(today.year, today.month, 1))
         season_meta = None
-        y = today.year
 
-    # Явные даты перекрывают окно сезона (как фильтр периода в UI).
     if args.get("date_from"):
         date_from = _parse_day(args.get("date_from"))
     if args.get("date_to"):
@@ -589,6 +541,7 @@ def _op_brand_sales(client: MoySkladAnalyticsClient, args: dict[str, Any]) -> di
     if gender_s not in ("male", "female", "both"):
         gender_s = "both"
     store = str(args.get("store") or "antrasha").strip().lower()
+    store_id = resolve_store_id(store)
 
     suppliers = _find_suppliers(client, brand, None if gender_s == "both" else gender_s)
     if not suppliers:
@@ -605,31 +558,31 @@ def _op_brand_sales(client: MoySkladAnalyticsClient, args: dict[str, Any]) -> di
             "by_category": [],
             "top_items": [],
             "notes": ["Поставщик (бренд) не найден в МойСклад."],
-            "method": "profit_byproduct+supplier",
+            "method": "report/profit/byproduct+filter=supplier",
         }
 
-    raw_rows: list[dict[str, Any]] = []
-    for sup in suppliers:
-        sid = sup.get("id")
-        if not sid:
-            continue
-        raw_rows.extend(
-            _iter_profit_by_supplier(
-                client,
-                supplier_href=client.href("counterparty", str(sid)),
-                date_from=date_from,
-                date_to=date_to,
-                store=store,
-            )
-        )
+    supplier_ids = [str(s["id"]) for s in suppliers if s.get("id")]
+    # Один запрос на всех поставщиков бренда (DUNO муж+жен) — API допускает несколько supplier=
+    raw_rows, _total = fetch_profit_rows(
+        client,
+        date_from=date_from,
+        date_to=date_to,
+        filters=ProfitFilters(
+            supplier_ids=supplier_ids,
+            store_ids=[store_id] if store_id else [],
+        ),
+    )
 
     items: list[dict[str, Any]] = []
     season_note = None
     for row in raw_rows:
-        fields = _profit_row_fields(row)
+        fields = normalize_profit_row(row)
+        path = fields.get("path") if isinstance(fields.get("path"), str) else None
+        name = fields.get("name") if isinstance(fields.get("name"), str) else None
+        fields["category"] = _category_from_path(path)
+        fields["gender"] = _gender_from_path(path, name)
         if gender_s in ("male", "female"):
             g = fields.get("gender")
-            # если пол не выведен из path — не отбрасываем (карточки без маркера)
             if g and g != gender_s:
                 continue
         if season_meta:
@@ -663,7 +616,13 @@ def _op_brand_sales(client: MoySkladAnalyticsClient, args: dict[str, Any]) -> di
         for k, v in sorted(by_cat.items(), key=lambda kv: -kv[1]["sell_sum"])
     ]
 
-    sold_skus = len({(it.get("article") or it.get("name") or "").casefold() for it in items if it.get("article") or it.get("name")})
+    sold_skus = len(
+        {
+            (it.get("article") or it.get("name") or "").casefold()
+            for it in items
+            if it.get("article") or it.get("name")
+        }
+    )
 
     return {
         "brand": brand,
@@ -680,10 +639,10 @@ def _op_brand_sales(client: MoySkladAnalyticsClient, args: dict[str, Any]) -> di
         "total_profit": total_profit,
         "by_category": by_category,
         "top_items": items[:25],
-        "method": "profit_byproduct+supplier",
+        "method": "report/profit/byproduct+filter=supplier",
         "notes": [
-            "Бренд = Поставщик. Отчёт как «Продажи → Прибыльность» с filter=supplier.",
-            "Сезон коллекции: маркер ВЛ/ОЗ в имени или дата в артикуле (/MM.YY).",
+            "Бренд = Поставщик. Remap: filter=supplier (docs report-pnl).",
+            "Сезон коллекции: маркер ВЛ/ОЗ или /MM.YY в артикуле (в API filter «сезон» нет).",
             season_note,
         ],
     }

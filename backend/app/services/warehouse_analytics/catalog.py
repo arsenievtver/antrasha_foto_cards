@@ -56,13 +56,14 @@ OPERATION_CATALOG: list[dict[str, Any]] = [
     },
     {
         "id": "stock_snapshot",
-        "description": "Снимок остатков склада (positive или low).",
+        "description": "Снимок остатков склада (positive или low). Опционально brand=поставщик (filter=supplier).",
         "input_schema": {
             "type": "object",
             "properties": {
-                "store": {"type": "string", "enum": ["antrasha", "stock"]},
+                "store": {"type": "string", "enum": ["antrasha", "stock", "all"]},
                 "mode": {"type": "string", "enum": ["positive", "low"]},
                 "limit": {"type": "integer", "minimum": 1, "maximum": 25},
+                "brand": {"type": "string", "description": "Поставщик/бренд для filter=supplier"},
             },
             "required": ["store", "mode"],
             "additionalProperties": False,
