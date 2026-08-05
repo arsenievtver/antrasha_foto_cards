@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { createFxRate, deleteFxRate, fetchFxRates } from "../api.js";
+import { createFxRate, deleteFxRate, fetchFxRates, updateFxRate } from "../api.js";
 import { dateRu, rate as fmtRate } from "../utils/money.js";
 
 function today() {
@@ -12,12 +12,19 @@ function periodLabel(row) {
   return `${from} — ${dateRu(row.valid_to)}`;
 }
 
+function emptyForm() {
+  return {
+    validFrom: today(),
+    validTo: "",
+    value: "",
+    comment: "",
+  };
+}
+
 export default function FxRates() {
   const [items, setItems] = useState([]);
-  const [validFrom, setValidFrom] = useState(today());
-  const [validTo, setValidTo] = useState("");
-  const [value, setValue] = useState("");
-  const [comment, setComment] = useState("");
+  const [form, setForm] = useState(emptyForm);
+  const [editingId, setEditingId] = useState(null);
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -39,23 +46,53 @@ export default function FxRates() {
     reload();
   }, [reload]);
 
+  function resetForm() {
+    setEditingId(null);
+    setForm(emptyForm());
+  }
+
+  function startEdit(row) {
+    setEditingId(row.id);
+    setForm({
+      validFrom: row.valid_from,
+      validTo: row.valid_to || "",
+      value: String(row.eur_rub),
+      comment: row.comment || "",
+    });
+    setErr("");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   async function onSubmit(e) {
     e.preventDefault();
     setBusy(true);
     setErr("");
     try {
-      await createFxRate({
-        valid_from: validFrom,
-        valid_to: validTo || null,
-        eur_rub: value,
-        comment: comment.trim() || null,
-      });
-      setValue("");
-      setComment("");
-      setValidTo("");
+      if (editingId) {
+        const body = {
+          valid_from: form.validFrom,
+          eur_rub: form.value,
+          // Пустая строка сбрасывает комментарий (null на PATCH игнорируется).
+          comment: form.comment.trim(),
+        };
+        if (form.validTo) {
+          body.valid_to = form.validTo;
+        } else {
+          body.clear_valid_to = true;
+        }
+        await updateFxRate(editingId, body);
+      } else {
+        await createFxRate({
+          valid_from: form.validFrom,
+          valid_to: form.validTo || null,
+          eur_rub: form.value,
+          comment: form.comment.trim() || null,
+        });
+      }
+      resetForm();
       await reload();
-    } catch (e) {
-      setErr(e.message);
+    } catch (ex) {
+      setErr(ex.message);
     } finally {
       setBusy(false);
     }
@@ -66,11 +103,14 @@ export default function FxRates() {
     setErr("");
     try {
       await deleteFxRate(row.id);
+      if (editingId === row.id) resetForm();
       await reload();
-    } catch (e) {
-      setErr(e.message);
+    } catch (ex) {
+      setErr(ex.message);
     }
   }
+
+  const isEditing = Boolean(editingId);
 
   return (
     <div>
@@ -79,20 +119,24 @@ export default function FxRates() {
         Курс задаётся на период. При создании заказа, оплаты или поставки в форму
         подставляется курс, чей период покрывает дату документа. Сам документ
         сохраняет свой курс — правка справочника не меняет уже посчитанные рубли.
-        Периоды не должны пересекаться; пустой «по» = бессрочно.
+        Периоды не должны пересекаться; пустой «по» = бессрочно. Чтобы повысить
+        курс: закройте текущий период датой «по», затем добавьте новый со следующего
+        дня.
       </p>
 
       {err ? <p className="error">{err}</p> : null}
 
       <div className="card" style={{ maxWidth: 560, marginBottom: "1.5rem" }}>
-        <h3 style={{ marginTop: 0 }}>Новый курс на период</h3>
+        <h3 style={{ marginTop: 0 }}>
+          {isEditing ? "Редактировать период" : "Новый курс на период"}
+        </h3>
         <form className="form-stack" onSubmit={onSubmit}>
           <label>
             С даты
             <input
               type="date"
-              value={validFrom}
-              onChange={(e) => setValidFrom(e.target.value)}
+              value={form.validFrom}
+              onChange={(e) => setForm((f) => ({ ...f, validFrom: e.target.value }))}
               required
             />
           </label>
@@ -100,8 +144,8 @@ export default function FxRates() {
             По дату
             <input
               type="date"
-              value={validTo}
-              onChange={(e) => setValidTo(e.target.value)}
+              value={form.validTo}
+              onChange={(e) => setForm((f) => ({ ...f, validTo: e.target.value }))}
             />
             <span className="field-hint">
               Можно оставить пустым — курс действует с даты начала без срока.
@@ -113,8 +157,8 @@ export default function FxRates() {
               type="number"
               step="0.0001"
               min="0"
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
+              value={form.value}
+              onChange={(e) => setForm((f) => ({ ...f, value: e.target.value }))}
               placeholder="105.5"
               required
             />
@@ -122,14 +166,21 @@ export default function FxRates() {
           <label>
             Комментарий
             <input
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
+              value={form.comment}
+              onChange={(e) => setForm((f) => ({ ...f, comment: e.target.value }))}
               placeholder="Курс банка на сезон / месяц"
             />
           </label>
-          <button type="submit" disabled={busy || !value || !validFrom}>
-            {busy ? "Сохранение…" : "Добавить курс"}
-          </button>
+          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+            <button type="submit" disabled={busy || !form.value || !form.validFrom}>
+              {busy ? "Сохранение…" : isEditing ? "Сохранить" : "Добавить курс"}
+            </button>
+            {isEditing ? (
+              <button type="button" className="secondary" disabled={busy} onClick={resetForm}>
+                Отмена
+              </button>
+            ) : null}
+          </div>
         </form>
       </div>
 
@@ -155,8 +206,22 @@ export default function FxRates() {
                   <td>{periodLabel(row)}</td>
                   <td>{fmtRate(row.eur_rub)}</td>
                   <td>{row.comment || "—"}</td>
-                  <td>
-                    <button type="button" className="secondary" onClick={() => onDelete(row)}>
+                  <td style={{ whiteSpace: "nowrap" }}>
+                    <button
+                      type="button"
+                      className="secondary"
+                      onClick={() => startEdit(row)}
+                      disabled={busy}
+                      style={{ marginRight: "0.35rem" }}
+                    >
+                      Изменить
+                    </button>
+                    <button
+                      type="button"
+                      className="secondary"
+                      onClick={() => onDelete(row)}
+                      disabled={busy}
+                    >
                       Удалить
                     </button>
                   </td>
