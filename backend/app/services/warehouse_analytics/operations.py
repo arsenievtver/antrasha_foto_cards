@@ -131,7 +131,7 @@ def run_operation(
     cache_ttl: float = 600.0,
 ) -> dict[str, Any]:
     args = dict(args or {})
-    key = cache_key(operation, args)
+    key = cache_key(f"{operation}:v2", args)
     if use_cache:
         hit = ANALYTICS_CACHE.get(key)
         if hit is not None:
@@ -511,34 +511,52 @@ def _op_top_counterparties(client: MoySkladAnalyticsClient, args: dict[str, Any]
     date_to = _parse_day(args.get("date_to"), default=today)
     date_from = _parse_day(args.get("date_from"), default=date(today.year, today.month, 1))
     limit = min(MAX_TOP_ROWS, max(1, int(args.get("limit") or 10)))
+    # API order= часто игнорируется — тянем пачку и сортируем сами.
+    fetch_limit = min(100, max(limit * 5, 50))
     rows, size = client.get_rows(
         "/report/profit/bycounterparty",
         params={
             "momentFrom": _moment(date_from),
             "momentTo": _moment(date_to, end=True),
-            "limit": limit,
-            "order": "sellSum,desc",
+            "limit": fetch_limit,
         },
     )
     items = []
-    for row in rows[:limit]:
+    for row in rows:
         cp = row.get("counterparty") if isinstance(row.get("counterparty"), dict) else {}
         meta = cp.get("meta") if isinstance(cp.get("meta"), dict) else {}
+        href = meta.get("href")
+        cid = cp.get("id")
+        if not cid and href:
+            m = re.search(r"/entity/counterparty/([0-9a-f-]{36})", str(href), re.I)
+            if m:
+                cid = m.group(1).lower()
+        name = cp.get("name")
+        sell = money_rub(row.get("sellSum"))
+        # отсечь пустых / нулевых
+        if sell is None or sell <= 0:
+            continue
         items.append(
             {
-                "id": cp.get("id"),
-                "name": cp.get("name"),
-                "href": meta.get("href"),
-                "sell_sum": money_rub(row.get("sellSum")),
+                "id": cid,
+                "name": name,
+                "href": href,
+                "sell_sum": sell,
                 "profit": money_rub(row.get("profit")),
                 "sell_quantity": row.get("sellQuantity"),
             }
         )
+    items.sort(key=lambda x: float(x.get("sell_sum") or 0), reverse=True)
+    top = items[:limit]
     return {
         "date_from": date_from.isoformat(),
         "date_to": date_to.isoformat(),
         "total_rows": size,
-        "items": items,
+        "fetched": len(items),
+        "sorted_by": "sell_sum_desc",
+        "best": top[0] if top else None,
+        "items": top,
+        "note": "Топ по sellSum отчёта profit/bycounterparty (сортировка на бэкенде).",
     }
 
 
@@ -548,22 +566,46 @@ def _resolve_counterparty(
     counterparty_id: str | None,
     counterparty_name: str | None,
 ) -> dict[str, Any]:
-    if counterparty_id:
-        data = client.get(f"/entity/counterparty/{counterparty_id}")
-        if isinstance(data, dict):
+    cid = (counterparty_id or "").strip()
+    if cid and re.fullmatch(r"[0-9a-f-]{36}", cid, re.I):
+        data = client.get(f"/entity/counterparty/{cid}")
+        if isinstance(data, dict) and data.get("id"):
             return {"id": data.get("id"), "name": data.get("name")}
     name = (counterparty_name or "").strip()
-    if not name:
+    if not name or _looks_like_placeholder(name):
         raise ValueError("counterparty_id or counterparty_name required")
     rows, _ = client.get_rows("/entity/counterparty", params={"search": name, "limit": 10})
     if not rows:
         raise LookupError(f"Контрагент не найден: {name}")
-    # prefer exact-ish
     name_l = name.casefold()
     for row in rows:
         if str(row.get("name") or "").casefold() == name_l:
             return {"id": row.get("id"), "name": row.get("name")}
     return {"id": rows[0].get("id"), "name": rows[0].get("name")}
+
+
+def _looks_like_placeholder(value: str | None) -> bool:
+    if value is None:
+        return True
+    s = str(value).strip()
+    if not s:
+        return True
+    if s.startswith("<<") and s.endswith(">>"):
+        return True
+    low = s.casefold()
+    return any(
+        x in low
+        for x in (
+            "top_counterparty",
+            "step_1",
+            "step1",
+            "placeholder",
+            "from_previous",
+            "todo",
+            "{{",
+            "}}",
+        )
+    )
 
 
 def _op_customer_purchases(client: MoySkladAnalyticsClient, args: dict[str, Any]) -> dict[str, Any]:

@@ -146,7 +146,8 @@ export default function WarehouseAi() {
         <div>
           <h1>AI ассистент ANTRASHA</h1>
           <p className="muted" style={{ maxWidth: "42rem", margin: "0.35rem 0 0" }}>
-            Semantic-аналитика: вопрос → операции МойСклад → ответ. Табы и свободный ввод.
+            Агент вызывает операции МойСклад по шагам (реальные данные в цикле), затем
+            отвечает. Табы — готовые сценарии без свободного планирования.
           </p>
         </div>
         <button type="button" className="secondary" disabled={busy || !messages.length} onClick={clearChat}>

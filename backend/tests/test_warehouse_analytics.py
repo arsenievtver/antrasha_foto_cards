@@ -13,7 +13,7 @@ from app.services.warehouse_analytics.operations import (
     run_operation,
     season_dates,
 )
-from app.services.warehouse_analytics.orchestrator import _normalize_steps
+from app.services.warehouse_analytics.orchestrator import _sanitize_tool_input
 
 
 class MoneyTests(unittest.TestCase):
@@ -51,18 +51,20 @@ class CatalogTests(unittest.TestCase):
         self.assertIn("revenue_series", text)
 
 
-class NormalizeStepsTests(unittest.TestCase):
-    def test_filters_unknown(self):
-        steps = _normalize_steps(
-            {
-                "steps": [
-                    {"operation": "revenue_series", "args": {"interval": "day"}},
-                    {"operation": "hack_drop_table", "args": {}},
-                ]
-            }
+class SanitizeInputTests(unittest.TestCase):
+    def test_rejects_unknown_keys_quietly_keeps_known(self):
+        out = _sanitize_tool_input(
+            "revenue_series",
+            {"interval": "day", "date_from": "2026-07-01", "date_to": "2026-07-07"},
         )
-        self.assertEqual(len(steps), 1)
-        self.assertEqual(steps[0]["operation"], "revenue_series")
+        self.assertEqual(out["interval"], "day")
+
+    def test_rejects_placeholder(self):
+        with self.assertRaises(ValueError):
+            _sanitize_tool_input(
+                "customer_purchases",
+                {"counterparty_name": "<<from_step_1>>"},
+            )
 
 
 class StockOperationTests(unittest.TestCase):
@@ -89,6 +91,47 @@ class StockOperationTests(unittest.TestCase):
         self.assertEqual(out["items"][0]["gender"], "male")
 
 
+class TopCounterpartiesSortTests(unittest.TestCase):
+    def test_sorts_by_sell_sum_desc(self):
+        client = MagicMock()
+        client.href.side_effect = lambda e, i: f"https://api.moysklad.ru/api/remap/1.2/entity/{e}/{i}"
+        client.get_rows.return_value = (
+            [
+                {
+                    "sellSum": 230000,
+                    "profit": 159122,
+                    "counterparty": {
+                        "name": "Абашева",
+                        "meta": {
+                            "href": "https://api.moysklad.ru/api/remap/1.2/entity/counterparty/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+                        },
+                    },
+                },
+                {
+                    "sellSum": 10000000,
+                    "profit": 5000000,
+                    "counterparty": {
+                        "name": "Ильичев",
+                        "meta": {
+                            "href": "https://api.moysklad.ru/api/remap/1.2/entity/counterparty/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+                        },
+                    },
+                },
+            ],
+            2,
+        )
+        out = run_operation(
+            client,
+            "top_counterparties",
+            {"date_from": "2026-07-01", "date_to": "2026-07-31", "limit": 5},
+            use_cache=False,
+        )
+        self.assertEqual(out["items"][0]["name"], "Ильичев")
+        self.assertEqual(out["best"]["name"], "Ильичев")
+        self.assertEqual(out["items"][0]["sell_sum"], 100000.0)
+        self.assertEqual(out["items"][0]["id"], "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
+
+
 class ProfitTopTests(unittest.TestCase):
     def test_profit_top(self):
         client = MagicMock()
@@ -113,6 +156,3 @@ class ProfitTopTests(unittest.TestCase):
         self.assertEqual(out["items"][0]["sell_sum"], 1000.0)
         self.assertEqual(out["items"][0]["gender"], "female")
 
-
-if __name__ == "__main__":
-    unittest.main()

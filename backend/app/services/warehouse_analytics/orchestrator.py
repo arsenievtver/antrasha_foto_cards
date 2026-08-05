@@ -1,4 +1,11 @@
-"""Orchestrator: Haiku router → MoySklad operations → Sonnet writer."""
+"""
+Orchestrator: agentic tool-loop по semantic operations.
+
+Свободный вопрос → Claude вызывает наши tools → backend исполняет МойСклад REST
+→ tool_result с реальными данными → следующий шаг / финальный ответ.
+
+Пресеты → прямой exec без агента (детерминированно) + короткий writer.
+"""
 
 from __future__ import annotations
 
@@ -6,7 +13,7 @@ import json
 import logging
 import re
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -15,7 +22,7 @@ import requests
 from app.config import Settings
 from app.services.warehouse_analytics.catalog import (
     KNOWN_OPERATION_IDS,
-    catalog_for_prompt,
+    anthropic_tools,
 )
 from app.services.warehouse_analytics.ms_client import (
     MoySkladAnalyticsClient,
@@ -28,13 +35,16 @@ log = logging.getLogger("app.warehouse_analytics.orch")
 _TZ = ZoneInfo("Europe/Moscow")
 ANTHROPIC_URL = "https://api.anthropic.com/v1/messages"
 ANTHROPIC_VERSION = "2023-06-01"
-MAX_PLAN_STEPS = 3
-# 529 Overloaded / 503 — временные; ретраим с backoff.
+MAX_TOOL_ROUNDS = 8
 _RETRYABLE_HTTP = frozenset({408, 429, 500, 502, 503, 529})
 _MAX_RETRIES = 4
 _RETRY_BASE_SEC = 1.5
+_UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
+_PLACEHOLDER_RE = re.compile(
+    r"<<|>>|top_counterparty|step_?\d|placeholder|from_previous|\{\{",
+    re.I,
+)
 
-# Пресет → готовый план (без router).
 PRESET_PLANS: dict[str, list[dict[str, Any]]] = {
     "stock_overview": [
         {"operation": "stock_snapshot", "args": {"store": "antrasha", "mode": "positive", "limit": 15}},
@@ -43,7 +53,7 @@ PRESET_PLANS: dict[str, list[dict[str, Any]]] = {
         {"operation": "stock_snapshot", "args": {"store": "antrasha", "mode": "low", "limit": 20}},
     ],
     "sales_week": [
-        {"operation": "revenue_series", "args": {"interval": "day"}},  # dates filled in execute
+        {"operation": "revenue_series", "args": {"interval": "day"}},
         {"operation": "dashboard_period", "args": {"period": "week"}},
         {"operation": "profit_top_products", "args": {"limit": 10, "store": "antrasha"}},
     ],
@@ -97,32 +107,56 @@ def _merge_usage(dst: dict[str, int], src: object) -> None:
                 pass
 
 
-def _anthropic_messages(
+def _today() -> datetime.date:
+    return datetime.now(_TZ).date()
+
+
+def _fill_preset_args(operation: str, args: dict[str, Any], *, preset_id: str) -> dict[str, Any]:
+    from datetime import date as date_cls
+
+    out = dict(args)
+    today = _today()
+    if operation == "revenue_series":
+        if preset_id == "sales_week":
+            out["date_from"] = (today - timedelta(days=6)).isoformat()
+            out["date_to"] = today.isoformat()
+            out["interval"] = "day"
+        elif preset_id == "sales_month":
+            out["date_from"] = today.replace(day=1).isoformat()
+            out["date_to"] = today.isoformat()
+            out["interval"] = "day"
+        elif preset_id == "sales_year_chart":
+            y, m = today.year, today.month - 11
+            while m <= 0:
+                m += 12
+                y -= 1
+            out["date_from"] = date_cls(y, m, 1).isoformat()
+            out["date_to"] = today.isoformat()
+            out["interval"] = "month"
+    if operation == "profit_top_products":
+        out.setdefault("date_from", today.replace(day=1).isoformat())
+        out.setdefault("date_to", today.isoformat())
+        if preset_id == "sales_week":
+            out["date_from"] = (today - timedelta(days=6)).isoformat()
+            out["date_to"] = today.isoformat()
+    return out
+
+
+def _anthropic_raw(
     settings: Settings,
     *,
     model: str,
-    system: str,
-    messages: list[dict[str, str]],
-    max_tokens: int,
-) -> tuple[str, dict[str, int], str | None]:
+    payload: dict[str, Any],
+) -> dict[str, Any]:
     api_key = str(settings.anthropic_api_key).strip()
     timeout = max(30.0, float(settings.anthropic_http_timeout or 180.0))
-    payload = {
-        "model": model,
-        "max_tokens": max_tokens,
-        "system": system,
-        "messages": messages,
-    }
     headers = {
         "Content-Type": "application/json",
         "x-api-key": api_key,
         "anthropic-version": ANTHROPIC_VERSION,
     }
     proxies = _proxies(settings)
-    data: Any = {}
-    res: requests.Response | None = None
     last_err = "unknown"
-
     for attempt in range(_MAX_RETRIES + 1):
         try:
             res = requests.post(
@@ -135,214 +169,285 @@ def _anthropic_messages(
         except requests.RequestException as e:
             last_err = str(e)
             if attempt < _MAX_RETRIES:
-                delay = _RETRY_BASE_SEC * (2**attempt)
-                log.warning(
-                    "anthropic network error attempt=%s/%s sleep=%.1fs: %s",
-                    attempt + 1,
-                    _MAX_RETRIES + 1,
-                    delay,
-                    e,
-                )
-                time.sleep(delay)
+                time.sleep(_RETRY_BASE_SEC * (2**attempt))
                 continue
             raise RuntimeError(f"Сеть Anthropic: {e}") from e
-
         try:
             data = res.json()
         except ValueError:
             data = {"raw": (res.text or "")[:400]}
-
         if res.status_code < 400:
-            break
-
+            return data if isinstance(data, dict) else {"content": [], "stop_reason": "end_turn"}
         detail = data.get("error", data) if isinstance(data, dict) else data
-        if isinstance(detail, dict):
-            msg = detail.get("message") or str(detail)
-        else:
-            msg = str(detail)
+        msg = detail.get("message") if isinstance(detail, dict) else str(detail)
         last_err = f"Anthropic HTTP {res.status_code}: {msg}"
-
         if res.status_code in _RETRYABLE_HTTP and attempt < _MAX_RETRIES:
             delay = _RETRY_BASE_SEC * (2**attempt)
-            # Respect Retry-After if present
             ra = res.headers.get("retry-after")
             if ra:
                 try:
                     delay = max(delay, float(ra))
                 except ValueError:
                     pass
-            log.warning(
-                "anthropic retryable HTTP %s attempt=%s/%s sleep=%.1fs model=%s",
-                res.status_code,
-                attempt + 1,
-                _MAX_RETRIES + 1,
-                delay,
-                model,
-            )
+            log.warning("anthropic retry HTTP %s sleep=%.1fs", res.status_code, delay)
             time.sleep(delay)
             continue
-
-        hint = ""
-        if res.status_code == 529:
-            hint = " — Anthropic перегружен, подождите минуту и повторите запрос."
+        hint = " — Anthropic перегружен, повторите позже." if res.status_code == 529 else ""
         raise RuntimeError(f"{last_err}{hint}")
-
-    assert res is not None and res.status_code < 400
-    texts = []
-    for block in data.get("content") or []:
-        if isinstance(block, dict) and block.get("type") == "text" and block.get("text"):
-            texts.append(str(block["text"]))
-    usage: dict[str, int] = {}
-    _merge_usage(usage, data.get("usage"))
-    return "\n".join(texts).strip(), usage, data.get("stop_reason")
+    raise RuntimeError(last_err)
 
 
-def _extract_json(text: str) -> dict[str, Any]:
-    text = text.strip()
-    if text.startswith("```"):
-        text = re.sub(r"^```(?:json)?\s*", "", text)
-        text = re.sub(r"\s*```$", "", text)
-    try:
-        obj = json.loads(text)
-        if isinstance(obj, dict):
-            return obj
-    except json.JSONDecodeError:
-        pass
-    m = re.search(r"\{[\s\S]*\}", text)
-    if not m:
-        raise ValueError("Router не вернул JSON")
-    obj = json.loads(m.group(0))
-    if not isinstance(obj, dict):
-        raise ValueError("Router JSON не объект")
-    return obj
+def _sanitize_tool_input(name: str, raw: dict[str, Any] | None) -> dict[str, Any]:
+    """Отбрасываем выдуманные args; ошибка уходит в tool_result, модель исправляется на следующем шаге."""
+    args = dict(raw or {})
+    for key, val in list(args.items()):
+        if isinstance(val, str) and _PLACEHOLDER_RE.search(val):
+            raise ValueError(
+                f"Запрещён placeholder в {name}.{key}={val!r}. "
+                "Сначала дождись tool_result, затем вызови tool с реальными id/именами из него."
+            )
+    if name == "customer_purchases":
+        cid = str(args.get("counterparty_id") or "").strip()
+        cname = str(args.get("counterparty_name") or "").strip()
+        if cid and not _UUID_RE.match(cid):
+            args.pop("counterparty_id", None)
+            cid = ""
+        if not cid and not cname:
+            raise ValueError(
+                "customer_purchases требует counterparty_id (UUID из top_counterparties.best.id / items[].id) "
+                "или counterparty_name из вопроса пользователя."
+            )
+    return args
 
 
-def _fill_default_dates(args: dict[str, Any], *, interval: str | None = None) -> dict[str, Any]:
-    """Подставить даты для пресетов, если router/пресет не указал."""
-    from datetime import date, timedelta
-
-    today = datetime.now(_TZ).date()
-    out = dict(args)
-    if "date_to" not in out and "date_from" not in out and "season" not in out:
-        if interval == "month" or out.get("interval") == "month":
-            # 12 full months + current
-            start = date(today.year, today.month, 1)
-            # go back 12 months
-            y, m = today.year, today.month - 11
-            while m <= 0:
-                m += 12
-                y -= 1
-            out["date_from"] = date(y, m, 1).isoformat()
-            out["date_to"] = today.isoformat()
-            out.setdefault("interval", "month")
-        elif "period" in out and out["period"] == "week":
-            pass
-        else:
-            # last 7 days for week-ish revenue
-            if out.get("interval") == "day" and not out.get("date_from"):
-                out["date_from"] = (today - timedelta(days=6)).isoformat()
-                out["date_to"] = today.isoformat()
-            elif not out.get("date_from"):
-                out["date_from"] = date(today.year, today.month, 1).isoformat()
-                out["date_to"] = today.isoformat()
+def _compact_tool_result(result: dict[str, Any]) -> dict[str, Any]:
+    """Ужимаем facts для следующего хода модели (токены)."""
+    out = {k: v for k, v in result.items() if k != "cache_hit"}
+    # обрезать длинные списки уже сделано в operations; доп. страховка
+    for key in ("items", "products", "lines", "top_items", "points"):
+        if isinstance(out.get(key), list) and len(out[key]) > 30:
+            out[key] = out[key][:30]
+            out[f"{key}_truncated"] = True
     return out
 
 
-def route_question(
-    settings: Settings,
-    question: str,
-    *,
-    history: list[dict[str, str]] | None = None,
-) -> tuple[dict[str, Any], dict[str, int]]:
-    today = datetime.now(_TZ).date().isoformat()
-    system = f"""\
-Ты router аналитики магазина ANTRASHA (МойСклад).
-Сегодня (Europe/Moscow): {today}.
-Верни ТОЛЬКО JSON без markdown.
+def _agent_system() -> str:
+    today = _today().isoformat()
+    return f"""\
+Ты аналитик розничного магазина одежды ANTRASHA (Тверь). Сегодня (Europe/Moscow): {today}.
 
-Формат успеха:
-{{"steps":[{{"operation":"...","args":{{...}}}}], "rationale":"кратко"}}
-
-Уточнение:
-{{"clarify":"вопрос пользователю"}}
-
-Не умеем:
-{{"unsupported":"почему"}}
-
-Правила:
-- Максимум {MAX_PLAN_STEPS} steps.
-- Бренд = поставщик; не путать с папкой.
-- Выручка = revenue_series / dashboard_period / profit_*, не «суммируй отгрузки».
-- Для «лучший покупатель + разрез покупок»: top_counterparties затем customer_purchases (подставь counterparty_name из топа нельзя заранее — сначала только top_counterparties; если в истории уже есть имя/id клиента — сразу customer_purchases).
-- Даты YYYY-MM-DD. Если период «июль» без года — июль текущего года (если ещё не наступил — прошлый июль относительно {today}).
-- store по умолчанию antrasha.
-
-Доступные operation:
-{catalog_for_prompt()}
+У тебя есть tools к МойСклад (только чтение). Правила:
+1. Сначала вызови нужные tools, потом дай итоговый ответ с цифрами (Markdown, таблицы GFM).
+2. Не выдумывай цифры — только из tool results.
+3. Бренд = поставщик (supplier), не папка товаров.
+4. Выручка = revenue_series / dashboard / profit_*, не сумма сырых отгрузок.
+5. Многошаговые вопросы: вызови tool → дождись result → следующий tool с РЕАЛЬНЫМИ id/именами из result.
+6. Запрещены placeholder в аргументах (<<...>>, step_1, TODO). Для customer_purchases бери counterparty_id из top_counterparties.best.id или items[0].id.
+7. Если данных недостаточно — один уточняющий вопрос. Если вне возможностей tools — скажи честно.
+8. store по умолчанию antrasha. Период «июль» без года = июль текущего года (если ещё не наступил — прошлый).
 """
-    msgs: list[dict[str, str]] = []
-    if history:
-        # last few turns for context
-        for m in history[-6:]:
-            msgs.append({"role": m["role"], "content": m["content"][:4000]})
-    msgs.append({"role": "user", "content": question[:8000]})
-    model = (settings.warehouse_ai_router_model or "claude-haiku-4-5").strip()
-    text, usage, _ = _anthropic_messages(
-        settings,
-        model=model,
-        system=system,
-        messages=msgs,
-        max_tokens=1024,
-    )
-    plan = _extract_json(text)
-    return plan, usage
 
 
-def _normalize_steps(plan: dict[str, Any]) -> list[dict[str, Any]]:
-    steps = plan.get("steps")
-    if not isinstance(steps, list):
-        return []
-    out = []
-    for step in steps[:MAX_PLAN_STEPS]:
-        if not isinstance(step, dict):
-            continue
-        op = str(step.get("operation") or "").strip()
-        if op not in KNOWN_OPERATION_IDS:
-            continue
-        args = step.get("args") if isinstance(step.get("args"), dict) else {}
-        out.append({"operation": op, "args": _fill_default_dates(args, interval=args.get("interval"))})
-    return out
-
-
-def write_answer(
+def _run_agent_loop(
     settings: Settings,
     *,
     question: str,
-    facts: list[dict[str, Any]],
-) -> tuple[str, dict[str, int], str]:
+    history: list[dict[str, str]],
+) -> dict[str, Any]:
     model = (settings.warehouse_ai_writer_model or settings.anthropic_model or "claude-sonnet-4-6").strip()
-    system = """\
-Ты аналитик магазина одежды ANTRASHA. Отвечай по-русски, кратко, Markdown (таблицы GFM).
-Используй ТОЛЬКО переданные facts. Не выдумывай цифры. Укажи периоды и допущения одной строкой.
-Если facts с ошибкой — скажи прямо. Деньги в ₽.
-"""
-    payload = {
-        "question": question,
-        "facts": facts,
+    client = MoySkladAnalyticsClient(str(settings.moysklad_token).strip())
+    usage: dict[str, int] = {}
+    operations_run: list[str] = []
+    cache_hits = 0
+    tools_payload = anthropic_tools()
+
+    messages: list[dict[str, Any]] = []
+    for m in history[-6:]:
+        messages.append({"role": m["role"], "content": m["content"][:6000]})
+    messages.append({"role": "user", "content": question[:12000]})
+
+    final_text = ""
+    stop_reason = None
+
+    try:
+        for round_i in range(MAX_TOOL_ROUNDS):
+            data = _anthropic_raw(
+                settings,
+                model=model,
+                payload={
+                    "model": model,
+                    "max_tokens": max(1024, int(settings.anthropic_max_tokens or 8192)),
+                    "system": _agent_system(),
+                    "tools": tools_payload,
+                    "messages": messages,
+                },
+            )
+            _merge_usage(usage, data.get("usage"))
+            stop_reason = data.get("stop_reason")
+            content = data.get("content") if isinstance(data.get("content"), list) else []
+
+            tool_uses = [
+                b for b in content if isinstance(b, dict) and b.get("type") == "tool_use"
+            ]
+            text_parts = [
+                str(b.get("text") or "")
+                for b in content
+                if isinstance(b, dict) and b.get("type") == "text" and b.get("text")
+            ]
+            if text_parts:
+                final_text = "\n\n".join(text_parts).strip()
+
+            log.info(
+                "agent round=%s stop=%s tools=%s",
+                round_i,
+                stop_reason,
+                [t.get("name") for t in tool_uses],
+            )
+
+            if not tool_uses:
+                break
+
+            # Append assistant turn with full content (incl. tool_use)
+            messages.append({"role": "assistant", "content": content})
+
+            tool_results: list[dict[str, Any]] = []
+            for tu in tool_uses:
+                name = str(tu.get("name") or "")
+                tool_use_id = str(tu.get("id") or "")
+                raw_input = tu.get("input") if isinstance(tu.get("input"), dict) else {}
+                if name not in KNOWN_OPERATION_IDS:
+                    tool_results.append(
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": tool_use_id,
+                            "is_error": True,
+                            "content": f"Unknown tool: {name}",
+                        }
+                    )
+                    continue
+                try:
+                    args = _sanitize_tool_input(name, raw_input)
+                    result = run_operation(client, name, args, use_cache=True)
+                    if result.get("cache_hit"):
+                        cache_hits += 1
+                    operations_run.append(name)
+                    compact = _compact_tool_result(result)
+                    tool_results.append(
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": tool_use_id,
+                            "content": json.dumps(compact, ensure_ascii=False, default=str)[:80_000],
+                        }
+                    )
+                except (MoySkladAnalyticsError, ValueError, LookupError) as e:
+                    log.warning("tool %s error: %s input=%s", name, e, raw_input)
+                    operations_run.append(name)
+                    tool_results.append(
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": tool_use_id,
+                            "is_error": True,
+                            "content": str(e),
+                        }
+                    )
+
+            messages.append({"role": "user", "content": tool_results})
+
+            if stop_reason == "end_turn":
+                break
+        else:
+            if not final_text:
+                final_text = (
+                    "Достигнут лимит шагов анализа. Уточните вопрос или сузьте период/бренд."
+                )
+    finally:
+        client.close()
+
+    if not final_text:
+        final_text = (
+            "Не удалось сформировать ответ. Попробуйте переформулировать вопрос "
+            "или выбрать готовый таб."
+        )
+
+    return {
+        "reply": final_text,
+        "model": model,
+        "tools_used": operations_run,
+        "operations": operations_run,
+        "stop_reason": stop_reason or "end_turn",
+        "usage": usage,
+        "continues": 0,
+        "mode": "semantic_agent",
+        "cache_hits": cache_hits,
+        "plan": {"type": "tool_loop", "rounds": MAX_TOOL_ROUNDS},
     }
-    text, usage, _ = _anthropic_messages(
+
+
+def _run_preset(
+    settings: Settings,
+    *,
+    preset_id: str,
+    question: str,
+) -> dict[str, Any]:
+    steps = PRESET_PLANS.get(preset_id) or []
+    client = MoySkladAnalyticsClient(str(settings.moysklad_token).strip())
+    facts: list[dict[str, Any]] = []
+    operations_run: list[str] = []
+    cache_hits = 0
+    usage: dict[str, int] = {}
+    try:
+        for raw in steps:
+            op = raw["operation"]
+            args = _fill_preset_args(op, dict(raw.get("args") or {}), preset_id=preset_id)
+            result = run_operation(client, op, args, use_cache=True)
+            if result.get("cache_hit"):
+                cache_hits += 1
+            operations_run.append(op)
+            facts.append(_compact_tool_result(result))
+    finally:
+        client.close()
+
+    model = (settings.warehouse_ai_writer_model or settings.anthropic_model or "claude-sonnet-4-6").strip()
+    data = _anthropic_raw(
         settings,
         model=model,
-        system=system,
-        messages=[
-            {
-                "role": "user",
-                "content": json.dumps(payload, ensure_ascii=False, default=str)[:120_000],
-            }
-        ],
-        max_tokens=max(1024, int(settings.anthropic_max_tokens or 8192)),
+        payload={
+            "model": model,
+            "max_tokens": max(1024, int(settings.anthropic_max_tokens or 8192)),
+            "system": (
+                "Ты аналитик ANTRASHA. Ответь по-русски Markdown по facts. "
+                "Не выдумывай цифры. Деньги в ₽."
+            ),
+            "messages": [
+                {
+                    "role": "user",
+                    "content": json.dumps(
+                        {"question": question, "facts": facts},
+                        ensure_ascii=False,
+                        default=str,
+                    )[:120_000],
+                }
+            ],
+        },
     )
-    return text, usage, model
+    _merge_usage(usage, data.get("usage"))
+    texts = []
+    for b in data.get("content") or []:
+        if isinstance(b, dict) and b.get("type") == "text" and b.get("text"):
+            texts.append(str(b["text"]))
+    reply = "\n\n".join(texts).strip() or "Нет данных для ответа."
+    return {
+        "reply": reply,
+        "model": model,
+        "tools_used": operations_run,
+        "operations": operations_run,
+        "stop_reason": data.get("stop_reason") or "end_turn",
+        "usage": usage,
+        "continues": 0,
+        "mode": "semantic_preset",
+        "cache_hits": cache_hits,
+        "plan": {"type": "preset", "id": preset_id},
+    }
 
 
 def chat_semantic(
@@ -363,152 +468,11 @@ def chat_semantic(
         preset = next((p for p in WAREHOUSE_AI_PRESETS if p["id"] == preset_id), None)
         if preset:
             question = f"{preset['title']}: {preset['description']}"
+        if preset_id in PRESET_PLANS:
+            return _run_preset(settings, preset_id=preset_id, question=question)
 
-    usage_total: dict[str, int] = {}
-    operations_run: list[str] = []
-    cache_hits = 0
-
-    # 1) Plan
-    if preset_id and preset_id in PRESET_PLANS:
-        steps = []
-        for raw in PRESET_PLANS[preset_id]:
-            args = _fill_default_dates(dict(raw.get("args") or {}), interval=(raw.get("args") or {}).get("interval"))
-            # week revenue dates
-            if preset_id == "sales_week" and raw["operation"] == "revenue_series":
-                from datetime import timedelta
-
-                today = datetime.now(_TZ).date()
-                args["date_from"] = (today - timedelta(days=6)).isoformat()
-                args["date_to"] = today.isoformat()
-                args["interval"] = "day"
-            if preset_id == "sales_month" and raw["operation"] == "revenue_series":
-                today = datetime.now(_TZ).date()
-                args["date_from"] = today.replace(day=1).isoformat()
-                args["date_to"] = today.isoformat()
-                args["interval"] = "day"
-            steps.append({"operation": raw["operation"], "args": args})
-        plan = {"steps": steps, "rationale": f"preset:{preset_id}"}
-    else:
-        plan, u_route = route_question(settings, question, history=messages[:-1])
-        _merge_usage(usage_total, u_route)
-        if plan.get("clarify"):
-            return {
-                "reply": str(plan["clarify"]),
-                "model": settings.warehouse_ai_router_model or "claude-haiku-4-5",
-                "tools_used": [],
-                "operations": [],
-                "stop_reason": "clarify",
-                "usage": usage_total,
-                "continues": 0,
-                "mode": "semantic",
-            }
-        if plan.get("unsupported"):
-            return {
-                "reply": f"Пока не умею это надёжно посчитать: {plan['unsupported']}",
-                "model": settings.warehouse_ai_router_model or "claude-haiku-4-5",
-                "tools_used": [],
-                "operations": [],
-                "stop_reason": "unsupported",
-                "usage": usage_total,
-                "continues": 0,
-                "mode": "semantic",
-            }
-        steps = _normalize_steps(plan)
-        if not steps:
-            return {
-                "reply": "Не смог сопоставить вопрос с доступными операциями. Уточните период, бренд или метрику.",
-                "model": settings.warehouse_ai_router_model or "claude-haiku-4-5",
-                "tools_used": [],
-                "operations": [],
-                "stop_reason": "empty_plan",
-                "usage": usage_total,
-                "continues": 0,
-                "mode": "semantic",
-            }
-
-    # 2) Execute
-    client = MoySkladAnalyticsClient(str(settings.moysklad_token).strip())
-    facts: list[dict[str, Any]] = []
-    try:
-        for i, step in enumerate(steps):
-            op = step["operation"]
-            args = dict(step["args"])
-            # Chain: after top_counterparties, if next is customer_purchases without id — inject top name
-            if (
-                op == "customer_purchases"
-                and not args.get("counterparty_id")
-                and not args.get("counterparty_name")
-            ):
-                for prev in facts:
-                    items = prev.get("items") if isinstance(prev.get("items"), list) else []
-                    if prev.get("operation") == "top_counterparties" and items:
-                        top = items[0]
-                        if top.get("id"):
-                            args["counterparty_id"] = top["id"]
-                        elif top.get("name"):
-                            args["counterparty_name"] = top["name"]
-                        break
-
-            try:
-                result = run_operation(client, op, args, use_cache=True)
-                if result.get("cache_hit"):
-                    cache_hits += 1
-                operations_run.append(op)
-                facts.append(result)
-            except (MoySkladAnalyticsError, ValueError, LookupError) as e:
-                log.warning("operation %s failed: %s", op, e)
-                facts.append({"operation": op, "error": str(e), "args": args})
-                operations_run.append(op)
-
-            # Auto-extend: if single top_counterparties and question asks for breakdown — fetch purchases
-            if (
-                i == len(steps) - 1
-                and op == "top_counterparties"
-                and len(steps) < MAX_PLAN_STEPS
-                and re.search(r"размер|пол|марку|бренд|покупк|разрез|анализ", question, re.I)
-            ):
-                items = facts[-1].get("items") if isinstance(facts[-1].get("items"), list) else []
-                if items and items[0].get("id"):
-                    try:
-                        extra = run_operation(
-                            client,
-                            "customer_purchases",
-                            {
-                                "counterparty_id": items[0]["id"],
-                                "date_from": facts[-1].get("date_from"),
-                                "date_to": facts[-1].get("date_to"),
-                            },
-                        )
-                        if extra.get("cache_hit"):
-                            cache_hits += 1
-                        operations_run.append("customer_purchases")
-                        facts.append(extra)
-                    except (MoySkladAnalyticsError, ValueError, LookupError) as e:
-                        facts.append({"operation": "customer_purchases", "error": str(e)})
-    finally:
-        client.close()
-
-    # 3) Writer
-    reply, u_write, model = write_answer(settings, question=question, facts=facts)
-    _merge_usage(usage_total, u_write)
-    if not reply:
-        reply = "Не удалось сформировать ответ по данным."
-
-    log.info(
-        "warehouse_semantic ops=%s cache_hits=%s usage=%s",
-        operations_run,
-        cache_hits,
-        usage_total,
+    return _run_agent_loop(
+        settings,
+        question=question,
+        history=messages[:-1],
     )
-    return {
-        "reply": reply,
-        "model": model,
-        "tools_used": operations_run,
-        "operations": operations_run,
-        "stop_reason": "end_turn",
-        "usage": usage_total,
-        "continues": 0,
-        "mode": "semantic",
-        "cache_hits": cache_hits,
-        "plan": plan if isinstance(plan, dict) else {"steps": steps},
-    }
