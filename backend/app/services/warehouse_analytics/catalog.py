@@ -86,16 +86,25 @@ OPERATION_CATALOG: list[dict[str, Any]] = [
     },
     {
         "id": "brand_sales",
-        "description": "Продажи/маржа бренда-поставщика за даты или сезон ВЛ/ОЗ + год.",
+        "description": (
+            "Продажи/маржа бренда (=Поставщик) как отчёт Прибыльность: "
+            "filter=supplier + период. Сезон ВЛ/ОЗ — коллекция по маркеру или дате в артикуле (/02.26). "
+            "В ответе: total_*, by_category, top_items."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "brand": {"type": "string"},
+                "brand": {"type": "string", "description": "Имя поставщика/бренда, напр. Roy Robson"},
                 "date_from": {"type": "string"},
                 "date_to": {"type": "string"},
                 "season": {"type": "string", "enum": ["VL", "OZ", "ВЛ", "ОЗ"]},
                 "year": {"type": "integer"},
                 "gender": {"type": "string", "enum": ["male", "female", "both"]},
+                "store": {
+                    "type": "string",
+                    "enum": ["antrasha", "stock", "all"],
+                    "description": "Склад; all = как в UI без фильтра склада",
+                },
             },
             "required": ["brand"],
             "additionalProperties": False,

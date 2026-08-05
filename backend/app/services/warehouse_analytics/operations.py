@@ -10,6 +10,8 @@ from zoneinfo import ZoneInfo
 
 from app.services.warehouse_analytics.cache import ANALYTICS_CACHE, cache_key
 from app.services.warehouse_analytics.constants import (
+    MAX_BRAND_SALES_PAGES,
+    MAX_BRAND_SALES_ROWS,
     MAX_PRODUCTS_BRAND,
     MAX_PURCHASE_LINES,
     MAX_SERIES_POINTS,
@@ -27,6 +29,8 @@ from app.services.warehouse_analytics.ms_client import (
 log = logging.getLogger("app.warehouse_analytics.ops")
 _TZ = ZoneInfo("Europe/Moscow")
 _SEASON_RE = re.compile(r"(ВЛ|ОЗ)\s*(\d{2,4})", re.IGNORECASE)
+# Дата коллекции в артикуле: …/02.26 или …/06.26
+_ARTICLE_DATE_RE = re.compile(r"(?:^|/|\s)(\d{2})\.(\d{2})(?:\s|$|/)", re.IGNORECASE)
 
 
 def _today() -> date:
@@ -135,11 +139,33 @@ def season_dates(season: str, year: int) -> tuple[date, date]:
     raise ValueError(f"unknown season {season}")
 
 
+def article_collection_season(text: str | None) -> tuple[str, int] | None:
+    """Сезон коллекции из даты в артикуле/имени: /02.26 → (VL, 2026), /11.25 → (OZ, 2025)."""
+    if not text:
+        return None
+    matches = list(_ARTICLE_DATE_RE.finditer(str(text).replace(" ", "")))
+    if not matches:
+        matches = list(_ARTICLE_DATE_RE.finditer(str(text)))
+    if not matches:
+        return None
+    m = matches[-1]
+    mm, yy = int(m.group(1)), int(m.group(2))
+    year = 2000 + yy
+    if 2 <= mm <= 8:
+        return ("VL", year)
+    if mm == 1:
+        return ("OZ", year - 1)
+    if mm >= 9:
+        return ("OZ", year)
+    return None
+
+
 def matches_season_marker(text: str | None, season: str, year: int) -> bool:
     if not text:
         return False
     s = season.strip().upper()
     marker = "ВЛ" if s in ("VL", "ВЛ") else "ОЗ"
+    want = "VL" if marker == "ВЛ" else "OZ"
     yy2 = str(year % 100).zfill(2)
     yy4 = str(year)
     for m in _SEASON_RE.finditer(text):
@@ -151,8 +177,17 @@ def matches_season_marker(text: str | None, season: str, year: int) -> bool:
             y += 2000
         if y == year or str(y).endswith(yy2) or yy4 in yraw:
             return True
-    # fallback substring
-    return f"{marker}{yy2}" in text.upper().replace(" ", "") or f"{marker}{year}" in text.upper().replace(" ", "")
+    if f"{marker}{yy2}" in text.upper().replace(" ", "") or f"{marker}{year}" in text.upper().replace(" ", ""):
+        return True
+    coll = article_collection_season(text)
+    return bool(coll and coll[0] == want and coll[1] == year)
+
+
+def _category_from_path(path: str | None) -> str:
+    if not path:
+        return "без категории"
+    parts = [p for p in str(path).split("/") if p.strip()]
+    return parts[-1] if parts else "без категории"
 
 
 def run_operation(
@@ -359,14 +394,13 @@ def _find_suppliers(client: MoySkladAnalyticsClient, brand: str, gender: str | N
         "/entity/counterparty",
         params={"search": brand, "limit": 50},
     )
-    brand_l = brand.casefold()
-    out = []
+    brand_l = brand.casefold().strip()
+    brand_key = (_brand_key(brand) or brand).casefold()
+    scored: list[tuple[int, dict[str, Any]]] = []
     for row in rows:
         name = str(row.get("name") or "")
         nl = name.casefold()
-        if brand_l not in nl and not nl.startswith(brand_l[:4] if len(brand_l) >= 4 else brand_l):
-            # soft: still include if search returned it
-            pass
+        key = (_brand_key(name) or name).casefold()
         g = None
         if "(жен" in nl or " жен" in nl:
             g = "female"
@@ -374,15 +408,26 @@ def _find_suppliers(client: MoySkladAnalyticsClient, brand: str, gender: str | N
             g = "male"
         if gender in ("male", "female") and g and g != gender:
             continue
-        if gender in ("male", "female") and not g:
-            # keep unmarked only for both
+        score = 0
+        if nl == brand_l or key == brand_key:
+            score = 100
+        elif nl.startswith(brand_l) or key.startswith(brand_key):
+            score = 80
+        elif brand_l in nl or brand_key in key:
+            score = 60
+        elif brand_l[:4] and brand_l[:4] in nl:
+            score = 20
+        else:
+            score = 10  # search hit
+        if gender in ("male", "female") and not g and score < 80:
             continue
-        out.append({"id": row.get("id"), "name": name, "gender": g})
+        scored.append((score, {"id": row.get("id"), "name": name, "gender": g}))
+    scored.sort(key=lambda x: (-x[0], str(x[1].get("name") or "")))
+    out = [item for _, item in scored]
     if gender in ("male", "female") and not out:
-        # retry without gender strictness
         for row in rows:
             name = str(row.get("name") or "")
-            if brand_l[:3] in name.casefold():
+            if brand_key[:3] in (_brand_key(name) or name).casefold():
                 out.append({"id": row.get("id"), "name": name, "gender": None})
     return out[:6]
 
@@ -441,7 +486,79 @@ def _op_brand_products(client: MoySkladAnalyticsClient, args: dict[str, Any]) ->
     }
 
 
+def _profit_row_fields(row: dict[str, Any]) -> dict[str, Any]:
+    """Нормализация строки profit/byproduct: Remap (assortment) или flat."""
+    brief = _assortment_brief(row)
+    name = brief.get("name") or row.get("name")
+    article = brief.get("article") or row.get("article") or row.get("code")
+    path = brief.get("path") or row.get("pathName")
+    href = brief.get("href")
+    pid = None
+    if href:
+        m = re.search(r"/entity/(?:product|variant)/([0-9a-f-]{36})", str(href), re.I)
+        if m:
+            pid = m.group(1).lower()
+    ass = row.get("assortment") if isinstance(row.get("assortment"), dict) else {}
+    if not pid and ass.get("id"):
+        pid = str(ass.get("id")).lower()
+    sell_sum = row.get("sellSum")
+    # Remap отдаёт копейки; если значение уже «похоже на рубли» (мало), money_rub всё равно /100 —
+    # в MS API sellSum всегда в копейках.
+    return {
+        "name": name,
+        "article": article,
+        "path": path,
+        "href": href,
+        "product_id": pid,
+        "sell_quantity": row.get("sellQuantity") or 0,
+        "sell_sum": money_rub(sell_sum),
+        "sell_cost_sum": money_rub(row.get("sellCostSum")),
+        "profit": money_rub(row.get("profit")),
+        "category": _category_from_path(path if isinstance(path, str) else None),
+        "gender": _gender_from_path(path if isinstance(path, str) else None, name if isinstance(name, str) else None),
+    }
+
+
+def _iter_profit_by_supplier(
+    client: MoySkladAnalyticsClient,
+    *,
+    supplier_href: str,
+    date_from: date,
+    date_to: date,
+    store: str | None,
+) -> list[dict[str, Any]]:
+    filters = [f"supplier={supplier_href}"]
+    store_key = (store or "antrasha").strip().lower()
+    if store_key not in ("all", "any", "*"):
+        sid = _store_id(store_key)
+        if sid:
+            filters.append(f"store={client.href('store', sid)}")
+
+    out: list[dict[str, Any]] = []
+    offset = 0
+    for _ in range(MAX_BRAND_SALES_PAGES):
+        rows, size = client.get_rows(
+            "/report/profit/byproduct",
+            params={
+                "momentFrom": _moment(date_from),
+                "momentTo": _moment(date_to, end=True),
+                "limit": MAX_BRAND_SALES_ROWS,
+                "offset": offset,
+                "filter": encode_filter(filters),
+            },
+        )
+        out.extend(rows)
+        offset += len(rows)
+        if not rows or offset >= size or len(out) >= MAX_BRAND_SALES_ROWS * MAX_BRAND_SALES_PAGES:
+            break
+    return out
+
+
 def _op_brand_sales(client: MoySkladAnalyticsClient, args: dict[str, Any]) -> dict[str, Any]:
+    """
+    Как UI «Прибыльность»: период + filter=supplier (+ опционально склад).
+    Сезон коллекции — пост-фильтр по маркеру ВЛ/ОЗ или дате в артикуле (/02.26).
+    """
     brand = str(args.get("brand") or "").strip()
     if not brand:
         raise ValueError("brand required")
@@ -450,91 +567,124 @@ def _op_brand_sales(client: MoySkladAnalyticsClient, args: dict[str, Any]) -> di
     year = args.get("year")
     if season:
         y = int(year or today.year)
+        # Период продаж по умолчанию = календарное окно сезона, но для ВЛ текущего года
+        # можно сузить date_to «сегодня», если сезон ещё идёт.
         date_from, date_to = season_dates(str(season), y)
-        season_meta = {"season": str(season).upper(), "year": y}
+        if date_to > today:
+            date_to = today
+        season_meta: dict[str, Any] | None = {"season": str(season).upper(), "year": y}
     else:
         date_to = _parse_day(args.get("date_to"), default=today)
         date_from = _parse_day(args.get("date_from"), default=date(today.year, today.month, 1))
         season_meta = None
         y = today.year
 
+    # Явные даты перекрывают окно сезона (как фильтр периода в UI).
+    if args.get("date_from"):
+        date_from = _parse_day(args.get("date_from"))
+    if args.get("date_to"):
+        date_to = _parse_day(args.get("date_to"))
+
     gender_s = str(args.get("gender") or "both").strip().lower()
-    bp = _op_brand_products(client, {"brand": brand, "gender": gender_s, "limit": MAX_PRODUCTS_BRAND})
-    product_ids = {p["id"] for p in bp["products"] if p.get("id")}
-    # optional season filter on product names
-    if season_meta:
-        filtered = [
-            p
-            for p in bp["products"]
-            if matches_season_marker(f"{p.get('name')} {p.get('article')}", str(season), int(season_meta["year"]))
-        ]
-        if filtered:
-            product_ids = {p["id"] for p in filtered if p.get("id")}
-            bp["season_filtered_products"] = len(filtered)
-        else:
-            bp["season_filtered_products"] = 0
-            bp["season_note"] = "Маркер сезона в именах не найден — считаем весь ассортимент поставщика за даты сезона."
+    if gender_s not in ("male", "female", "both"):
+        gender_s = "both"
+    store = str(args.get("store") or "antrasha").strip().lower()
 
-    # pull profit report and filter
-    params: dict[str, Any] = {
-        "momentFrom": _moment(date_from),
-        "momentTo": _moment(date_to, end=True),
-        "limit": 100,
-        "order": "sellSum,desc",
-    }
-    params["filter"] = encode_filter([f"store={client.href('store', STORE_ANTRASHA_ID)}"])
-    rows, _ = client.get_rows("/report/profit/byproduct", params=params)
-    matched = []
-    for row in rows:
-        brief = _assortment_brief(row)
-        href = brief.get("href") or ""
-        pid = None
-        m = re.search(
-            r"/entity/(?:product|variant)/([0-9a-f-]{36})",
-            str(href),
-            re.I,
-        )
-        if m:
-            pid = m.group(1).lower()
-        # also try nested id
-        ass = row.get("assortment") if isinstance(row.get("assortment"), dict) else {}
-        if not pid and ass.get("id"):
-            pid = str(ass.get("id")).lower()
-        if product_ids and pid and pid not in product_ids:
-            # variants: check product field
+    suppliers = _find_suppliers(client, brand, None if gender_s == "both" else gender_s)
+    if not suppliers:
+        return {
+            "brand": brand,
+            "date_from": date_from.isoformat(),
+            "date_to": date_to.isoformat(),
+            "season": season_meta,
+            "suppliers": [],
+            "matched_sales_rows": 0,
+            "total_sell_sum": 0,
+            "total_profit": 0,
+            "total_sell_quantity": 0,
+            "by_category": [],
+            "top_items": [],
+            "notes": ["Поставщик (бренд) не найден в МойСклад."],
+            "method": "profit_byproduct+supplier",
+        }
+
+    raw_rows: list[dict[str, Any]] = []
+    for sup in suppliers:
+        sid = sup.get("id")
+        if not sid:
             continue
-        if product_ids and not pid:
-            continue
-        if not product_ids:
-            # no products found — empty
-            continue
-        matched.append(
-            {
-                **brief,
-                "sell_quantity": row.get("sellQuantity"),
-                "sell_sum": money_rub(row.get("sellSum")),
-                "profit": money_rub(row.get("profit")),
-                "product_id": pid,
-            }
+        raw_rows.extend(
+            _iter_profit_by_supplier(
+                client,
+                supplier_href=client.href("counterparty", str(sid)),
+                date_from=date_from,
+                date_to=date_to,
+                store=store,
+            )
         )
 
-    # If product_ids filter too strict (variants), fallback: match by supplier name in path — already filtered list
-    total_sell = round(sum(x["sell_sum"] or 0 for x in matched), 2)
-    total_profit = round(sum(x["profit"] or 0 for x in matched), 2)
+    items: list[dict[str, Any]] = []
+    season_note = None
+    for row in raw_rows:
+        fields = _profit_row_fields(row)
+        if gender_s in ("male", "female"):
+            g = fields.get("gender")
+            # если пол не выведен из path — не отбрасываем (карточки без маркера)
+            if g and g != gender_s:
+                continue
+        if season_meta:
+            blob = f"{fields.get('name') or ''} {fields.get('article') or ''}"
+            if not matches_season_marker(blob, str(season_meta["season"]), int(season_meta["year"])):
+                continue
+        items.append(fields)
+
+    if season_meta and raw_rows and not items:
+        season_note = (
+            "По маркеру сезона/дате в артикуле строк не осталось — "
+            "проверьте season/year или смотрите продажи поставщика без фильтра коллекции."
+        )
+
+    items.sort(key=lambda x: -(x.get("sell_sum") or 0))
+    total_sell = round(sum(x.get("sell_sum") or 0 for x in items), 2)
+    total_profit = round(sum(x.get("profit") or 0 for x in items), 2)
+    total_qty = round(sum(float(x.get("sell_quantity") or 0) for x in items), 3)
+    total_cost = round(sum(x.get("sell_cost_sum") or 0 for x in items), 2)
+
+    by_cat: dict[str, dict[str, float]] = {}
+    for it in items:
+        cat = str(it.get("category") or "без категории")
+        bucket = by_cat.setdefault(cat, {"sell_sum": 0.0, "profit": 0.0, "sell_quantity": 0.0, "skus": 0})
+        bucket["sell_sum"] = round(bucket["sell_sum"] + (it.get("sell_sum") or 0), 2)
+        bucket["profit"] = round(bucket["profit"] + (it.get("profit") or 0), 2)
+        bucket["sell_quantity"] = round(bucket["sell_quantity"] + float(it.get("sell_quantity") or 0), 3)
+        bucket["skus"] += 1
+    by_category = [
+        {"category": k, **v}
+        for k, v in sorted(by_cat.items(), key=lambda kv: -kv[1]["sell_sum"])
+    ]
+
+    sold_skus = len({(it.get("article") or it.get("name") or "").casefold() for it in items if it.get("article") or it.get("name")})
+
     return {
         "brand": brand,
         "date_from": date_from.isoformat(),
         "date_to": date_to.isoformat(),
         "season": season_meta,
-        "suppliers": bp.get("suppliers"),
-        "products_in_scope": len(product_ids),
-        "matched_sales_rows": len(matched),
+        "store": store,
+        "suppliers": suppliers,
+        "matched_sales_rows": len(items),
+        "sold_skus": sold_skus,
+        "total_sell_quantity": total_qty,
         "total_sell_sum": total_sell,
+        "total_sell_cost_sum": total_cost,
         "total_profit": total_profit,
-        "top_items": matched[:20],
+        "by_category": by_category,
+        "top_items": items[:25],
+        "method": "profit_byproduct+supplier",
         "notes": [
-            bp.get("note"),
-            bp.get("season_note"),
+            "Бренд = Поставщик. Отчёт как «Продажи → Прибыльность» с filter=supplier.",
+            "Сезон коллекции: маркер ВЛ/ОЗ в имени или дата в артикуле (/MM.YY).",
+            season_note,
         ],
     }
 

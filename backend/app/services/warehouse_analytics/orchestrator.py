@@ -240,12 +240,12 @@ def _agent_system() -> str:
 1. Сначала вызови нужные tools, потом дай итоговый ответ с цифрами (Markdown, таблицы GFM).
 2. Не выдумывай цифры — только из tool results.
 3. Когда пользователь говорит «бренд», «марка» или «поставщик» — это поле «Поставщик» (supplier) в карточке товара МойСклад.
-   Источник в данных: lines[].brand / lines[].supplier / by_brand_sum / brand_* tools.
-4. Выручка = revenue_series / dashboard / profit_*, не сумма сырых отгрузок.
+   Продажи бренда/сезона: tool brand_sales (как UI Прибыльность). Источник: lines[].brand / by_brand_sum / brand_*.
+4. Выручка = revenue_series / dashboard / profit_* / brand_sales, не сумма сырых отгрузок.
 5. Многошаговые вопросы: вызови tool → дождись result → следующий tool с РЕАЛЬНЫМИ id/именами из result.
 6. Запрещены placeholder в аргументах (<<...>>, step_1, TODO). Для customer_purchases бери counterparty_id из top_counterparties.best.id или items[0].id.
 7. Если данных недостаточно — один уточняющий вопрос. Если вне возможностей tools — скажи честно.
-8. store по умолчанию antrasha. Период «июль» без года = июль текущего года (если ещё не наступил — прошлый).
+8. store по умолчанию antrasha. «Весна-лето / ВЛ» → brand_sales season=VL + year. Период «июль» без года = июль текущего года.
 """
 
 

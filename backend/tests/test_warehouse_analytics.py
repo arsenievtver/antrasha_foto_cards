@@ -34,16 +34,94 @@ class SeasonTests(unittest.TestCase):
         self.assertFalse(matches_season_marker("Куртка ВЛ2024", "VL", 2025))
 
 
-class BrandSupplierTests(unittest.TestCase):
-    def test_brand_key_strips_gender_suffix(self):
-        from app.services.warehouse_analytics.operations import _brand_key
+class BrandSalesSupplierTests(unittest.TestCase):
+    def test_article_season(self):
+        from app.services.warehouse_analytics.operations import article_collection_season, matches_season_marker
+
+        self.assertEqual(article_collection_season("S-2472-00/B410/02.26 пиджак"), ("VL", 2026))
+        self.assertEqual(article_collection_season("2890-00/В401/11.25"), ("OZ", 2025))
+        self.assertTrue(matches_season_marker("S-2472-00/B410/02.26 пиджак", "VL", 2026))
+        self.assertFalse(matches_season_marker("S-2472-00/B410/02.26 пиджак", "OZ", 2025))
+        self.assertTrue(matches_season_marker("Куртка ВЛ2026", "VL", 2026))
+
+    def test_brand_sales_uses_supplier_filter(self):
+        client = MagicMock()
+        client.href.side_effect = lambda e, i: f"https://api.moysklad.ru/api/remap/1.2/entity/{e}/{i}"
+
+        def get_rows(path, params=None):
+            params = params or {}
+            if path == "/entity/counterparty":
+                return (
+                    [{"id": "85b76c4f-8e8b-11e9-9ff4-31500007fdb1", "name": "Roy Robson"}],
+                    1,
+                )
+            if path == "/report/profit/byproduct":
+                filt = str(params.get("filter") or "")
+                self.assertIn("supplier=", filt)
+                self.assertIn("85b76c4f-8e8b-11e9-9ff4-31500007fdb1", filt)
+                return (
+                    [
+                        {
+                            "name": "S-2472-00/B410/02.26 пиджак",
+                            "article": "S-2472-00/B410/02.26",
+                            "pathName": "Мужская коллекция/Пиджаки, жакеты, бомбер муж",
+                            "sellQuantity": 5,
+                            "sellSum": 16277915,  # kopecks
+                            "sellCostSum": 5000000,
+                            "profit": 11277915,
+                        },
+                        {
+                            "name": "старый пуловер 10.23",
+                            "article": "1870-91/А220/10.23",
+                            "pathName": "Мужская коллекция/Трикотаж муж",
+                            "sellQuantity": 1,
+                            "sellSum": 795000,
+                            "sellCostSum": 300000,
+                            "profit": 495000,
+                        },
+                        {
+                            "name": "16802-90/А401/02.26 поло",
+                            "article": "16802-90/А401/02.26",
+                            "pathName": "Мужская коллекция/Футболки, поло муж",
+                            "sellQuantity": 4,
+                            "sellSum": 4464360,
+                            "sellCostSum": 1000000,
+                            "profit": 3464360,
+                        },
+                    ],
+                    3,
+                )
+            return ([], 0)
+
+        client.get_rows.side_effect = get_rows
+        out = run_operation(
+            client,
+            "brand_sales",
+            {
+                "brand": "Roy Robson",
+                "season": "VL",
+                "year": 2026,
+                "date_from": "2026-01-01",
+                "date_to": "2026-07-31",
+                "store": "antrasha",
+            },
+            use_cache=False,
+        )
+        self.assertEqual(out["method"], "profit_byproduct+supplier")
+        self.assertEqual(out["matched_sales_rows"], 2)
+        self.assertAlmostEqual(out["total_sell_sum"], 162779.15 + 44643.60, places=1)
+        self.assertEqual(out["total_sell_quantity"], 9)
+        cats = {c["category"]: c for c in out["by_category"]}
+        self.assertIn("Пиджаки, жакеты, бомбер муж", cats)
+        self.assertIn("Футболки, поло муж", cats)
+        # OZ article excluded
+        self.assertTrue(all("10.23" not in (i.get("article") or "") for i in out["top_items"]))
+
+    def test_brand_key_and_gender(self):
+        from app.services.warehouse_analytics.operations import _brand_key, _gender_from_path
 
         self.assertEqual(_brand_key("DUNO(муж)"), "DUNO")
         self.assertEqual(_brand_key("TREVI (жен)"), "TREVI")
-
-    def test_gender_from_short_path(self):
-        from app.services.warehouse_analytics.operations import _gender_from_path
-
         self.assertEqual(_gender_from_path("Брюки, джинсы муж"), "male")
         self.assertEqual(_gender_from_path("Платья жен"), "female")
 
