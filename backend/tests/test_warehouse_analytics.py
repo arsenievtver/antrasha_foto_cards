@@ -45,6 +45,120 @@ class MsReportsFoundationTests(unittest.TestCase):
         self.assertIn("quantityMode=positiveOnly", parts)
 
 
+class CategoryMatchTests(unittest.TestCase):
+    def test_category_search_tokens(self):
+        from app.services.warehouse_analytics.operations import _category_search_tokens
+
+        self.assertIn("рубаш", _category_search_tokens("рубашки"))
+        self.assertIn("джинс", _category_search_tokens("джинсы"))
+        self.assertIn("верхняя одежда", _category_search_tokens("верхняя одежда"))
+
+    def test_folder_matches_query(self):
+        from app.services.warehouse_analytics.operations import _folder_matches_query
+
+        self.assertTrue(_folder_matches_query("Рубашки", "Мужская коллекция", "рубашки"))
+        self.assertTrue(_folder_matches_query("Брюки, джинсы муж", "Мужская коллекция", "джинсы"))
+        self.assertTrue(_folder_matches_query("Платья/юбки", "Женская коллекция", "платье"))
+
+    def test_matches_suit_name_and_path(self):
+        from app.services.warehouse_analytics.operations import matches_product_category
+
+        self.assertTrue(
+            matches_product_category(
+                "39095/380/03.19 костюмы",
+                "Мужская коллекция/Костюмы муж",
+                "костюм",
+            )
+        )
+        self.assertTrue(matches_product_category("Костюм SCABAL", "Мужская коллекция/Костюмы муж", "костюмы"))
+        self.assertTrue(
+            matches_product_category("21-710N3/26 рубашка", "Мужская коллекция/Рубашки", "рубашки")
+        )
+        self.assertFalse(
+            matches_product_category(
+                "2215/018/2.16бр брюки (классика, Раздел.костюмы, 98)",
+                None,
+                "костюм",
+            )
+        )
+
+    def test_category_sales_flow(self):
+        from app.services.warehouse_analytics.operations import matches_product_category
+
+        client = MagicMock()
+        client.href.side_effect = lambda e, i: f"https://api.moysklad.ru/api/remap/1.2/entity/{e}/{i}"
+        folder_id = "eec41100-9847-11eb-0a80-0616000ac009"
+        product_id = "0189a452-b37b-11e9-9ff4-3150003a1cb8"
+
+        def get_rows(path, params=None):
+            params = params or {}
+            filt = str(params.get("filter") or "")
+            if path == "/entity/productfolder":
+                return (
+                    [
+                        {
+                            "id": folder_id,
+                            "name": "Костюмы муж",
+                            "pathName": "Мужская коллекция",
+                        }
+                    ],
+                    1,
+                )
+            if path == "/entity/assortment":
+                if "productfolder" in filt or "productFolder" in filt:
+                    return (
+                        [
+                            {
+                                "type": "product",
+                                "id": product_id,
+                                "name": "39095/380/02.25 костюмы",
+                                "article": "39095/380/02.25",
+                                "pathName": "Мужская коллекция/Костюмы муж",
+                                "stock": 2,
+                                "salePrice": 3405000,
+                            }
+                        ],
+                        1,
+                    )
+                if "name~" in filt:
+                    return ([], 0)
+                return ([], 0)
+            if path == "/report/profit/byproduct":
+                return (
+                    [
+                        {
+                            "assortment": {
+                                "name": "39095/380/02.25 костюмы",
+                                "article": "39095/380/02.25",
+                                "pathName": "Мужская коллекция/Костюмы муж",
+                                "meta": {"href": f"https://api.moysklad.ru/api/remap/1.2/entity/product/{product_id}"},
+                            },
+                            "sellQuantity": 3,
+                            "sellSum": 9000000,
+                            "profit": 3000000,
+                        }
+                    ],
+                    1,
+                )
+            return [], 0
+
+        client.get_rows.side_effect = get_rows
+        out = run_operation(
+            client,
+            "category_sales",
+            {"category": "костюм", "gender": "male", "season": "VL", "year": 2025},
+            use_cache=False,
+        )
+        self.assertEqual(out["matched_sales_rows"], 1)
+        self.assertEqual(out["total_sell_sum"], 90000.0)
+        self.assertEqual(out["total_sell_quantity"], 3)
+        self.assertIn("productfolder", out["method"])
+        self.assertTrue(out["product_folders"])
+        self.assertTrue(
+            matches_product_category("39095/380/03.19 костюмы", "Мужская коллекция/Костюмы муж", "костюм")
+        )
+
+
 class SeasonTests(unittest.TestCase):
     def test_dates_vl(self):
         a, b = season_dates("VL", 2025)

@@ -112,6 +112,40 @@ OPERATION_CATALOG: list[dict[str, Any]] = [
         },
     },
     {
+        "id": "category_sales",
+        "description": (
+            "Продажи и остатки по КАТЕГОРИИ/ТИПУ изделия (любая группа товаров МойСклад), не по бренду. "
+            "Ищет productfolder (Рубашки, Платья, Обувь, Аксессуары, Верхняя одежда…) "
+            "и /entity/assortment, затем profit/byproduct. "
+            "Сезон ВЛ/ОЗ — как brand_sales. Для сравнения лет — отдельный вызов на каждый year. "
+            "В ответе: total_sell_sum, total_sell_quantity, avg_sell_price, stock_units, stock_items, product_folders."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "category": {
+                    "type": "string",
+                    "description": (
+                        "Категория/тип как в учёте: костюм, рубашка, платье, джинсы, "
+                        "верхняя одежда, обувь, аксессуары, трикотаж, галстук…"
+                    ),
+                },
+                "gender": {"type": "string", "enum": ["male", "female", "both"]},
+                "date_from": {"type": "string"},
+                "date_to": {"type": "string"},
+                "season": {"type": "string", "enum": ["VL", "OZ", "ВЛ", "ОЗ"]},
+                "year": {"type": "integer"},
+                "store": {
+                    "type": "string",
+                    "enum": ["antrasha", "stock", "all"],
+                    "description": "Склад; all = без фильтра склада",
+                },
+            },
+            "required": ["category"],
+            "additionalProperties": False,
+        },
+    },
+    {
         "id": "top_counterparties",
         "description": (
             "Топ покупателей (контрагентов) по сумме продаж за период. "

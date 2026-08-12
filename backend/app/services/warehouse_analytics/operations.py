@@ -10,6 +10,10 @@ from zoneinfo import ZoneInfo
 
 from app.services.warehouse_analytics.cache import ANALYTICS_CACHE, cache_key
 from app.services.warehouse_analytics.constants import (
+    MAX_CATEGORY_ASSORTMENT_PAGES,
+    MAX_CATEGORY_FOLDERS,
+    MAX_CATEGORY_PRODUCTS,
+    MAX_CATEGORY_PROFIT_BATCH,
     MAX_PRODUCTS_BRAND,
     MAX_PURCHASE_LINES,
     MAX_SERIES_POINTS,
@@ -39,6 +43,8 @@ _TZ = ZoneInfo("Europe/Moscow")
 _SEASON_RE = re.compile(r"(ВЛ|ОЗ)\s*(\d{2,4})", re.IGNORECASE)
 # Дата коллекции в артикуле: …/02.26 или …/06.26
 _ARTICLE_DATE_RE = re.compile(r"(?:^|/|\s)(\d{2})\.(\d{2})(?:\s|$|/)", re.IGNORECASE)
+_CATEGORY_FALSE_POSITIVE = re.compile(r"раздел\.?\s*\w+", re.IGNORECASE)
+_FOLDER_SPLIT_RE = re.compile(r"[,/|]+")
 
 
 def _today() -> date:
@@ -198,6 +204,299 @@ def _category_from_path(path: str | None) -> str:
     return parts[-1] if parts else "без категории"
 
 
+def _category_stem(query: str) -> str:
+    """Короткий префикс для name~ (legacy helper)."""
+    tokens = _category_search_tokens(query)
+    return tokens[-1] if tokens else query.strip().casefold()
+
+
+def _category_search_tokens(query: str) -> list[str]:
+    """Подстроки для поиска любой категории (рубашки, джинсы, верхняя одежда…)."""
+    q = query.strip().casefold()
+    if not q:
+        return []
+    tokens: set[str] = {q}
+    words = [w for w in re.split(r"[\s,/|+]+", q) if len(w) >= 3]
+    tokens.update(words)
+    for word in list(tokens):
+        if len(word) <= 3:
+            continue
+        for suffix in ("ы", "и", "а", "я", "о", "е", "ь"):
+            if word.endswith(suffix) and len(word) - len(suffix) >= 3:
+                tokens.add(word[: -len(suffix)])
+        if word.endswith("ки") and len(word) > 4:
+            tokens.add(word[:-1])
+            tokens.add(word[:-2])
+            tokens.add(word[:-2] + "к")
+        if word.endswith("цы") and len(word) > 4:
+            tokens.add(word[:-1])
+    return sorted({t for t in tokens if len(t) >= 3}, key=len, reverse=True)
+
+
+def _folder_full_path(folder_path: str | None, folder_name: str) -> str:
+    p = str(folder_path or "").strip()
+    n = str(folder_name or "").strip()
+    return f"{p}/{n}" if p else n
+
+
+def _folder_name_segments(folder_name: str) -> list[str]:
+    segs: list[str] = []
+    for part in _FOLDER_SPLIT_RE.split(str(folder_name or "")):
+        part = part.strip().casefold()
+        if part:
+            segs.append(part)
+    return segs
+
+
+def _text_matches_category_tokens(text: str, tokens: list[str]) -> bool:
+    text_l = text.casefold()
+    for t in tokens:
+        if t in text_l:
+            return True
+        if re.search(rf"(?:^|[\s,/(-]){re.escape(t)}", text_l):
+            return True
+    return False
+
+
+def _folder_matches_query(folder_name: str, folder_path: str | None, query: str) -> bool:
+    tokens = _category_search_tokens(query)
+    if not tokens:
+        return False
+    blob = _folder_full_path(folder_path, folder_name)
+    if _text_matches_category_tokens(blob, tokens):
+        return True
+    for seg in _folder_name_segments(folder_name):
+        if _text_matches_category_tokens(seg, tokens):
+            return True
+    return False
+
+
+def matches_product_category(
+    name: str | None,
+    path: str | None,
+    query: str,
+    *,
+    folder_paths: set[str] | None = None,
+) -> bool:
+    """Тип изделия: папка pathName, группа товаров или слово в названии."""
+    q = query.strip().casefold()
+    if not q:
+        return False
+    tokens = _category_search_tokens(q)
+    name_l = (name or "").casefold()
+    path_l = (path or "").casefold()
+    if name_l and _CATEGORY_FALSE_POSITIVE.search(name_l):
+        if "раздел." in name_l and not any(
+            re.search(rf"(?:^|\s){re.escape(t)}(?:ы|и|а|ов|ом|у|е|ь)?(?:\s|$|\()", name_l)
+            for t in tokens
+            if len(t) >= 4
+        ):
+            return False
+    if folder_paths and path_l:
+        for fp in folder_paths:
+            fp_l = fp.casefold()
+            if path_l == fp_l or path_l.startswith(fp_l + "/"):
+                return True
+            last = fp_l.split("/")[-1]
+            if last and path_l.endswith("/" + last):
+                return True
+    if path_l and _text_matches_category_tokens(path_l, tokens):
+        return True
+    if name_l:
+        for t in tokens:
+            if re.search(rf"(?:^|\s){re.escape(t)}(?:ы|и|а|ов|ом|у|е|ь)?(?:\s|$|\()", name_l):
+                return True
+            if name_l.startswith(f"{t} ") or f" {t} " in name_l:
+                return True
+    return False
+
+
+def _find_product_folders(client: MoySkladAnalyticsClient, query: str, gender: str | None) -> list[dict[str, Any]]:
+    tokens = _category_search_tokens(query)
+    seen: set[str] = set()
+    candidates: list[dict[str, Any]] = []
+    search_terms = [query.strip()] + [t for t in tokens if t != query.strip().casefold()]
+    for term in search_terms[:5]:
+        rows, _ = client.get_rows(
+            "/entity/productfolder",
+            params={"search": term, "limit": 50},
+        )
+        for row in rows:
+            fid = str(row.get("id") or "")
+            if not fid or fid in seen:
+                continue
+            seen.add(fid)
+            name = str(row.get("name") or "")
+            path = str(row.get("pathName") or "")
+            if not _folder_matches_query(name, path, query):
+                continue
+            g = _gender_from_path(path, name)
+            if gender in ("male", "female") and g and g != gender:
+                continue
+            blob = f"{path} {name}".casefold()
+            if gender == "male" and "жен" in blob and "муж" not in blob:
+                continue
+            if gender == "female" and "муж" in blob and "жен" not in blob:
+                continue
+            full = _folder_full_path(path or None, name)
+            candidates.append({"id": fid, "name": name, "path": path or None, "full_path": full})
+    q = query.strip().casefold()
+    candidates.sort(
+        key=lambda x: (
+            0 if q in str(x.get("name") or "").casefold() else 1,
+            len(str(x.get("full_path") or "")),
+            str(x.get("name") or ""),
+        )
+    )
+    return candidates[:MAX_CATEGORY_FOLDERS]
+
+
+def _fetch_assortment_for_folder(
+    client: MoySkladAnalyticsClient,
+    folder_id: str,
+) -> tuple[list[dict[str, Any]], list[str]]:
+    matched: list[dict[str, Any]] = []
+    product_ids: set[str] = set()
+    offset = 0
+    for _ in range(MAX_CATEGORY_ASSORTMENT_PAGES):
+        rows, size = client.get_rows(
+            "/entity/assortment",
+            params={
+                "filter": f"productFolder={client.href('productfolder', folder_id)}",
+                "limit": 100,
+                "offset": offset,
+            },
+        )
+        if not rows:
+            break
+        for row in rows:
+            matched.append(row)
+            pid = row.get("productId") or (row.get("id") if row.get("type") == "product" else None)
+            if pid:
+                product_ids.add(str(pid).lower())
+        offset += len(rows)
+        if offset >= size or len(product_ids) >= MAX_CATEGORY_PRODUCTS:
+            break
+    return matched, sorted(product_ids)
+
+
+def _fetch_category_assortment(
+    client: MoySkladAnalyticsClient,
+    query: str,
+    gender: str | None,
+    folders: list[dict[str, Any]] | None = None,
+) -> tuple[list[dict[str, Any]], list[str], set[str]]:
+    """Каталог SKU: папки групп товаров + name~ fallback."""
+    folder_paths = {str(f["full_path"]) for f in (folders or []) if f.get("full_path")}
+    matched_by_key: dict[str, dict[str, Any]] = {}
+    product_ids: set[str] = set()
+
+    for folder in folders or []:
+        fid = folder.get("id")
+        if not fid:
+            continue
+        rows, pids = _fetch_assortment_for_folder(client, str(fid))
+        for row in rows:
+            name = str(row.get("name") or "")
+            path = str(row.get("pathName") or "") if row.get("pathName") else None
+            if not matches_product_category(name, path, query, folder_paths=folder_paths):
+                continue
+            g = _gender_from_path(path, name)
+            if gender in ("male", "female") and g and g != gender:
+                continue
+            key = str(row.get("id") or f"{name}:{path}")
+            matched_by_key[key] = row
+            pid = row.get("productId") or (row.get("id") if row.get("type") == "product" else None)
+            if pid:
+                product_ids.add(str(pid).lower())
+        product_ids.update(pids)
+
+    for stem in _category_search_tokens(query)[:3]:
+        offset = 0
+        for _ in range(MAX_CATEGORY_ASSORTMENT_PAGES):
+            rows, size = client.get_rows(
+                "/entity/assortment",
+                params={"filter": f"name~{stem}", "limit": 100, "offset": offset},
+            )
+            if not rows:
+                break
+            for row in rows:
+                name = str(row.get("name") or "")
+                path = str(row.get("pathName") or "") if row.get("pathName") else None
+                if not matches_product_category(name, path, query, folder_paths=folder_paths):
+                    continue
+                g = _gender_from_path(path, name)
+                if gender in ("male", "female") and g and g != gender:
+                    continue
+                key = str(row.get("id") or f"{name}:{path}")
+                matched_by_key[key] = row
+                pid = row.get("productId") or (row.get("id") if row.get("type") == "product" else None)
+                if pid:
+                    product_ids.add(str(pid).lower())
+            offset += len(rows)
+            if offset >= size or len(product_ids) >= MAX_CATEGORY_PRODUCTS:
+                break
+        if len(product_ids) >= MAX_CATEGORY_PRODUCTS:
+            break
+
+    return list(matched_by_key.values()), sorted(product_ids)[:MAX_CATEGORY_PRODUCTS], folder_paths
+
+
+def _fetch_profit_for_folders(
+    client: MoySkladAnalyticsClient,
+    folder_ids: list[str],
+    *,
+    date_from: date,
+    date_to: date,
+    store_id: str | None,
+) -> list[dict[str, Any]]:
+    all_rows: list[dict[str, Any]] = []
+    for fid in folder_ids:
+        raw, _ = fetch_profit_rows(
+            client,
+            date_from=date_from,
+            date_to=date_to,
+            filters=ProfitFilters(
+                product_folder_ids=[fid],
+                with_subfolders=False,
+                store_ids=[store_id] if store_id else [],
+            ),
+            limit=1000,
+            max_pages=5,
+        )
+        all_rows.extend(raw)
+    return all_rows
+
+
+def _fetch_profit_for_product_ids(
+    client: MoySkladAnalyticsClient,
+    product_ids: list[str],
+    *,
+    date_from: date,
+    date_to: date,
+    store_id: str | None,
+) -> list[dict[str, Any]]:
+    if not product_ids:
+        return []
+    all_rows: list[dict[str, Any]] = []
+    for i in range(0, len(product_ids), MAX_CATEGORY_PROFIT_BATCH):
+        batch = product_ids[i : i + MAX_CATEGORY_PROFIT_BATCH]
+        hrefs = [client.href("product", pid) for pid in batch]
+        raw, _ = fetch_profit_rows(
+            client,
+            date_from=date_from,
+            date_to=date_to,
+            filters=ProfitFilters(
+                product_hrefs=hrefs,
+                store_ids=[store_id] if store_id else [],
+            ),
+            limit=500,
+            max_pages=2,
+        )
+        all_rows.extend(raw)
+    return all_rows
+
+
 def run_operation(
     client: MoySkladAnalyticsClient,
     operation: str,
@@ -222,6 +521,7 @@ def run_operation(
         "stock_snapshot": _op_stock_snapshot,
         "brand_products": _op_brand_products,
         "brand_sales": _op_brand_sales,
+        "category_sales": _op_category_sales,
         "top_counterparties": _op_top_counterparties,
         "customer_purchases": _op_customer_purchases,
         "open_orders": _op_open_orders,
@@ -643,6 +943,194 @@ def _op_brand_sales(client: MoySkladAnalyticsClient, args: dict[str, Any]) -> di
         "notes": [
             "Бренд = Поставщик. Remap: filter=supplier (docs report-pnl).",
             "Сезон коллекции: маркер ВЛ/ОЗ или /MM.YY в артикуле (в API filter «сезон» нет).",
+            season_note,
+        ],
+    }
+
+
+def _assortment_sale_price(value: Any) -> float | None:
+    if value is None:
+        return None
+    try:
+        n = float(value)
+    except (TypeError, ValueError):
+        return None
+    if n >= 100_000 and abs(n - round(n)) < 0.01:
+        return money_rub(n)
+    return round(n, 2)
+
+
+def _op_category_sales(client: MoySkladAnalyticsClient, args: dict[str, Any]) -> dict[str, Any]:
+    """
+    Продажи по типу изделия / группе товаров, не по бренду-поставщику.
+    productfolder → profit/byproduct; остатки из assortment.
+    """
+    category = str(args.get("category") or "").strip()
+    if not category:
+        raise ValueError("category required")
+    today = _today()
+    season = args.get("season")
+    year = args.get("year")
+    if season:
+        y = int(year or today.year)
+        date_from, date_to = season_dates(str(season), y)
+        if date_to > today:
+            date_to = today
+        season_meta: dict[str, Any] | None = {"season": str(season).upper(), "year": y}
+    else:
+        date_to = _parse_day(args.get("date_to"), default=today)
+        date_from = _parse_day(args.get("date_from"), default=date(today.year, today.month, 1))
+        season_meta = None
+    if args.get("date_from"):
+        date_from = _parse_day(args.get("date_from"))
+    if args.get("date_to"):
+        date_to = _parse_day(args.get("date_to"))
+
+    gender_s = str(args.get("gender") or "both").strip().lower()
+    if gender_s not in ("male", "female", "both"):
+        gender_s = "both"
+    gender_f = None if gender_s == "both" else gender_s
+    store = str(args.get("store") or "antrasha").strip().lower()
+    store_id = resolve_store_id(store)
+
+    folders = _find_product_folders(client, category, gender_f)
+    assortment_rows, product_ids, folder_paths = _fetch_category_assortment(
+        client, category, gender_f, folders
+    )
+    folder_ids = [str(f["id"]) for f in folders if f.get("id")]
+
+    if not product_ids and not folder_ids:
+        return {
+            "category": category,
+            "date_from": date_from.isoformat(),
+            "date_to": date_to.isoformat(),
+            "season": season_meta,
+            "store": store,
+            "gender": gender_s,
+            "product_folders": folders,
+            "catalog_skus": 0,
+            "matched_sales_rows": 0,
+            "total_sell_sum": 0,
+            "total_sell_quantity": 0,
+            "avg_sell_price": None,
+            "total_profit": 0,
+            "stock_units": 0,
+            "stock_retail_sum": 0,
+            "top_items": [],
+            "stock_items": [],
+            "notes": ["Категория не найдена: нет групп товаров и позиций в ассортименте."],
+            "method": "productfolder+assortment+report/profit/byproduct",
+        }
+
+    if folder_ids:
+        raw_rows = _fetch_profit_for_folders(
+            client,
+            folder_ids,
+            date_from=date_from,
+            date_to=date_to,
+            store_id=store_id,
+        )
+        profit_method = "report/profit/byproduct+filter=productFolder"
+    else:
+        raw_rows = _fetch_profit_for_product_ids(
+            client,
+            product_ids,
+            date_from=date_from,
+            date_to=date_to,
+            store_id=store_id,
+        )
+        profit_method = "report/profit/byproduct+filter=product"
+
+    items: list[dict[str, Any]] = []
+    season_note = None
+    for row in raw_rows:
+        fields = normalize_profit_row(row)
+        path = fields.get("path") if isinstance(fields.get("path"), str) else None
+        name = fields.get("name") if isinstance(fields.get("name"), str) else None
+        if not matches_product_category(name, path, category, folder_paths=folder_paths):
+            continue
+        fields["category"] = _category_from_path(path)
+        fields["gender"] = _gender_from_path(path, name)
+        if gender_s in ("male", "female"):
+            g = fields.get("gender")
+            if g and g != gender_s:
+                continue
+        if season_meta:
+            blob = f"{fields.get('name') or ''} {fields.get('article') or ''}"
+            if not matches_season_marker(blob, str(season_meta["season"]), int(season_meta["year"])):
+                continue
+        qty = float(fields.get("sell_quantity") or 0)
+        sell = fields.get("sell_sum") or 0
+        fields["avg_sell_price"] = round(sell / qty, 2) if qty > 0 and sell else None
+        items.append(fields)
+
+    if season_meta and raw_rows and not items:
+        season_note = (
+            "По маркеру сезона/дате в артикуле строк не осталось — "
+            "проверьте season/year или запросите без фильтра коллекции."
+        )
+
+    items.sort(key=lambda x: -(x.get("sell_sum") or 0))
+    total_sell = round(sum(x.get("sell_sum") or 0 for x in items), 2)
+    total_profit = round(sum(x.get("profit") or 0 for x in items), 2)
+    total_qty = round(sum(float(x.get("sell_quantity") or 0) for x in items), 3)
+    avg_price = round(total_sell / total_qty, 2) if total_qty > 0 else None
+
+    stock_items: list[dict[str, Any]] = []
+    stock_units = 0.0
+    stock_retail = 0.0
+    for row in assortment_rows:
+        stock = row.get("stock")
+        if stock is None:
+            stock = row.get("quantity")
+        try:
+            sq = float(stock or 0)
+        except (TypeError, ValueError):
+            sq = 0.0
+        if sq <= 0:
+            continue
+        if season_meta:
+            blob = f"{row.get('name') or ''} {row.get('article') or ''}"
+            if not matches_season_marker(blob, str(season_meta["season"]), int(season_meta["year"])):
+                continue
+        price = _assortment_sale_price(row.get("salePrice"))
+        stock_items.append(
+            {
+                "name": row.get("name"),
+                "article": row.get("article"),
+                "stock": sq,
+                "sale_price": price,
+                "path": row.get("pathName"),
+            }
+        )
+        stock_units += sq
+        if price is not None:
+            stock_retail += sq * price
+    stock_items.sort(key=lambda x: -(float(x.get("stock") or 0)))
+
+    return {
+        "category": category,
+        "date_from": date_from.isoformat(),
+        "date_to": date_to.isoformat(),
+        "season": season_meta,
+        "store": store,
+        "gender": gender_s,
+        "product_folders": folders,
+        "catalog_skus": len(assortment_rows),
+        "catalog_products": len(product_ids),
+        "matched_sales_rows": len(items),
+        "total_sell_quantity": total_qty,
+        "total_sell_sum": total_sell,
+        "avg_sell_price": avg_price,
+        "total_profit": total_profit,
+        "stock_units": round(stock_units, 3),
+        "stock_retail_sum": round(stock_retail, 2),
+        "top_items": items[:25],
+        "stock_items": stock_items[:40],
+        "method": f"productfolder+assortment+{profit_method}",
+        "notes": [
+            "Категория = группа товаров (productfolder) или тип в pathName/названии; не путать с брендом-поставщиком.",
+            "Сезон коллекции: маркер ВЛ/ОЗ или /MM.YY в артикуле.",
             season_note,
         ],
     }

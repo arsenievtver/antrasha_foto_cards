@@ -224,7 +224,7 @@ def _compact_tool_result(result: dict[str, Any]) -> dict[str, Any]:
     """Ужимаем facts для следующего хода модели (токены)."""
     out = {k: v for k, v in result.items() if k != "cache_hit"}
     # обрезать длинные списки уже сделано в operations; доп. страховка
-    for key in ("items", "products", "lines", "top_items", "points"):
+    for key in ("items", "products", "lines", "top_items", "points", "stock_items"):
         if isinstance(out.get(key), list) and len(out[key]) > 30:
             out[key] = out[key][:30]
             out[f"{key}_truncated"] = True
@@ -245,7 +245,11 @@ def _agent_system() -> str:
 5. Многошаговые вопросы: вызови tool → дождись result → следующий tool с РЕАЛЬНЫМИ id/именами из result.
 6. Запрещены placeholder в аргументах (<<...>>, step_1, TODO). Для customer_purchases бери counterparty_id из top_counterparties.best.id или items[0].id.
 7. Если данных недостаточно — один уточняющий вопрос. Если вне возможностей tools — скажи честно.
-8. store по умолчанию antrasha. «Весна-лето / ВЛ» → brand_sales season=VL + year. Период «июль» без года = июль текущего года.
+8. store по умолчанию antrasha. «Весна-лето / ВЛ» → season=VL + year. Период «июль» без года = июль текущего года.
+9. Категория/тип изделия (костюмы, рубашки, платья, обувь, аксессуары, верхняя одежда и любая группа товаров) —
+   tool category_sales, НЕ brand_sales. gender=male|female если указан пол.
+   Сравнение нескольких сезонов/лет — отдельный вызов category_sales на каждый year.
+   Остатки в stock_items; итог: stock_units, stock_retail_sum. product_folders — какие папки МС сопоставлены.
 """
 
 
