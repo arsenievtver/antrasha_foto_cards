@@ -4,6 +4,7 @@
  */
 html {
 	height: 100%;
+	height: var(--app-vh, 100dvh);
 	margin: 0;
 	padding: 0;
 	width: 100%;
@@ -23,8 +24,7 @@ body {
 	max-width: 500px;
 	margin: 0 auto;
 	height: 100%;
-	min-height: 100%;
-	min-height: 100dvh;
+	min-height: 0;
 	box-sizing: border-box;
 	display: flex;
 	flex-direction: column;
@@ -36,13 +36,13 @@ html.hv2-edge,
 html.hv2-edge body {
 	background: #0c0b0a;
 	height: 100%;
-	height: 100dvh;
+	height: var(--app-vh, 100dvh);
 }
 
 html.hv2-edge #root {
 	height: 100%;
-	height: 100dvh;
-	max-height: 100dvh;
+	height: var(--app-vh, 100dvh);
+	max-height: var(--app-vh, 100dvh);
 	overflow: hidden;
 	background: #0c0b0a;
 }

@@ -6,6 +6,19 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, viewport-fit=cover"
     />
+    <script>
+      (function () {
+        function s() {
+          var h = window.innerHeight || 0;
+          var vv = window.visualViewport;
+          if (vv) h = Math.max(h, Math.round(vv.height + vv.offsetTop));
+          if (h) document.documentElement.style.setProperty("--app-vh", h + "px");
+        }
+        s();
+        window.addEventListener("resize", s);
+        if (window.visualViewport) window.visualViewport.addEventListener("resize", s);
+      })();
+    </script>
 
     <title>Новинки от ANTRASHA</title>
     <meta
