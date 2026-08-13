@@ -344,15 +344,15 @@ export default function HeroBanners() {
           </div>
 
           <div>
-            <label>Картинка mobile (6:5 — зона баннера)</label>
+            <label>Картинка mobile (6:5 — зона баннера) *</label>
             <input
               type="file"
               accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
               onChange={(e) => onPickImage(e, "mobile")}
             />
             <p style={{ fontSize: "0.85rem", color: "var(--muted)", margin: "0.35rem 0 0" }}>
-              После выбора откроется кадрирование. Акцент лучше держать справа — слева
-              затемнение и текст.
+              Без этого кадра баннер не попадёт в карусель на главной. После выбора
+              откроется кадрирование. Акцент лучше держать справа — слева затемнение и текст.
             </p>
             {imagePreview ? (
               <div className="promo-banner-admin-preview hero-crop-preview hero-crop-preview--mobile">
@@ -434,6 +434,12 @@ export default function HeroBanners() {
                     {row.title}
                     {row.image_url ? " 📱" : ""}
                     {row.image_url_desktop ? " 🖥" : ""}
+                    {!row.image_url && !row.image_url_desktop ? (
+                      <span style={{ color: "var(--muted)" }}>
+                        {" "}
+                        — нет фото, на главной не будет
+                      </span>
+                    ) : null}
                   </td>
                   <td style={{ fontSize: "0.85rem", color: "var(--muted)" }}>
                     {row.starts_at

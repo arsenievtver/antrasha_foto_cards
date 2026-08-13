@@ -68,12 +68,12 @@ function SlideCopy({ slide, active, onOpenVideo }) {
 	const hasImage = Boolean(slide?.image_url || slide?.image_url_desktop);
 	const isPlaceholderTitle = !hasImage && title.length > 40;
 	const ctaInner = (
-		<>
+		<span className="hv2-hero__cta-shimmer">
 			<span>{linkLabel}</span>
 			<span className="hv2-hero__cta-arrow" aria-hidden>
 				→
 			</span>
-		</>
+		</span>
 	);
 
 	return (
@@ -106,7 +106,11 @@ function SlideCopy({ slide, active, onOpenVideo }) {
 						type="button"
 						className="hv2-hero__cta"
 						tabIndex={active ? 0 : -1}
-						onClick={() => onOpenVideo?.(watchSlug)}
+						onClick={(e) => {
+							e.preventDefault();
+							e.stopPropagation();
+							onOpenVideo?.(watchSlug);
+						}}
 					>
 						{ctaInner}
 					</button>

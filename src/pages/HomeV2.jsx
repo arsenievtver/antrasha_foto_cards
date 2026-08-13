@@ -93,8 +93,8 @@ export default function HomeV2() {
 			<HeroBanner items={heroes} />
 
 			<div className="hv2-below">
-				<GenderCards />
 				<BrandMarquee />
+				<GenderCards />
 				<AccentBlocks
 					onSelect={(accent) => {
 						setLeadAccent(accent);

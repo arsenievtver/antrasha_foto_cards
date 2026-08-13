@@ -94,31 +94,32 @@
 .hv2-hero__scrim {
 	position: absolute;
 	inset: 0;
+	z-index: 2;
 	pointer-events: none;
 	/*
-	 * Как в макете: кадр в целом тёмный, овал света справа (лицо/фигура),
-	 * сверху вуаль под status bar + колокол, слева — читаемость текста.
+	 * Слайды карусели выше фона — вуаль должна быть поверх кадра.
+	 * Мягче исходной: свет справа живой, слева читается текст.
 	 */
 	background:
 		linear-gradient(
 			180deg,
-			rgba(8, 7, 6, 0.72) 0%,
-			rgba(8, 7, 6, 0.35) 12%,
-			rgba(8, 7, 6, 0) 28%
+			rgba(8, 7, 6, 0.55) 0%,
+			rgba(8, 7, 6, 0.22) 14%,
+			rgba(8, 7, 6, 0) 32%
 		),
 		linear-gradient(
 			90deg,
-			rgba(8, 7, 6, 0.9) 0%,
-			rgba(8, 7, 6, 0.68) 26%,
-			rgba(8, 7, 6, 0.28) 48%,
-			rgba(8, 7, 6, 0) 68%
+			rgba(8, 7, 6, 0.72) 0%,
+			rgba(8, 7, 6, 0.48) 28%,
+			rgba(8, 7, 6, 0.16) 52%,
+			rgba(8, 7, 6, 0) 74%
 		),
 		radial-gradient(
 			ellipse 52% 68% at 78% 48%,
 			rgba(8, 7, 6, 0) 0%,
-			rgba(8, 7, 6, 0.12) 38%,
-			rgba(8, 7, 6, 0.58) 72%,
-			rgba(8, 7, 6, 0.82) 100%
+			rgba(8, 7, 6, 0.08) 42%,
+			rgba(8, 7, 6, 0.4) 78%,
+			rgba(8, 7, 6, 0.58) 100%
 		);
 }
 
@@ -214,7 +215,6 @@
 .hv2-hero__cta {
 	display: inline-flex;
 	align-items: center;
-	gap: 0.45rem;
 	margin-top: 0.75rem;
 	padding: 0;
 	border: 0;
@@ -227,6 +227,51 @@
 	color: var(--hv2-gold);
 	cursor: pointer;
 	-webkit-tap-highlight-color: transparent;
+}
+
+.hv2-hero__cta-shimmer {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.45rem;
+	background-image: linear-gradient(
+		105deg,
+		#c9a96e 0%,
+		#c9a96e 38%,
+		#f3e0a8 46%,
+		#fffef8 50%,
+		#f3e0a8 54%,
+		#c9a96e 62%,
+		#c9a96e 100%
+	);
+	background-size: 220% 100%;
+	background-position: 100% 50%;
+	background-repeat: no-repeat;
+	-webkit-background-clip: text;
+	background-clip: text;
+	color: transparent;
+	-webkit-text-fill-color: transparent;
+}
+
+.hv2-hero__cta-shimmer > * {
+	color: inherit;
+	-webkit-text-fill-color: inherit;
+}
+
+.hv2-hero__copy.is-active .hv2-hero__cta-shimmer {
+	animation: hv2-cta-shimmer 3.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes hv2-cta-shimmer {
+	0%,
+	22% {
+		background-position: 100% 50%;
+	}
+	48% {
+		background-position: 0% 50%;
+	}
+	100% {
+		background-position: 0% 50%;
+	}
 }
 
 .hv2-hero__cta-arrow {
@@ -379,5 +424,12 @@
 	.hv2-hero__progress-item.is-active .hv2-hero__progress-fill {
 		animation: none;
 		transform: scaleX(1);
+	}
+
+	.hv2-hero__copy.is-active .hv2-hero__cta-shimmer {
+		animation: none;
+		background-image: none;
+		color: var(--hv2-gold);
+		-webkit-text-fill-color: var(--hv2-gold);
 	}
 }
