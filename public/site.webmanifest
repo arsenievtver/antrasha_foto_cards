@@ -1,11 +1,11 @@
 {
-  "id": "/",
+  "id": "/?pwa=antrasha-client",
   "name": "ANTRASHA — новинки и образы",
   "short_name": "ANTRASHA",
   "description": "Новинки и образы ANTRASHA. Свайпайте, отмечайте лайки и формируйте персональные подборки под ваш стиль.",
   "lang": "ru",
   "dir": "ltr",
-  "start_url": "/",
+  "start_url": "/?pwa=antrasha-client",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",

@@ -88,9 +88,31 @@ if [[ "${TAG_CATALOG_SEED:-0}" == "1" ]]; then
   compose exec -T backend python -m app.tag_catalog_seed
 fi
 
-echo "[step] smoke check /health (nginx :80 или backend :8000)"
+echo "[step] smoke check /health + app identity (frontend/work containers)"
+_header_from_container() {
+  local svc="$1"
+  # nginx:alpine имеет wget; парсим ответные заголовки
+  compose exec -T "$svc" sh -c \
+    'wget -S -O /dev/null http://127.0.0.1/ 2>&1' \
+    | tr -d '\r' \
+    | awk -F': ' 'tolower($1)=="x-antrasha-app"{print tolower($2); exit}'
+}
+
 for _ in 1 2 3 4 5 6 7 8 9 10; do
   if curl -fsS "http://127.0.0.1/health" >/dev/null 2>&1; then
+    app_hdr="$(_header_from_container frontend || true)"
+    work_hdr="$(_header_from_container work || true)"
+    if [[ "$app_hdr" != "client" ]]; then
+      echo "[error] container frontend отдал X-Antrasha-App='${app_hdr:-<empty>}' (ожидали client)"
+      compose logs --tail=80 frontend work nginx
+      exit 1
+    fi
+    if [[ "$work_hdr" != "work" ]]; then
+      echo "[error] container work отдал X-Antrasha-App='${work_hdr:-<empty>}' (ожидали work)"
+      compose logs --tail=80 frontend work nginx
+      exit 1
+    fi
+    echo "[ok] app identity: frontend=client, work=work"
     echo "[ok] update complete (nginx)"
     exit 0
   fi
