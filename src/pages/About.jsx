@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion as Motion } from "framer-motion";
-import { createFittingRequest, createGuestFittingRequest } from "../api/client";
+import { createFittingRequest, createGuestFittingRequest, fetchModalVideo } from "../api/client";
 import { useAuth } from "../context/AuthContext";
+import { useVideoModal } from "../context/VideoModalContext";
 import { formatPhoneMask, normalizePhoneRu } from "../utils/masks";
 import PrivacyConsent from "../components/PrivacyConsent";
 import "./About.css";
@@ -39,10 +40,27 @@ const fade = {
 export default function About() {
 	const navigate = useNavigate();
 	const { isAuthenticated } = useAuth();
+	const { openVideo } = useVideoModal();
 	const [fittingBusy, setFittingBusy] = useState(false);
 	const [fittingDone, setFittingDone] = useState(false);
 	const [fittingErr, setFittingErr] = useState("");
 	const [guestPhone, setGuestPhone] = useState("");
+	const [hasAboutVideo, setHasAboutVideo] = useState(false);
+
+	useEffect(() => {
+		let cancelled = false;
+		(async () => {
+			try {
+				const data = await fetchModalVideo("about");
+				if (!cancelled) setHasAboutVideo(Boolean(data?.video_url));
+			} catch {
+				if (!cancelled) setHasAboutVideo(false);
+			}
+		})();
+		return () => {
+			cancelled = true;
+		};
+	}, []);
 
 	async function onFittingRequest() {
 		setFittingErr("");
@@ -108,6 +126,16 @@ export default function About() {
 								className="about-media-slot__img"
 							/>
 							<span className="about-media-slot__hint">hero — 3∶4 или 16∶9</span>
+							{hasAboutVideo ? (
+								<button
+									type="button"
+									className="about-play"
+									onClick={() => openVideo("about")}
+								>
+									<span className="about-play__icon" aria-hidden />
+									<span>Посмотреть видео</span>
+								</button>
+							) : null}
 						</div>
 					</div>
 				</Motion.section>

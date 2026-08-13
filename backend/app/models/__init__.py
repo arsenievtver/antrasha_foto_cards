@@ -15,6 +15,7 @@ from app.models.interaction import Interaction
 from app.models.marketing_campaign import MarketingCampaign
 from app.models.payment import PAYMENT_KINDS, Payment
 from app.models.hero_banner import HeroBanner
+from app.models.modal_video import ModalVideo
 from app.models.home_v2_settings import HomeV2Settings
 from app.models.promo_banner import PromoBanner, PromoBannerDisplayMode, PromoBannerImpression
 from app.models.push_subscription import PushSubscription
@@ -49,6 +50,7 @@ __all__ = [
     "UserSession",
     "MarketingCampaign",
     "HeroBanner",
+    "ModalVideo",
     "HomeV2Settings",
     "PromoBanner",
     "PromoBannerDisplayMode",

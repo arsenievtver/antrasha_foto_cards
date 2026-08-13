@@ -27,7 +27,7 @@ server {
   listen 80;
   server_name ${APP_DOMAIN} ${APP_DOMAIN_ALIASES};
 
-  client_max_body_size 25m;
+  client_max_body_size 80m;
 
   location /.well-known/acme-challenge/ {
     root /var/www/certbot;
@@ -69,7 +69,7 @@ server {
   listen 80;
   server_name ${ADMIN_DOMAIN};
 
-  client_max_body_size 25m;
+  client_max_body_size 80m;
 
   location /.well-known/acme-challenge/ {
     root /var/www/certbot;
@@ -111,7 +111,7 @@ server {
   listen 80;
   server_name ${WORK_DOMAIN};
 
-  client_max_body_size 25m;
+  client_max_body_size 80m;
 
   location /.well-known/acme-challenge/ {
     root /var/www/certbot;

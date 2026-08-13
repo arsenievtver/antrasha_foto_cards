@@ -336,6 +336,40 @@
 	display: block;
 }
 
+.about-play {
+	position: absolute;
+	left: 50%;
+	bottom: 16px;
+	z-index: 1;
+	translate: -50% 0;
+	display: inline-flex;
+	align-items: center;
+	gap: 10px;
+	margin: 0;
+	padding: 10px 16px 10px 12px;
+	border: 1px solid rgba(245, 240, 232, 0.35);
+	border-radius: 999px;
+	background: rgba(6, 6, 5, 0.55);
+	backdrop-filter: blur(10px);
+	-webkit-backdrop-filter: blur(10px);
+	color: #f5f0e8;
+	font-family: inherit;
+	font-size: 0.72rem;
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+	cursor: pointer;
+	-webkit-tap-highlight-color: transparent;
+}
+
+.about-play__icon {
+	width: 0;
+	height: 0;
+	border-style: solid;
+	border-width: 6px 0 6px 10px;
+	border-color: transparent transparent transparent #c4a484;
+	translate: 1px 0;
+}
+
 .about-steps {
 	margin: 1.25rem 0 0;
 	padding: 0;

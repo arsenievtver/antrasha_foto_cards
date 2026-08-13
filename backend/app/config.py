@@ -206,6 +206,9 @@ class Settings(BaseSettings):
     home_v2_max_file_bytes: int = 8 * 1024 * 1024
     # Фото MEN/WOMEN на /v2. Пусто = backend/data/home-v2
     home_v2_media_dir: str | None = None
+    modal_video_max_file_bytes: int = 80 * 1024 * 1024
+    # Ролики модалки. Пусто = backend/data/modal-videos
+    modal_video_media_dir: str | None = None
     ai_ingest_max_pending_jobs: int = 400
     ai_ingest_worker_concurrency: int = 2
     # Пусто = backend/var/ai_ingest_tmp (создаётся при старте загрузки)
@@ -251,6 +254,12 @@ class Settings(BaseSettings):
         if self.home_v2_media_dir and str(self.home_v2_media_dir).strip():
             return Path(self.home_v2_media_dir).expanduser().resolve()
         return (_BACKEND_DIR / "data" / "home-v2").resolve()
+
+    @property
+    def modal_video_media_path(self) -> Path:
+        if self.modal_video_media_dir and str(self.modal_video_media_dir).strip():
+            return Path(self.modal_video_media_dir).expanduser().resolve()
+        return (_BACKEND_DIR / "data" / "modal-videos").resolve()
 
     @property
     def web_push_configured(self) -> bool:

@@ -68,7 +68,7 @@ server {
   ssl_session_cache shared:SSL:10m;
   ssl_session_tickets off;
 
-  client_max_body_size 25m;
+  client_max_body_size 80m;
 
   location /api/ {
     proxy_pass http://backend_upstream/;
@@ -132,7 +132,7 @@ server {
   ssl_session_cache shared:SSL:10m;
   ssl_session_tickets off;
 
-  client_max_body_size 25m;
+  client_max_body_size 80m;
 
   location /api/ {
     proxy_pass http://backend_upstream/;
@@ -178,7 +178,7 @@ server {
   ssl_session_cache shared:SSL:10m;
   ssl_session_tickets off;
 
-  client_max_body_size 25m;
+  client_max_body_size 80m;
 
   # Камера/сканер штрихкода в PWA (Safari/Chrome Feature Policy)
   add_header Permissions-Policy "camera=(self), microphone=()" always;

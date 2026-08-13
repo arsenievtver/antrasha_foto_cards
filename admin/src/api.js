@@ -1073,6 +1073,72 @@ export async function uploadHeroBannerImage(id, file, variant = "mobile") {
   return data;
 }
 
+export async function fetchModalVideos() {
+  const res = await fetch(apiUrl("/admin/videos"), { headers: headersJson() });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
+export async function createModalVideo(body) {
+  const res = await fetch(apiUrl("/admin/videos"), {
+    method: "POST",
+    headers: headersJson(),
+    body: JSON.stringify(body),
+  });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
+export async function updateModalVideo(id, body) {
+  const res = await fetch(apiUrl(`/admin/videos/${id}`), {
+    method: "PATCH",
+    headers: headersJson(),
+    body: JSON.stringify(body),
+  });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
+export async function deleteModalVideo(id) {
+  const res = await fetch(apiUrl(`/admin/videos/${id}`), {
+    method: "DELETE",
+    headers: headersAuthOnly(),
+  });
+  if (!res.ok && res.status !== 204) {
+    const data = await parseResponseJson(res);
+    throw new Error(detail(data, res.statusText));
+  }
+}
+
+export async function uploadModalVideoFile(id, file) {
+  const fd = new FormData();
+  fd.append("file", file);
+  const res = await fetch(apiUrl(`/admin/videos/${id}/file`), {
+    method: "POST",
+    headers: headersAuthOnly(),
+    body: fd,
+  });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
+export async function uploadModalVideoPoster(id, file) {
+  const fd = new FormData();
+  fd.append("file", file);
+  const res = await fetch(apiUrl(`/admin/videos/${id}/poster`), {
+    method: "POST",
+    headers: headersAuthOnly(),
+    body: fd,
+  });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
 export async function fetchHomeV2Settings() {
   const res = await fetch(apiUrl("/admin/home-v2/settings"), { headers: headersJson() });
   const data = await parseResponseJson(res);

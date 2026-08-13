@@ -9,9 +9,11 @@ import { useEffect } from "react";
 import UserMenu from "./components/UserMenu";
 import SessionBootstrap from "./components/SessionBootstrap";
 import { AuthProvider } from "./context/AuthContext";
+import { VideoModalProvider } from "./context/VideoModalContext";
 import Home from "./pages/Home";
 import HomeV2 from "./pages/HomeV2";
 import About from "./pages/About";
+import Watch from "./pages/Watch";
 import Swipe from "./pages/Swipe";
 import ThankYou from "./pages/ThankYou";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
@@ -31,7 +33,8 @@ function AppShell() {
 		pathname === "/thank-you" ||
 		pathname === "/about" ||
 		pathname === "/privacy" ||
-		pathname === "/experiment/try-on";
+		pathname === "/experiment/try-on" ||
+		pathname.startsWith("/watch/");
 	/* Главная (HomeV2) — свой низ с User; глобальный UserMenu не показываем */
 	const showUserMenu =
 		pathname === "/thank-you" ||
@@ -76,6 +79,7 @@ function AppShell() {
 					<Route path="/v2" element={<Navigate to="/" replace />} />
 					<Route path="/classic" element={<Home />} />
 					<Route path="/about" element={<About />} />
+					<Route path="/watch/:slug" element={<Watch />} />
 					<Route path="/swipe/:gender" element={<Swipe />} />
 					<Route path="/thank-you" element={<ThankYou />} />
 					<Route path="/privacy" element={<PrivacyPolicy />} />
@@ -90,8 +94,10 @@ export default function App() {
 	return (
 		<AuthProvider>
 			<Router>
-				<SessionBootstrap />
-				<AppShell />
+				<VideoModalProvider>
+					<SessionBootstrap />
+					<AppShell />
+				</VideoModalProvider>
 			</Router>
 		</AuthProvider>
 	);

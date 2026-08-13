@@ -16,6 +16,7 @@ import Campaigns from "./pages/Campaigns.jsx";
 import PromoBanners from "./pages/PromoBanners.jsx";
 import HeroBanners from "./pages/HeroBanners.jsx";
 import HomeV2GenderCards from "./pages/HomeV2GenderCards.jsx";
+import ModalVideos from "./pages/ModalVideos.jsx";
 import PushNotifications from "./pages/PushNotifications.jsx";
 import WarehouseAi from "./pages/WarehouseAi.jsx";
 import Seasons from "./pages/Seasons.jsx";
@@ -170,6 +171,14 @@ export default function App() {
             element={
               <PermissionRoute permission="ads">
                 <HeroBanners />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/videos"
+            element={
+              <PermissionRoute permission="ads">
+                <ModalVideos />
               </PermissionRoute>
             }
           />

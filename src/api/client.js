@@ -196,6 +196,16 @@ export async function fetchActiveHeroBanners() {
 	return res.json();
 }
 
+export async function fetchModalVideo(slug) {
+	const s = encodeURIComponent(String(slug || "").trim().toLowerCase());
+	const res = await fetch(apiUrl(`/videos/${s}`));
+	if (!res.ok) {
+		const text = await res.text();
+		throw new Error(text || `videos ${res.status}`);
+	}
+	return res.json();
+}
+
 export async function fetchHomeV2GenderCards() {
 	const res = await fetch(apiUrl("/home-v2/gender-cards"));
 	if (!res.ok) {

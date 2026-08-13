@@ -16,6 +16,7 @@ from app.routers import (
     admin_ai_ingest,
     admin_hero_banners,
     admin_home_v2,
+    admin_modal_videos,
     admin_outlet_photo,
     admin_procurement,
     admin_promo_banners,
@@ -27,6 +28,7 @@ from app.routers import (
     guest,
     hero_banners,
     home_v2,
+    modal_videos,
     interactions,
     internal_sync,
     promo_banners,
@@ -118,6 +120,7 @@ app.include_router(auth.router)
 app.include_router(admin.router)
 app.include_router(admin_promo_banners.router)
 app.include_router(admin_hero_banners.router)
+app.include_router(admin_modal_videos.router)
 app.include_router(admin_home_v2.router)
 app.include_router(admin_ai_ingest.router)
 app.include_router(admin_outlet_photo.router)
@@ -126,6 +129,7 @@ app.include_router(admin_push.router)
 app.include_router(admin_warehouse_ai.router)
 app.include_router(promo_banners.router)
 app.include_router(hero_banners.router)
+app.include_router(modal_videos.router)
 app.include_router(home_v2.router)
 app.include_router(push.router)
 app.include_router(internal_sync.router)
@@ -156,6 +160,14 @@ app.mount(
     "/media/home-v2",
     StaticFiles(directory=str(_home_v2_media)),
     name="home-v2-media",
+)
+
+_modal_video_media = settings.modal_video_media_path
+_modal_video_media.mkdir(parents=True, exist_ok=True)
+app.mount(
+    "/media/modal-videos",
+    StaticFiles(directory=str(_modal_video_media)),
+    name="modal-video-media",
 )
 
 

@@ -241,8 +241,10 @@ export default function HeroBanners() {
     <div>
       <h2 style={{ marginTop: 0 }}>Hero-баннеры (главная /v2)</h2>
       <p style={{ color: "var(--muted)", maxWidth: 640 }}>
-        Баннер на /v2 занимает верх экрана (не весь viewport). Кадрируйте mobile под
-        рамку 6:5 — как реальная зона на телефоне; desktop — 16:9.
+        Баннер на /v2 занимает верх экрана (не весь viewport). Несколько активных
+        сменяются по очереди: от большего приоритета к меньшему, плавный crossfade.
+        Кадрируйте mobile под рамку 6:5 — как реальная зона на телефоне; desktop — 16:9.
+        Видео в модалке: CTA-ссылка <code>/watch/slug</code> из раздела «Видео».
       </p>
 
       <div className="card" style={{ marginBottom: "1rem" }}>
@@ -292,7 +294,7 @@ export default function HeroBanners() {
               <input
                 value={form.link_url}
                 onChange={(e) => setForm((f) => ({ ...f, link_url: e.target.value }))}
-                placeholder="/swipe/female или https://…"
+                placeholder="/watch/about, /swipe/female или https://…"
               />
             </div>
             <div style={{ flex: 1 }}>
@@ -324,7 +326,7 @@ export default function HeroBanners() {
           </div>
           <div className="flex-gap">
             <div style={{ flex: 1 }}>
-              <label>Приоритет (больше — выше)</label>
+              <label>Приоритет (больше — раньше в карусели)</label>
               <input
                 type="number"
                 value={form.priority}
