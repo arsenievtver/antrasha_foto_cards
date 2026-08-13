@@ -1,7 +1,16 @@
 .hv2-bottom {
 	display: flex;
+	align-items: center;
 	gap: 8px;
-	padding: 6px 12px calc(8px + env(safe-area-inset-bottom, 0px));
+	/*
+	 * Safe-area только здесь (главная immersive, без padding у shell).
+	 * Делим inset пополам: кнопки по центру зоны над home-индикатором,
+	 * а не прижаты к верху «пустого» низа.
+	 */
+	padding:
+		calc(8px + env(safe-area-inset-bottom, 0px) * 0.5)
+		12px
+		calc(8px + env(safe-area-inset-bottom, 0px) * 0.5);
 	box-sizing: border-box;
 	width: 100%;
 	flex: 0 0 auto;
@@ -57,7 +66,10 @@
 @media (min-width: 720px) {
 	.hv2-bottom {
 		gap: 10px;
-		padding: 8px 18px calc(12px + env(safe-area-inset-bottom, 0px));
+		padding:
+			calc(10px + env(safe-area-inset-bottom, 0px) * 0.5)
+			18px
+			calc(10px + env(safe-area-inset-bottom, 0px) * 0.5);
 	}
 
 	.hv2-bottom__user {

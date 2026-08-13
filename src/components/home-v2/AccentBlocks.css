@@ -1,7 +1,7 @@
 .hv2-accents {
 	display: grid;
 	grid-template-columns: 1fr 1fr 1fr;
-	margin: 4px 12px 2px;
+	margin: 10px 12px 12px;
 	border: 1px solid rgba(245, 240, 232, 0.18);
 	border-radius: 4px;
 	overflow: hidden;
@@ -14,7 +14,7 @@
 	align-items: center;
 	justify-content: flex-start;
 	gap: 6px;
-	padding: 5px 7px;
+	padding: 9px 7px;
 	border: none;
 	border-right: 1px solid rgba(245, 240, 232, 0.14);
 	background: transparent;
@@ -50,12 +50,12 @@
 
 @media (min-width: 720px) {
 	.hv2-accents {
-		margin: 6px 18px 4px;
+		margin: 12px 18px 14px;
 	}
 
 	.hv2-accent {
 		gap: 8px;
-		padding: 8px 10px;
+		padding: 11px 10px;
 	}
 
 	.hv2-accent__icon {
