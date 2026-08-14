@@ -95,10 +95,10 @@ def upgrade() -> None:
             """
             UPDATE brand_order_category_lines AS lines
             SET category_id = :women_id
-            FROM categories AS accessories_men
-            JOIN brand_orders AS orders ON orders.id = lines.order_id
+            FROM categories AS accessories_men, brand_orders AS orders
             WHERE accessories_men.moy_sklad_id = :ms_id
               AND lines.category_id = accessories_men.id
+              AND orders.id = lines.order_id
               AND orders.gender = 'women'
             """
         ),
