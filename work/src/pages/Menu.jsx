@@ -11,10 +11,16 @@ export default function Menu() {
     <div className="menu-page">
       <nav className="menu-list" aria-label="Дополнительно">
         {hasProductAccess() ? (
-          <Link to="/for-order" className="menu-list__item">
-            <span className="menu-list__title">Для заказа</span>
-            <span className="menu-list__hint">Подсказки по сезону и брендам</span>
-          </Link>
+          <>
+            <Link to="/prepayments" className="menu-list__item">
+              <span className="menu-list__title">Предоплата</span>
+              <span className="menu-list__hint">Сроки, просрочки и итоги по сезонам</span>
+            </Link>
+            <Link to="/for-order" className="menu-list__item">
+              <span className="menu-list__title">Для заказа</span>
+              <span className="menu-list__hint">Подсказки по сезону и брендам</span>
+            </Link>
+          </>
         ) : null}
         {hasOutletAccess() ? (
           <Link to="/outlet" className="menu-list__item">

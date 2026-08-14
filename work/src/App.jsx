@@ -11,6 +11,7 @@ import OrderDetail from "./pages/OrderDetail.jsx";
 import OrderCreate from "./pages/OrderCreate.jsx";
 import OrderEdit from "./pages/OrderEdit.jsx";
 import OrderGuidance from "./pages/OrderGuidance.jsx";
+import Prepayments from "./pages/Prepayments.jsx";
 import PaymentsList from "./pages/PaymentsList.jsx";
 import PaymentDetail from "./pages/PaymentDetail.jsx";
 import PaymentCreate from "./pages/PaymentCreate.jsx";
@@ -154,6 +155,14 @@ export default function App() {
             element={
               <RequireProduct>
                 <OrderGuidance />
+              </RequireProduct>
+            }
+          />
+          <Route
+            path="/prepayments"
+            element={
+              <RequireProduct>
+                <Prepayments />
               </RequireProduct>
             }
           />

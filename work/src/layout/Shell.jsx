@@ -126,6 +126,9 @@ function getPageMeta(pathname) {
   if (pathname === "/ai-assistant") return { title: "AI помощник" };
   if (pathname === "/orders") return { title: "Заказы", addTo: "/orders/new", addLabel: "Добавить заказ" };
   if (pathname === "/for-order") return { title: "Для заказа" };
+  if (pathname === "/prepayments") {
+    return { title: "Предоплата", addTo: "/payments/new", addLabel: "Добавить оплату" };
+  }
   if (pathname === "/payments") return { title: "Оплаты", addTo: "/payments/new", addLabel: "Добавить оплату" };
   if (pathname === "/shipments") return { title: "Поставки", addTo: "/shipments/new", addLabel: "Добавить поставку" };
   if (pathname === "/orders/new") return { title: "Новый заказ" };

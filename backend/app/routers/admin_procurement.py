@@ -59,6 +59,10 @@ from app.schemas.procurement import (
     PaymentListResponse,
     PaymentOut,
     PaymentUpdateRequest,
+    PrepaymentItemOut,
+    PrepaymentOverviewOut,
+    PrepaymentSeasonOut,
+    PrepaymentSeasonTotalsOut,
     ProcurementRefsOut,
     SeasonBrandStatOut,
     SeasonCategoryStatOut,
@@ -1528,6 +1532,193 @@ def get_season_dashboard(
     seasons = _list_dashboard_seasons(db, season_id)
     return SeasonDashboardListResponse(
         items=[_build_season_dashboard(db, season) for season in seasons]
+    )
+
+
+_PREPAYMENT_STATUS_RANK = {
+    "overdue": 0,
+    "due_soon": 1,
+    "open": 2,
+    "paid": 3,
+}
+
+_DUE_SOON_DAYS_DEFAULT = 14
+
+
+def _prepayment_status(
+    outstanding: Decimal,
+    due_on: date | None,
+    *,
+    as_of: date,
+    due_soon_days: int,
+) -> tuple[str, int | None]:
+    """Статус предоплаты и дней до срока (отрицательно = просрочка)."""
+    if outstanding <= ZERO:
+        days = (due_on - as_of).days if due_on else None
+        return "paid", days
+    if due_on is None:
+        return "open", None
+    days = (due_on - as_of).days
+    if days < 0:
+        return "overdue", days
+    if days <= due_soon_days:
+        return "due_soon", days
+    return "open", days
+
+
+def _empty_prepayment_totals() -> PrepaymentSeasonTotalsOut:
+    return PrepaymentSeasonTotalsOut(
+        planned_eur=ZERO,
+        paid_eur=ZERO,
+        outstanding_eur=ZERO,
+        overdue_eur=ZERO,
+        due_soon_eur=ZERO,
+        orders_count=0,
+        overdue_count=0,
+        due_soon_count=0,
+        open_count=0,
+        paid_count=0,
+    )
+
+
+def _build_prepayment_season(
+    db: Session,
+    season: Season,
+    *,
+    as_of: date,
+    due_soon_days: int,
+) -> PrepaymentSeasonOut:
+    orders = list(
+        db.scalars(
+            select(BrandOrder)
+            .where(
+                BrandOrder.season_id == season.id,
+                BrandOrder.has_prepayment.is_(True),
+            )
+            .options(selectinload(BrandOrder.brand))
+            .order_by(BrandOrder.prepayment_due_on.asc().nulls_last(), BrandOrder.created_at.desc())
+        ).all()
+    )
+    _, prepaid_by_order, _ = _order_facts(db, [o.id for o in orders])
+
+    items: list[PrepaymentItemOut] = []
+    totals = _empty_prepayment_totals()
+
+    for order in orders:
+        planned = _money(order.prepayment_amount_eur)
+        if planned <= ZERO:
+            continue
+        prepaid = _money(prepaid_by_order.get(order.id, ZERO))
+        outstanding = planned - prepaid
+        if outstanding < ZERO:
+            outstanding = ZERO
+        status, days = _prepayment_status(
+            outstanding,
+            order.prepayment_due_on,
+            as_of=as_of,
+            due_soon_days=due_soon_days,
+        )
+        items.append(
+            PrepaymentItemOut(
+                order_id=order.id,
+                brand_id=order.brand_id,
+                brand_name=order.brand.name if order.brand else "",
+                gender=order.gender,
+                ordered_on=order.ordered_on,
+                order_amount_eur=_money(order.amount_eur),
+                prepayment_amount_eur=planned,
+                prepaid_eur=prepaid,
+                outstanding_eur=outstanding,
+                due_on=order.prepayment_due_on,
+                days_until_due=days,
+                status=status,
+            )
+        )
+        totals.orders_count += 1
+        totals.planned_eur += planned
+        totals.paid_eur += prepaid
+        totals.outstanding_eur += outstanding
+        if status == "overdue":
+            totals.overdue_count += 1
+            totals.overdue_eur += outstanding
+        elif status == "due_soon":
+            totals.due_soon_count += 1
+            totals.due_soon_eur += outstanding
+        elif status == "open":
+            totals.open_count += 1
+        else:
+            totals.paid_count += 1
+
+    items.sort(
+        key=lambda it: (
+            _PREPAYMENT_STATUS_RANK.get(it.status, 9),
+            it.days_until_due if it.days_until_due is not None else 10_000,
+            it.brand_name.lower(),
+        )
+    )
+    totals.planned_eur = _money(totals.planned_eur)
+    totals.paid_eur = _money(totals.paid_eur)
+    totals.outstanding_eur = _money(totals.outstanding_eur)
+    totals.overdue_eur = _money(totals.overdue_eur)
+    totals.due_soon_eur = _money(totals.due_soon_eur)
+
+    return PrepaymentSeasonOut(
+        season_id=season.id,
+        season_name=season.name,
+        season_code=season.code,
+        is_primary=bool(season.is_primary),
+        sort_order=int(season.sort_order or 0),
+        totals=totals,
+        items=items,
+    )
+
+
+def _sum_prepayment_totals(
+    seasons: list[PrepaymentSeasonOut],
+) -> PrepaymentSeasonTotalsOut:
+    totals = _empty_prepayment_totals()
+    for season in seasons:
+        t = season.totals
+        totals.planned_eur += t.planned_eur
+        totals.paid_eur += t.paid_eur
+        totals.outstanding_eur += t.outstanding_eur
+        totals.overdue_eur += t.overdue_eur
+        totals.due_soon_eur += t.due_soon_eur
+        totals.orders_count += t.orders_count
+        totals.overdue_count += t.overdue_count
+        totals.due_soon_count += t.due_soon_count
+        totals.open_count += t.open_count
+        totals.paid_count += t.paid_count
+    totals.planned_eur = _money(totals.planned_eur)
+    totals.paid_eur = _money(totals.paid_eur)
+    totals.outstanding_eur = _money(totals.outstanding_eur)
+    totals.overdue_eur = _money(totals.overdue_eur)
+    totals.due_soon_eur = _money(totals.due_soon_eur)
+    return totals
+
+
+@router.get("/procurement/prepayments", response_model=PrepaymentOverviewOut)
+def get_prepayment_overview(
+    season_id: uuid.UUID | None = Query(default=None),
+    due_soon_days: int = Query(default=_DUE_SOON_DAYS_DEFAULT, ge=1, le=90),
+    db: Session = Depends(get_db),
+    _su: AdminPrincipal = Depends(require_permission("product")),
+) -> PrepaymentOverviewOut:
+    """Картина предоплат по сезонам дашборда (PWA): сроки, просрочки, итоги."""
+    _ = _su
+    as_of = date.today()
+    seasons = _list_dashboard_seasons(db, season_id)
+    items = [
+        _build_prepayment_season(
+            db, season, as_of=as_of, due_soon_days=due_soon_days
+        )
+        for season in seasons
+    ]
+    return PrepaymentOverviewOut(
+        as_of=as_of,
+        due_soon_days=due_soon_days,
+        totals=_sum_prepayment_totals(items),
+        items=items,
     )
 
 

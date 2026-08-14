@@ -385,6 +385,56 @@ class SeasonDashboardListResponse(BaseModel):
     items: list[SeasonDashboardOut]
 
 
+# --- Предоплаты (PWA) -----------------------------------------------------
+
+PrepaymentStatus = Literal["overdue", "due_soon", "open", "paid"]
+
+
+class PrepaymentItemOut(BaseModel):
+    order_id: uuid.UUID
+    brand_id: uuid.UUID
+    brand_name: str
+    gender: str | None = None
+    ordered_on: date | None = None
+    order_amount_eur: Decimal
+    prepayment_amount_eur: Decimal
+    prepaid_eur: Decimal
+    outstanding_eur: Decimal
+    due_on: date | None = None
+    days_until_due: int | None = None
+    status: PrepaymentStatus
+
+
+class PrepaymentSeasonTotalsOut(BaseModel):
+    planned_eur: Decimal
+    paid_eur: Decimal
+    outstanding_eur: Decimal
+    overdue_eur: Decimal
+    due_soon_eur: Decimal
+    orders_count: int
+    overdue_count: int
+    due_soon_count: int
+    open_count: int
+    paid_count: int
+
+
+class PrepaymentSeasonOut(BaseModel):
+    season_id: uuid.UUID
+    season_name: str
+    season_code: str
+    is_primary: bool
+    sort_order: int = 0
+    totals: PrepaymentSeasonTotalsOut
+    items: list[PrepaymentItemOut] = Field(default_factory=list)
+
+
+class PrepaymentOverviewOut(BaseModel):
+    as_of: date
+    due_soon_days: int
+    totals: PrepaymentSeasonTotalsOut
+    items: list[PrepaymentSeasonOut]
+
+
 # --- Справочники для форм -------------------------------------------------
 
 

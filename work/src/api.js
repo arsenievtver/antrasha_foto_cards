@@ -231,6 +231,10 @@ export function fetchSeasonDashboard(seasonId) {
   });
 }
 
+export function fetchPrepaymentOverview(query) {
+  return request("/admin/procurement/prepayments", { query });
+}
+
 export function createBrand(name) {
   return request("/admin/brands", { method: "POST", body: { name } });
 }
