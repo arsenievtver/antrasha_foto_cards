@@ -1,0 +1,1809 @@
+{
+  "hints": {
+    "Aeronautica аксессуары муж.pdf": {
+      "lines": 1,
+      "sum": 100.0,
+      "hint": null
+    },
+    "Aeronautica муж 2.pdf": {
+      "lines": 26,
+      "sum": 5065.0,
+      "hint": null
+    },
+    "Aeronautica муж.pdf": {
+      "lines": 1,
+      "sum": 199.5,
+      "hint": null
+    },
+    "Diktat муж.pdf": {
+      "lines": 11,
+      "sum": 1997.3,
+      "hint": 1997.3
+    },
+    "Duno жен.pdf": {
+      "lines": 12,
+      "sum": 4342.0,
+      "hint": 4342.0
+    },
+    "Duno муж 2.pdf": {
+      "lines": 17,
+      "sum": 5440.0,
+      "hint": 5440.0
+    },
+    "Duno муж.pdf": {
+      "lines": 7,
+      "sum": 436.0,
+      "hint": 436.0
+    },
+    "Gardeur жен.pdf": {
+      "lines": 10,
+      "sum": 1999.5,
+      "hint": 1999.5
+    },
+    "Gardeur муж 2.pdf": {
+      "lines": 1,
+      "sum": 160.5,
+      "hint": 160.5
+    },
+    "Gardeur муж.pdf": {
+      "lines": 10,
+      "sum": 3072.0,
+      "hint": 3072.0
+    },
+    "RIANI жен.pdf": {
+      "lines": 18,
+      "sum": 5848.0,
+      "hint": 5848.0
+    },
+    "Roy Robson муж.pdf": {
+      "lines": 27,
+      "sum": 9255.1,
+      "hint": 9255.1
+    },
+    "SeidenSticker муж.pdf": {
+      "lines": 16,
+      "sum": 2279.2,
+      "hint": 2279.2
+    },
+    "TRANSIT жен.xlsx": {
+      "lines": 18,
+      "sum": 5369.0,
+      "hint": 5369.0
+    },
+    "TRANSIT муж.xlsx": {
+      "lines": 17,
+      "sum": 4486.0,
+      "hint": 4486.0
+    }
+  },
+  "lines": [
+    {
+      "brand": "Aeronautica",
+      "gender": "муж",
+      "source": "Aeronautica аксессуары муж.pdf",
+      "name": "PORTACASCO BLU NAVY",
+      "category": "Аксессуары муж",
+      "qty": 2.0,
+      "amount": 100.0
+    },
+    {
+      "brand": "Aeronautica",
+      "gender": "муж",
+      "source": "Aeronautica муж 2.pdf",
+      "name": "GIUBBOTTO CON CAPPUCCIO BLU NAVY",
+      "category": "Верхняя одежда муж",
+      "qty": 4.0,
+      "amount": 328.0
+    },
+    {
+      "brand": "Aeronautica",
+      "gender": "муж",
+      "source": "Aeronautica муж 2.pdf",
+      "name": "MAGLIA CON BOTTONI BLU NAVY",
+      "category": "Трикотаж муж",
+      "qty": 2.0,
+      "amount": 174.0
+    },
+    {
+      "brand": "Aeronautica",
+      "gender": "муж",
+      "source": "Aeronautica муж 2.pdf",
+      "name": "BERMUDA DUNE",
+      "category": "Бриджи, шорты муж",
+      "qty": 2.0,
+      "amount": 132.0
+    },
+    {
+      "brand": "Aeronautica",
+      "gender": "муж",
+      "source": "Aeronautica муж 2.pdf",
+      "name": "BERMUDA BLU NAVY",
+      "category": "Бриджи, шорты муж",
+      "qty": 4.0,
+      "amount": 180.0
+    },
+    {
+      "brand": "Aeronautica",
+      "gender": "муж",
+      "source": "Aeronautica муж 2.pdf",
+      "name": "BERMUDA OFF WHITE",
+      "category": "Бриджи, шорты муж",
+      "qty": 2.0,
+      "amount": 86.0
+    },
+    {
+      "brand": "Aeronautica",
+      "gender": "муж",
+      "source": "Aeronautica муж 2.pdf",
+      "name": "CAMICIA A MANICA LUNGA DUNE",
+      "category": "Рубашки",
+      "qty": 3.0,
+      "amount": 159.0
+    },
+    {
+      "brand": "Aeronautica",
+      "gender": "муж",
+      "source": "Aeronautica муж 2.pdf",
+      "name": "CAMICIA A MANICA LUNGA STRIPES WHITE/NAVY PEONY",
+      "category": "Рубашки",
+      "qty": 3.0,
+      "amount": 174.0
+    },
+    {
+      "brand": "Aeronautica",
+      "gender": "муж",
+      "source": "Aeronautica муж 2.pdf",
+      "name": "CAMICIA A MANICA LUNGA DOUBLE STRIPE LIGHT",
+      "category": "Рубашки",
+      "qty": 4.0,
+      "amount": 232.0
+    },
+    {
+      "brand": "Aeronautica",
+      "gender": "муж",
+      "source": "Aeronautica муж 2.pdf",
+      "name": "FELPA FULL ZIP BLU NAVY",
+      "category": "Трикотаж муж",
+      "qty": 3.0,
+      "amount": 207.0
+    },
+    {
+      "brand": "Aeronautica",
+      "gender": "муж",
+      "source": "Aeronautica муж 2.pdf",
+      "name": "PANTALONI BLU NAVY",
+      "category": "Брюки, джинсы муж",
+      "qty": 3.0,
+      "amount": 246.0
+    },
+    {
+      "brand": "Aeronautica",
+      "gender": "муж",
+      "source": "Aeronautica муж 2.pdf",
+      "name": "PANTALONI 5 TASCHE CAFFELATTE",
+      "category": "Брюки, джинсы муж",
+      "qty": 4.0,
+      "amount": 212.0
+    },
+    {
+      "brand": "Aeronautica",
+      "gender": "муж",
+      "source": "Aeronautica муж 2.pdf",
+      "name": "PANTALONI TASCONATI BLU NAVY",
+      "category": "Брюки, джинсы муж",
+      "qty": 5.0,
+      "amount": 250.0
+    },
+    {
+      "brand": "Aeronautica",
+      "gender": "муж",
+      "source": "Aeronautica муж 2.pdf",
+      "name": "PANTALONI BLU NAVY",
+      "category": "Брюки, джинсы муж",
+      "qty": 2.0,
+      "amount": 138.0
+    },
+    {
+      "brand": "Aeronautica",
+      "gender": "муж",
+      "source": "Aeronautica муж 2.pdf",
+      "name": "PANTALONI OFF WHITE",
+      "category": "Брюки, джинсы муж",
+      "qty": 1.0,
+      "amount": 69.0
+    },
+    {
+      "brand": "Aeronautica",
+      "gender": "муж",
+      "source": "Aeronautica муж 2.pdf",
+      "name": "PANTALONI BLU NAVY",
+      "category": "Брюки, джинсы муж",
+      "qty": 3.0,
+      "amount": 138.0
+    },
+    {
+      "brand": "Aeronautica",
+      "gender": "муж",
+      "source": "Aeronautica муж 2.pdf",
+      "name": "PANTALONI 5 TASCHE LAVAGGIO BLU MEDIO",
+      "category": "Брюки, джинсы муж",
+      "qty": 3.0,
+      "amount": 222.0
+    },
+    {
+      "brand": "Aeronautica",
+      "gender": "муж",
+      "source": "Aeronautica муж 2.pdf",
+      "name": "BOMBER NERO",
+      "category": "Пиджаки, жакеты, бомбер муж",
+      "qty": 2.0,
+      "amount": 554.0
+    },
+    {
+      "brand": "Aeronautica",
+      "gender": "муж",
+      "source": "Aeronautica муж 2.pdf",
+      "name": "GIUBBINO BLU",
+      "category": "Верхняя одежда муж",
+      "qty": 2.0,
+      "amount": 536.0
+    },
+    {
+      "brand": "Aeronautica",
+      "gender": "муж",
+      "source": "Aeronautica муж 2.pdf",
+      "name": "POLO A MANICA CORTA BLU NAVY",
+      "category": "Футболки, поло муж",
+      "qty": 4.0,
+      "amount": 212.0
+    },
+    {
+      "brand": "Aeronautica",
+      "gender": "муж",
+      "source": "Aeronautica муж 2.pdf",
+      "name": "TUTA IN FELPA OFF WHITE",
+      "category": "Трикотаж муж",
+      "qty": 1.0,
+      "amount": 120.0
+    },
+    {
+      "brand": "Aeronautica",
+      "gender": "муж",
+      "source": "Aeronautica муж 2.pdf",
+      "name": "T-SHIRT A MANICA CORTA BLU NAVY",
+      "category": "Футболки, поло муж",
+      "qty": 4.0,
+      "amount": 96.0
+    },
+    {
+      "brand": "Aeronautica",
+      "gender": "муж",
+      "source": "Aeronautica муж 2.pdf",
+      "name": "T-SHIRT A MANICA CORTA OFF WHITE",
+      "category": "Футболки, поло муж",
+      "qty": 4.0,
+      "amount": 128.0
+    },
+    {
+      "brand": "Aeronautica",
+      "gender": "муж",
+      "source": "Aeronautica муж 2.pdf",
+      "name": "T-SHIRT A MANICA CORTA RHYTHMIC RED",
+      "category": "Футболки, поло муж",
+      "qty": 4.0,
+      "amount": 136.0
+    },
+    {
+      "brand": "Aeronautica",
+      "gender": "муж",
+      "source": "Aeronautica муж 2.pdf",
+      "name": "T-SHIRT A MANICA CORTA OFF WHITE",
+      "category": "Футболки, поло муж",
+      "qty": 4.0,
+      "amount": 84.0
+    },
+    {
+      "brand": "Aeronautica",
+      "gender": "муж",
+      "source": "Aeronautica муж 2.pdf",
+      "name": "T-SHIRT A MANICA CORTA OFF WHITE",
+      "category": "Футболки, поло муж",
+      "qty": 4.0,
+      "amount": 104.0
+    },
+    {
+      "brand": "Aeronautica",
+      "gender": "муж",
+      "source": "Aeronautica муж 2.pdf",
+      "name": "T-SHIRT A MANICA CORTA CHOCOLATE BROWN",
+      "category": "Футболки, поло муж",
+      "qty": 4.0,
+      "amount": 148.0
+    },
+    {
+      "brand": "Aeronautica",
+      "gender": "муж",
+      "source": "Aeronautica муж.pdf",
+      "name": "SNEAKERS GRIGIO/CREMA",
+      "category": "Обувь муж",
+      "qty": 5.0,
+      "amount": 199.5
+    },
+    {
+      "brand": "Diktat",
+      "gender": "муж",
+      "source": "Diktat муж.pdf",
+      "name": "DK37-007 POLO DERBY M/L100 %                                  1         1         1",
+      "category": "Футболки, поло муж",
+      "qty": 3.0,
+      "amount": 112.5
+    },
+    {
+      "brand": "Diktat",
+      "gender": "муж",
+      "source": "Diktat муж.pdf",
+      "name": "DK37-068 G/C M/M 100% COTTON F.18                             1         1         1",
+      "category": "Футболки, поло муж",
+      "qty": 3.0,
+      "amount": 119.7
+    },
+    {
+      "brand": "Diktat",
+      "gender": "муж",
+      "source": "Diktat муж.pdf",
+      "name": "DK37-072 BOMBER FULL ZIP 100%                                 1         1         1         1",
+      "category": "Пиджаки, жакеты, бомбер муж",
+      "qty": 4.0,
+      "amount": 231.6
+    },
+    {
+      "brand": "Diktat",
+      "gender": "муж",
+      "source": "Diktat муж.pdf",
+      "name": "DK37-078 POLO DERBY 100% COTONE                               1         1",
+      "category": "Футболки, поло муж",
+      "qty": 2.0,
+      "amount": 99.8
+    },
+    {
+      "brand": "Diktat",
+      "gender": "муж",
+      "source": "Diktat муж.pdf",
+      "name": "DK37-079 G/C M/M RIGATO 100%                                  1         1         1",
+      "category": "Футболки, поло муж",
+      "qty": 3.0,
+      "amount": 149.7
+    },
+    {
+      "brand": "Diktat",
+      "gender": "муж",
+      "source": "Diktat муж.pdf",
+      "name": "DK37-085 G/C M/L ONDE 100%                                    1         1         1",
+      "category": "Футболки, поло муж",
+      "qty": 3.0,
+      "amount": 164.7
+    },
+    {
+      "brand": "Diktat",
+      "gender": "муж",
+      "source": "Diktat муж.pdf",
+      "name": "DK37-092 G/C M/M MISTO SETA F. 18                             1         1         1",
+      "category": "Футболки, поло муж",
+      "qty": 3.0,
+      "amount": 179.7
+    },
+    {
+      "brand": "Diktat",
+      "gender": "муж",
+      "source": "Diktat муж.pdf",
+      "name": "DK37-093 POLO BOTT M/M MISTO                                  1         1         1         1",
+      "category": "Футболки, поло муж",
+      "qty": 4.0,
+      "amount": 251.6
+    },
+    {
+      "brand": "Diktat",
+      "gender": "муж",
+      "source": "Diktat муж.pdf",
+      "name": "DK37-095 POLO DERBY M/M MISTO                                 1         1         1",
+      "category": "Футболки, поло муж",
+      "qty": 3.0,
+      "amount": 188.7
+    },
+    {
+      "brand": "Diktat",
+      "gender": "муж",
+      "source": "Diktat муж.pdf",
+      "name": "DK37-099 G/C M/M PUNTO OPERATO                                1         1         1",
+      "category": "Футболки, поло муж",
+      "qty": 3.0,
+      "amount": 179.7
+    },
+    {
+      "brand": "Diktat",
+      "gender": "муж",
+      "source": "Diktat муж.pdf",
+      "name": "DK37-952 GIACCA IN VISCOSA TWILL                              1         1         1         1",
+      "category": "Пиджаки, жакеты, бомбер муж",
+      "qty": 4.0,
+      "amount": 319.6
+    },
+    {
+      "brand": "Duno",
+      "gender": "жен",
+      "source": "Duno жен.pdf",
+      "name": "Quilted short jacket - OAT MILK WOMAN OUTER JACKET",
+      "category": "Пиджаки, жакеты, бомбер жен",
+      "qty": 3.0,
+      "amount": 363.0
+    },
+    {
+      "brand": "Duno",
+      "gender": "жен",
+      "source": "Duno жен.pdf",
+      "name": "Short jacket with hood - BLU NOTTE WOMAN OUTER JACKET",
+      "category": "Пиджаки, жакеты, бомбер жен",
+      "qty": 4.0,
+      "amount": 496.0
+    },
+    {
+      "brand": "Duno",
+      "gender": "жен",
+      "source": "Duno жен.pdf",
+      "name": "Short jacket with hood - CHOCOLATE WOMAN OUTER JACKET",
+      "category": "Пиджаки, жакеты, бомбер жен",
+      "qty": 3.0,
+      "amount": 351.0
+    },
+    {
+      "brand": "Duno",
+      "gender": "жен",
+      "source": "Duno жен.pdf",
+      "name": "Short padded 3-button jacket with ballon-shape sle - BLURRED BEIGE WOMAN OUTER JACKET",
+      "category": "Пиджаки, жакеты, бомбер жен",
+      "qty": 3.0,
+      "amount": 321.0
+    },
+    {
+      "brand": "Duno",
+      "gender": "жен",
+      "source": "Duno жен.pdf",
+      "name": "Short jacket with a ribbed hem - EBONY BROWN WOMAN OUTER JACKET",
+      "category": "Пиджаки, жакеты, бомбер жен",
+      "qty": 2.0,
+      "amount": 466.0
+    },
+    {
+      "brand": "Duno",
+      "gender": "жен",
+      "source": "Duno жен.pdf",
+      "name": "Wide-leg palazzo pants - CHOCOLATE WOMAN TROUSERS",
+      "category": "Брюки, джинсы жен",
+      "qty": 3.0,
+      "amount": 198.0
+    },
+    {
+      "brand": "Duno",
+      "gender": "жен",
+      "source": "Duno жен.pdf",
+      "name": "Straight trousers with relaxed fit and wide leg - OAT MILK WOMAN TROUSERS",
+      "category": "Брюки, джинсы жен",
+      "qty": 3.0,
+      "amount": 222.0
+    },
+    {
+      "brand": "Duno",
+      "gender": "жен",
+      "source": "Duno жен.pdf",
+      "name": "Straight trousers with relaxed fit and wide leg - OAT MILK WOMAN TROUSERS",
+      "category": "Брюки, джинсы жен",
+      "qty": 4.0,
+      "amount": 296.0
+    },
+    {
+      "brand": "Duno",
+      "gender": "жен",
+      "source": "Duno жен.pdf",
+      "name": "Short jacket with raglan sleeves - CHOCOLATE WOMAN OUTER JACKET",
+      "category": "Пиджаки, жакеты, бомбер жен",
+      "qty": 4.0,
+      "amount": 468.0
+    },
+    {
+      "brand": "Duno",
+      "gender": "жен",
+      "source": "Duno жен.pdf",
+      "name": "Reversible short parka with side openings - BLURRED BEIGE WOMAN OUTER JACKET",
+      "category": "Верхняя одежда жен",
+      "qty": 3.0,
+      "amount": 405.0
+    },
+    {
+      "brand": "Duno",
+      "gender": "жен",
+      "source": "Duno жен.pdf",
+      "name": "Reversible short parka with side openings - BLURRED BEIGE WOMAN OUTER JACKET",
+      "category": "Верхняя одежда жен",
+      "qty": 3.0,
+      "amount": 405.0
+    },
+    {
+      "brand": "Duno",
+      "gender": "жен",
+      "source": "Duno жен.pdf",
+      "name": "Short oversize parka with flared line - COCOA MOUSSE WOMAN OUTER JACKET",
+      "category": "Верхняя одежда жен",
+      "qty": 3.0,
+      "amount": 351.0
+    },
+    {
+      "brand": "Duno",
+      "gender": "муж",
+      "source": "Duno муж 2.pdf",
+      "name": "Comfort trousers with waistband and stretch band - TAUPE MAN TROUSERS",
+      "category": "Брюки, джинсы муж",
+      "qty": 3.0,
+      "amount": 210.0
+    },
+    {
+      "brand": "Duno",
+      "gender": "муж",
+      "source": "Duno муж 2.pdf",
+      "name": "Trousers - BLACK MAN TROUSERS",
+      "category": "Брюки, джинсы муж",
+      "qty": 5.0,
+      "amount": 370.0
+    },
+    {
+      "brand": "Duno",
+      "gender": "муж",
+      "source": "Duno муж 2.pdf",
+      "name": "Trousers - NAVY MAN TROUSERS",
+      "category": "Брюки, джинсы муж",
+      "qty": 3.0,
+      "amount": 255.0
+    },
+    {
+      "brand": "Duno",
+      "gender": "муж",
+      "source": "Duno муж 2.pdf",
+      "name": "Bomber jacket - EBONY BROWN MAN OUTER JACKET",
+      "category": "Пиджаки, жакеты, бомбер муж",
+      "qty": 2.0,
+      "amount": 466.0
+    },
+    {
+      "brand": "Duno",
+      "gender": "муж",
+      "source": "Duno муж 2.pdf",
+      "name": "Crewneck t-shirt with small pocket - ARDESIA GREY MAN T-SHIRT",
+      "category": "Футболки, поло муж",
+      "qty": 3.0,
+      "amount": 117.0
+    },
+    {
+      "brand": "Duno",
+      "gender": "муж",
+      "source": "Duno муж 2.pdf",
+      "name": "Short jacket with hood and elastic hem - BLACK MAN OUTER JACKET",
+      "category": "Пиджаки, жакеты, бомбер муж",
+      "qty": 4.0,
+      "amount": 540.0
+    },
+    {
+      "brand": "Duno",
+      "gender": "муж",
+      "source": "Duno муж 2.pdf",
+      "name": "Padded bomber jacket - BLACK MAN OUTER JACKET",
+      "category": "Пиджаки, жакеты, бомбер муж",
+      "qty": 4.0,
+      "amount": 512.0
+    },
+    {
+      "brand": "Duno",
+      "gender": "муж",
+      "source": "Duno муж 2.pdf",
+      "name": "Multi-pocket padded jacket - DRIED TOBACCO MAN OUTER JACKET",
+      "category": "Пиджаки, жакеты, бомбер муж",
+      "qty": 3.0,
+      "amount": 405.0
+    },
+    {
+      "brand": "Duno",
+      "gender": "муж",
+      "source": "Duno муж 2.pdf",
+      "name": "Short jacket with zipper - TAUPE MAN OUTER JACKET",
+      "category": "Пиджаки, жакеты, бомбер муж",
+      "qty": 3.0,
+      "amount": 390.0
+    },
+    {
+      "brand": "Duno",
+      "gender": "муж",
+      "source": "Duno муж 2.pdf",
+      "name": "Jogging trousers with stretch waistband - DEEP BLUE MAN TROUSERS",
+      "category": "Брюки, джинсы муж",
+      "qty": 3.0,
+      "amount": 234.0
+    },
+    {
+      "brand": "Duno",
+      "gender": "муж",
+      "source": "Duno муж 2.pdf",
+      "name": "Jogging trousers with stretch waistband - BLURRED BEIGE MAN TROUSERS",
+      "category": "Брюки, джинсы муж",
+      "qty": 3.0,
+      "amount": 198.0
+    },
+    {
+      "brand": "Duno",
+      "gender": "муж",
+      "source": "Duno муж 2.pdf",
+      "name": "Jogging trousers with stretch waistband - BLURRED BEIGE MAN TROUSERS",
+      "category": "Брюки, джинсы муж",
+      "qty": 3.0,
+      "amount": 198.0
+    },
+    {
+      "brand": "Duno",
+      "gender": "муж",
+      "source": "Duno муж 2.pdf",
+      "name": "Jogging trousers with stretch waistband - BLURRED BEIGE MAN TROUSERS",
+      "category": "Брюки, джинсы муж",
+      "qty": 3.0,
+      "amount": 198.0
+    },
+    {
+      "brand": "Duno",
+      "gender": "муж",
+      "source": "Duno муж 2.pdf",
+      "name": "Shirt with pocket - CHOCOLATE MAN OUTER JACKET",
+      "category": "Пиджаки, жакеты, бомбер муж",
+      "qty": 3.0,
+      "amount": 351.0
+    },
+    {
+      "brand": "Duno",
+      "gender": "муж",
+      "source": "Duno муж 2.pdf",
+      "name": "Bomber jacket with front pockets - DEEP BLUE MAN OUTER JACKET",
+      "category": "Пиджаки, жакеты, бомбер муж",
+      "qty": 3.0,
+      "amount": 405.0
+    },
+    {
+      "brand": "Duno",
+      "gender": "муж",
+      "source": "Duno муж 2.pdf",
+      "name": "Bomber jacket with flap pockets - NAVY MAN OUTER JACKET",
+      "category": "Пиджаки, жакеты, бомбер муж",
+      "qty": 3.0,
+      "amount": 441.0
+    },
+    {
+      "brand": "Duno",
+      "gender": "муж",
+      "source": "Duno муж 2.pdf",
+      "name": "Polo shirt - BLURRED BEIGE MAN T-SHIRT",
+      "category": "Футболки, поло муж",
+      "qty": 3.0,
+      "amount": 150.0
+    },
+    {
+      "brand": "Duno",
+      "gender": "муж",
+      "source": "Duno муж.pdf",
+      "name": "Baseball hat - TAUPE HAT",
+      "category": "Аксессуары муж",
+      "qty": 2.0,
+      "amount": 38.0
+    },
+    {
+      "brand": "Duno",
+      "gender": "муж",
+      "source": "Duno муж.pdf",
+      "name": "Baseball hat - TAUPE HAT",
+      "category": "Аксессуары муж",
+      "qty": 2.0,
+      "amount": 38.0
+    },
+    {
+      "brand": "Duno",
+      "gender": "муж",
+      "source": "Duno муж.pdf",
+      "name": "Gym or travel duffel - BLACK BAG",
+      "category": "Аксессуары муж",
+      "qty": 1.0,
+      "amount": 61.0
+    },
+    {
+      "brand": "Duno",
+      "gender": "муж",
+      "source": "Duno муж.pdf",
+      "name": "Multi-pocket padded backpack - BLACK BAG",
+      "category": "Аксессуары муж",
+      "qty": 1.0,
+      "amount": 58.0
+    },
+    {
+      "brand": "Duno",
+      "gender": "муж",
+      "source": "Duno муж.pdf",
+      "name": "Travel beauty case - BLACK BAG",
+      "category": "Аксессуары муж",
+      "qty": 3.0,
+      "amount": 63.0
+    },
+    {
+      "brand": "Duno",
+      "gender": "муж",
+      "source": "Duno муж.pdf",
+      "name": "Trolley - standard cabin bag 20” - OATMEAL TROLLEY",
+      "category": "Аксессуары муж",
+      "qty": 1.0,
+      "amount": 89.0
+    },
+    {
+      "brand": "Duno",
+      "gender": "муж",
+      "source": "Duno муж.pdf",
+      "name": "Trolley - standard cabin bag 20” - OATMEAL TROLLEY",
+      "category": "Аксессуары муж",
+      "qty": 1.0,
+      "amount": 89.0
+    },
+    {
+      "brand": "Gardeur",
+      "gender": "жен",
+      "source": "Gardeur жен.pdf",
+      "name": "ULLA8 Hose Denim",
+      "category": "Брюки, джинсы жен",
+      "qty": 4.0,
+      "amount": 224.0
+    },
+    {
+      "brand": "Gardeur",
+      "gender": "жен",
+      "source": "Gardeur жен.pdf",
+      "name": "ZURI126 Hose Denim",
+      "category": "Брюки, джинсы жен",
+      "qty": 4.0,
+      "amount": 209.0
+    },
+    {
+      "brand": "Gardeur",
+      "gender": "жен",
+      "source": "Gardeur жен.pdf",
+      "name": "FELIZA11 Hose Denim",
+      "category": "Брюки, джинсы жен",
+      "qty": 4.0,
+      "amount": 209.0
+    },
+    {
+      "brand": "Gardeur",
+      "gender": "жен",
+      "source": "Gardeur жен.pdf",
+      "name": "FRONY70 Hose",
+      "category": "Брюки, джинсы жен",
+      "qty": 4.0,
+      "amount": 179.0
+    },
+    {
+      "brand": "Gardeur",
+      "gender": "жен",
+      "source": "Gardeur жен.pdf",
+      "name": "NIDIN3 Rock",
+      "category": "Юбки жен",
+      "qty": 4.0,
+      "amount": 179.0
+    },
+    {
+      "brand": "Gardeur",
+      "gender": "жен",
+      "source": "Gardeur жен.pdf",
+      "name": "DENISE15 Hose",
+      "category": "Брюки, джинсы жен",
+      "qty": 4.0,
+      "amount": 179.0
+    },
+    {
+      "brand": "Gardeur",
+      "gender": "жен",
+      "source": "Gardeur жен.pdf",
+      "name": "ULLA6 Hose",
+      "category": "Брюки, джинсы жен",
+      "qty": 5.0,
+      "amount": 223.75
+    },
+    {
+      "brand": "Gardeur",
+      "gender": "жен",
+      "source": "Gardeur жен.pdf",
+      "name": "ZENE57 Hose",
+      "category": "Брюки, джинсы жен",
+      "qty": 5.0,
+      "amount": 223.75
+    },
+    {
+      "brand": "Gardeur",
+      "gender": "жен",
+      "source": "Gardeur жен.pdf",
+      "name": "ZILLA2 Hose",
+      "category": "Брюки, джинсы жен",
+      "qty": 4.0,
+      "amount": 194.0
+    },
+    {
+      "brand": "Gardeur",
+      "gender": "жен",
+      "source": "Gardeur жен.pdf",
+      "name": "FRANCA801 Hose",
+      "category": "Брюки, джинсы жен",
+      "qty": 4.0,
+      "amount": 179.0
+    },
+    {
+      "brand": "Gardeur",
+      "gender": "муж",
+      "source": "Gardeur муж 2.pdf",
+      "name": "LUCIANO-6 Hose",
+      "category": "Брюки, джинсы муж",
+      "qty": 3.0,
+      "amount": 160.5
+    },
+    {
+      "brand": "Gardeur",
+      "gender": "муж",
+      "source": "Gardeur муж.pdf",
+      "name": "BILL-3 Hose",
+      "category": "Брюки, джинсы муж",
+      "qty": 7.0,
+      "amount": 308.0
+    },
+    {
+      "brand": "Gardeur",
+      "gender": "муж",
+      "source": "Gardeur муж.pdf",
+      "name": "BONO Hose",
+      "category": "Брюки, джинсы муж",
+      "qty": 8.0,
+      "amount": 384.0
+    },
+    {
+      "brand": "Gardeur",
+      "gender": "муж",
+      "source": "Gardeur муж.pdf",
+      "name": "BONO Hose",
+      "category": "Брюки, джинсы муж",
+      "qty": 7.0,
+      "amount": 308.0
+    },
+    {
+      "brand": "Gardeur",
+      "gender": "муж",
+      "source": "Gardeur муж.pdf",
+      "name": "BRADLEY-1 Hose",
+      "category": "Брюки, джинсы муж",
+      "qty": 10.0,
+      "amount": 440.0
+    },
+    {
+      "brand": "Gardeur",
+      "gender": "муж",
+      "source": "Gardeur муж.pdf",
+      "name": "REZA Hose",
+      "category": "Брюки, джинсы муж",
+      "qty": 6.0,
+      "amount": 312.0
+    },
+    {
+      "brand": "Gardeur",
+      "gender": "муж",
+      "source": "Gardeur муж.pdf",
+      "name": "REVIO-20 Hose",
+      "category": "Брюки, джинсы муж",
+      "qty": 7.0,
+      "amount": 308.0
+    },
+    {
+      "brand": "Gardeur",
+      "gender": "муж",
+      "source": "Gardeur муж.pdf",
+      "name": "BRADLEY-3 Hose",
+      "category": "Брюки, джинсы муж",
+      "qty": 7.0,
+      "amount": 364.0
+    },
+    {
+      "brand": "Gardeur",
+      "gender": "муж",
+      "source": "Gardeur муж.pdf",
+      "name": "JASPER-8TN Short/Bermuda Bermuda Hose",
+      "category": "Бриджи, шорты муж",
+      "qty": 5.0,
+      "amount": 140.0
+    },
+    {
+      "brand": "Gardeur",
+      "gender": "муж",
+      "source": "Gardeur муж.pdf",
+      "name": "BARDO-5 Hose",
+      "category": "Брюки, джинсы муж",
+      "qty": 3.0,
+      "amount": 144.0
+    },
+    {
+      "brand": "Gardeur",
+      "gender": "муж",
+      "source": "Gardeur муж.pdf",
+      "name": "RUBEN-2 Hose",
+      "category": "Брюки, джинсы муж",
+      "qty": 7.0,
+      "amount": 364.0
+    },
+    {
+      "brand": "RIANI",
+      "gender": "жен",
+      "source": "RIANI жен.pdf",
+      "name": "jacket",
+      "category": "Пиджаки, жакеты, бомбер жен",
+      "qty": null,
+      "amount": 450.0
+    },
+    {
+      "brand": "RIANI",
+      "gender": "жен",
+      "source": "RIANI жен.pdf",
+      "name": "pants barrel fit",
+      "category": "Брюки, джинсы жен",
+      "qty": null,
+      "amount": 294.0
+    },
+    {
+      "brand": "RIANI",
+      "gender": "жен",
+      "source": "RIANI жен.pdf",
+      "name": "dress jersey",
+      "category": "Платья жен",
+      "qty": null,
+      "amount": 294.0
+    },
+    {
+      "brand": "RIANI",
+      "gender": "жен",
+      "source": "RIANI жен.pdf",
+      "name": "jacket",
+      "category": "Пиджаки, жакеты, бомбер жен",
+      "qty": null,
+      "amount": 567.0
+    },
+    {
+      "brand": "RIANI",
+      "gender": "жен",
+      "source": "RIANI жен.pdf",
+      "name": "t-shirt with sleeve",
+      "category": "Футболки, поло, топы жен",
+      "qty": null,
+      "amount": 248.0
+    },
+    {
+      "brand": "RIANI",
+      "gender": "жен",
+      "source": "RIANI жен.pdf",
+      "name": "pants bermuda",
+      "category": "Бриджи, шорты жен",
+      "qty": null,
+      "amount": 213.0
+    },
+    {
+      "brand": "RIANI",
+      "gender": "жен",
+      "source": "RIANI жен.pdf",
+      "name": "pants bermuda",
+      "category": "Бриджи, шорты жен",
+      "qty": null,
+      "amount": 294.0
+    },
+    {
+      "brand": "RIANI",
+      "gender": "жен",
+      "source": "RIANI жен.pdf",
+      "name": "blouse",
+      "category": "Блузки, рубашки жен",
+      "qty": null,
+      "amount": 394.0
+    },
+    {
+      "brand": "RIANI",
+      "gender": "жен",
+      "source": "RIANI жен.pdf",
+      "name": "dress",
+      "category": "Платья жен",
+      "qty": null,
+      "amount": 514.0
+    },
+    {
+      "brand": "RIANI",
+      "gender": "жен",
+      "source": "RIANI жен.pdf",
+      "name": "dress",
+      "category": "Платья жен",
+      "qty": null,
+      "amount": 450.0
+    },
+    {
+      "brand": "RIANI",
+      "gender": "жен",
+      "source": "RIANI жен.pdf",
+      "name": "blouse",
+      "category": "Блузки, рубашки жен",
+      "qty": null,
+      "amount": 270.0
+    },
+    {
+      "brand": "RIANI",
+      "gender": "жен",
+      "source": "RIANI жен.pdf",
+      "name": "pants wide fit",
+      "category": "Брюки, джинсы жен",
+      "qty": null,
+      "amount": 370.0
+    },
+    {
+      "brand": "RIANI",
+      "gender": "жен",
+      "source": "RIANI жен.pdf",
+      "name": "blouse",
+      "category": "Блузки, рубашки жен",
+      "qty": null,
+      "amount": 258.0
+    },
+    {
+      "brand": "RIANI",
+      "gender": "жен",
+      "source": "RIANI жен.pdf",
+      "name": "top (shirt w/o                 sleeve)",
+      "category": "Футболки, поло, топы жен",
+      "qty": null,
+      "amount": 94.0
+    },
+    {
+      "brand": "RIANI",
+      "gender": "жен",
+      "source": "RIANI жен.pdf",
+      "name": "blouse",
+      "category": "Блузки, рубашки жен",
+      "qty": null,
+      "amount": 258.0
+    },
+    {
+      "brand": "RIANI",
+      "gender": "жен",
+      "source": "RIANI жен.pdf",
+      "name": "pants wide fit",
+      "category": "Брюки, джинсы жен",
+      "qty": null,
+      "amount": 196.0
+    },
+    {
+      "brand": "RIANI",
+      "gender": "жен",
+      "source": "RIANI жен.pdf",
+      "name": "blouse",
+      "category": "Блузки, рубашки жен",
+      "qty": null,
+      "amount": 354.0
+    },
+    {
+      "brand": "RIANI",
+      "gender": "жен",
+      "source": "RIANI жен.pdf",
+      "name": "pants wide fit",
+      "category": "Брюки, джинсы жен",
+      "qty": null,
+      "amount": 330.0
+    },
+    {
+      "brand": "Roy Robson",
+      "gender": "муж",
+      "source": "Roy Robson муж.pdf",
+      "name": "RR D-00-04014-10217-00 g00",
+      "category": "Пиджаки, жакеты, бомбер муж",
+      "qty": 4.0,
+      "amount": 432.0
+    },
+    {
+      "brand": "Roy Robson",
+      "gender": "муж",
+      "source": "Roy Robson муж.pdf",
+      "name": "RR D-01-04014-11589-00 g01",
+      "category": "Брюки, джинсы муж",
+      "qty": 4.0,
+      "amount": 200.0
+    },
+    {
+      "brand": "Roy Robson",
+      "gender": "муж",
+      "source": "Roy Robson муж.pdf",
+      "name": "RR 02-18128-11949-00 g02",
+      "category": "Костюмы муж",
+      "qty": 5.0,
+      "amount": 1062.5
+    },
+    {
+      "brand": "Roy Robson",
+      "gender": "муж",
+      "source": "Roy Robson муж.pdf",
+      "name": "RR 02-18125-11949-00 g02",
+      "category": "Костюмы муж",
+      "qty": 4.0,
+      "amount": 1018.0
+    },
+    {
+      "brand": "Roy Robson",
+      "gender": "муж",
+      "source": "Roy Robson муж.pdf",
+      "name": "RR 90-18821-13291-00 g90",
+      "category": "Трикотаж муж",
+      "qty": 6.0,
+      "amount": 359.4
+    },
+    {
+      "brand": "Roy Robson",
+      "gender": "муж",
+      "source": "Roy Robson муж.pdf",
+      "name": "RR 90-18823-13292-00 g90",
+      "category": "Брюки, джинсы муж",
+      "qty": 6.0,
+      "amount": 308.4
+    },
+    {
+      "brand": "Roy Robson",
+      "gender": "муж",
+      "source": "Roy Robson муж.pdf",
+      "name": "RR 90-18815-13290-00 g90",
+      "category": "Футболки, поло муж",
+      "qty": 6.0,
+      "amount": 190.2
+    },
+    {
+      "brand": "Roy Robson",
+      "gender": "муж",
+      "source": "Roy Robson муж.pdf",
+      "name": "RR 90-18803-13288-00 g90",
+      "category": "Футболки, поло муж",
+      "qty": 6.0,
+      "amount": 142.8
+    },
+    {
+      "brand": "Roy Robson",
+      "gender": "муж",
+      "source": "Roy Robson муж.pdf",
+      "name": "RR 90-18805-13281-00 g90",
+      "category": "Футболки, поло муж",
+      "qty": 6.0,
+      "amount": 94.8
+    },
+    {
+      "brand": "Roy Robson",
+      "gender": "муж",
+      "source": "Roy Robson муж.pdf",
+      "name": "RR 90-18816-13287-00 g90",
+      "category": "Футболки, поло муж",
+      "qty": 6.0,
+      "amount": 189.0
+    },
+    {
+      "brand": "Roy Robson",
+      "gender": "муж",
+      "source": "Roy Robson муж.pdf",
+      "name": "RR 91-18860-13254-00 g91",
+      "category": "Футболки, поло муж",
+      "qty": 6.0,
+      "amount": 190.2
+    },
+    {
+      "brand": "Roy Robson",
+      "gender": "муж",
+      "source": "Roy Robson муж.pdf",
+      "name": "RR 91-18859-13253-00 g91",
+      "category": "Футболки, поло муж",
+      "qty": 6.0,
+      "amount": 190.2
+    },
+    {
+      "brand": "Roy Robson",
+      "gender": "муж",
+      "source": "Roy Robson муж.pdf",
+      "name": "RR 91-18861-13255-00 g91",
+      "category": "Футболки, поло муж",
+      "qty": 6.0,
+      "amount": 190.2
+    },
+    {
+      "brand": "Roy Robson",
+      "gender": "муж",
+      "source": "Roy Robson муж.pdf",
+      "name": "RR 91-18863-13257-00 g91",
+      "category": "Футболки, поло муж",
+      "qty": 6.0,
+      "amount": 213.6
+    },
+    {
+      "brand": "Roy Robson",
+      "gender": "муж",
+      "source": "Roy Robson муж.pdf",
+      "name": "RR 00-18514-12491-00 g00",
+      "category": "Пиджаки, жакеты, бомбер муж",
+      "qty": 4.0,
+      "amount": 516.0
+    },
+    {
+      "brand": "Roy Robson",
+      "gender": "муж",
+      "source": "Roy Robson муж.pdf",
+      "name": "RR 07-18121-12819-00 g07",
+      "category": "Пиджаки, жакеты, бомбер муж",
+      "qty": 4.0,
+      "amount": 432.0
+    },
+    {
+      "brand": "Roy Robson",
+      "gender": "муж",
+      "source": "Roy Robson муж.pdf",
+      "name": "RR 01-18121-13234-00 g01",
+      "category": "Брюки, джинсы муж",
+      "qty": 4.0,
+      "amount": 302.0
+    },
+    {
+      "brand": "Roy Robson",
+      "gender": "муж",
+      "source": "Roy Robson муж.pdf",
+      "name": "RR 96-18920-13266-00 g96",
+      "category": "Пиджаки, жакеты, бомбер муж",
+      "qty": 4.0,
+      "amount": 378.0
+    },
+    {
+      "brand": "Roy Robson",
+      "gender": "муж",
+      "source": "Roy Robson муж.pdf",
+      "name": "RR 51-18353-13217-00 g51",
+      "category": "Брюки, джинсы муж",
+      "qty": 6.0,
+      "amount": 285.0
+    },
+    {
+      "brand": "Roy Robson",
+      "gender": "муж",
+      "source": "Roy Robson муж.pdf",
+      "name": "RR S-01-55066-12773-00 g01",
+      "category": "Брюки, джинсы муж",
+      "qty": 6.0,
+      "amount": 306.0
+    },
+    {
+      "brand": "Roy Robson",
+      "gender": "муж",
+      "source": "Roy Robson муж.pdf",
+      "name": "RR 51-18363-10833-00 g51",
+      "category": "Брюки, джинсы муж",
+      "qty": 6.0,
+      "amount": 309.0
+    },
+    {
+      "brand": "Roy Robson",
+      "gender": "муж",
+      "source": "Roy Robson муж.pdf",
+      "name": "RR 51-18371-10833-00 g51",
+      "category": "Брюки, джинсы муж",
+      "qty": 8.0,
+      "amount": 316.8
+    },
+    {
+      "brand": "Roy Robson",
+      "gender": "муж",
+      "source": "Roy Robson муж.pdf",
+      "name": "RR 51-18360-12788-00 g51",
+      "category": "Брюки, джинсы муж",
+      "qty": 6.0,
+      "amount": 285.0
+    },
+    {
+      "brand": "Roy Robson",
+      "gender": "муж",
+      "source": "Roy Robson муж.pdf",
+      "name": "RR 59-18356-13295-00 g59",
+      "category": "Бриджи, шорты муж",
+      "qty": 6.0,
+      "amount": 128.4
+    },
+    {
+      "brand": "Roy Robson",
+      "gender": "муж",
+      "source": "Roy Robson муж.pdf",
+      "name": "RR 59-18354-16208-00 g59",
+      "category": "Брюки, джинсы муж",
+      "qty": 6.0,
+      "amount": 189.6
+    },
+    {
+      "brand": "Roy Robson",
+      "gender": "муж",
+      "source": "Roy Robson муж.pdf",
+      "name": "RR 76-18610-13304-00 g76",
+      "category": "Обувь муж",
+      "qty": 6.0,
+      "amount": 513.0
+    },
+    {
+      "brand": "Roy Robson",
+      "gender": "муж",
+      "source": "Roy Robson муж.pdf",
+      "name": "RR 76-18645-13308-00 g76",
+      "category": "Обувь муж",
+      "qty": 6.0,
+      "amount": 513.0
+    },
+    {
+      "brand": "SeidenSticker",
+      "gender": "муж",
+      "source": "SeidenSticker муж.pdf",
+      "name": "shirt colorway",
+      "category": "Рубашки",
+      "qty": 5.0,
+      "amount": 148.0
+    },
+    {
+      "brand": "SeidenSticker",
+      "gender": "муж",
+      "source": "SeidenSticker муж.pdf",
+      "name": "shirt colorway",
+      "category": "Рубашки",
+      "qty": 4.0,
+      "amount": 133.2
+    },
+    {
+      "brand": "SeidenSticker",
+      "gender": "муж",
+      "source": "SeidenSticker муж.pdf",
+      "name": "shirt colorway",
+      "category": "Рубашки",
+      "qty": 5.0,
+      "amount": 129.5
+    },
+    {
+      "brand": "SeidenSticker",
+      "gender": "муж",
+      "source": "SeidenSticker муж.pdf",
+      "name": "shirt colorway",
+      "category": "Рубашки",
+      "qty": 4.0,
+      "amount": 118.4
+    },
+    {
+      "brand": "SeidenSticker",
+      "gender": "муж",
+      "source": "SeidenSticker муж.pdf",
+      "name": "shirt colorway",
+      "category": "Рубашки",
+      "qty": 4.0,
+      "amount": 118.4
+    },
+    {
+      "brand": "SeidenSticker",
+      "gender": "муж",
+      "source": "SeidenSticker муж.pdf",
+      "name": "shirt colorway",
+      "category": "Рубашки",
+      "qty": 6.0,
+      "amount": 177.6
+    },
+    {
+      "brand": "SeidenSticker",
+      "gender": "муж",
+      "source": "SeidenSticker муж.pdf",
+      "name": "shirt colorway",
+      "category": "Рубашки",
+      "qty": 5.0,
+      "amount": 129.5
+    },
+    {
+      "brand": "SeidenSticker",
+      "gender": "муж",
+      "source": "SeidenSticker муж.pdf",
+      "name": "shirt colorway",
+      "category": "Рубашки",
+      "qty": 5.0,
+      "amount": 129.5
+    },
+    {
+      "brand": "SeidenSticker",
+      "gender": "муж",
+      "source": "SeidenSticker муж.pdf",
+      "name": "shirt colorway",
+      "category": "Рубашки",
+      "qty": 6.0,
+      "amount": 177.6
+    },
+    {
+      "brand": "SeidenSticker",
+      "gender": "муж",
+      "source": "SeidenSticker муж.pdf",
+      "name": "shirt colorway",
+      "category": "Рубашки",
+      "qty": 5.0,
+      "amount": 129.5
+    },
+    {
+      "brand": "SeidenSticker",
+      "gender": "муж",
+      "source": "SeidenSticker муж.pdf",
+      "name": "shirt colorway",
+      "category": "Рубашки",
+      "qty": 4.0,
+      "amount": 118.4
+    },
+    {
+      "brand": "SeidenSticker",
+      "gender": "муж",
+      "source": "SeidenSticker муж.pdf",
+      "name": "shirt colorway",
+      "category": "Рубашки",
+      "qty": 5.0,
+      "amount": 148.0
+    },
+    {
+      "brand": "SeidenSticker",
+      "gender": "муж",
+      "source": "SeidenSticker муж.pdf",
+      "name": "shirt colorway",
+      "category": "Рубашки",
+      "qty": 5.0,
+      "amount": 148.0
+    },
+    {
+      "brand": "SeidenSticker",
+      "gender": "муж",
+      "source": "SeidenSticker муж.pdf",
+      "name": "shirt colorway",
+      "category": "Рубашки",
+      "qty": 5.0,
+      "amount": 148.0
+    },
+    {
+      "brand": "SeidenSticker",
+      "gender": "муж",
+      "source": "SeidenSticker муж.pdf",
+      "name": "shirt colorway",
+      "category": "Рубашки",
+      "qty": 5.0,
+      "amount": 148.0
+    },
+    {
+      "brand": "SeidenSticker",
+      "gender": "муж",
+      "source": "SeidenSticker муж.pdf",
+      "name": "shirt colorway",
+      "category": "Рубашки",
+      "qty": 6.0,
+      "amount": 177.6
+    },
+    {
+      "brand": "TRANSIT",
+      "gender": "жен",
+      "source": "TRANSIT жен.xlsx",
+      "name": "JACKET CFDTRFA100",
+      "category": "Пиджаки, жакеты, бомбер жен",
+      "qty": 3.0,
+      "amount": 420.0
+    },
+    {
+      "brand": "TRANSIT",
+      "gender": "жен",
+      "source": "TRANSIT жен.xlsx",
+      "name": "TROUSERS CFDTRFA101",
+      "category": "Брюки, джинсы жен",
+      "qty": 3.0,
+      "amount": 354.0
+    },
+    {
+      "brand": "TRANSIT",
+      "gender": "жен",
+      "source": "TRANSIT жен.xlsx",
+      "name": "SKIRT CFDTRFV315",
+      "category": "Юбки жен",
+      "qty": 3.0,
+      "amount": 312.0
+    },
+    {
+      "brand": "TRANSIT",
+      "gender": "жен",
+      "source": "TRANSIT жен.xlsx",
+      "name": "TROUSERS CFDTRFV314",
+      "category": "Брюки, джинсы жен",
+      "qty": 4.0,
+      "amount": 448.0
+    },
+    {
+      "brand": "TRANSIT",
+      "gender": "жен",
+      "source": "TRANSIT жен.xlsx",
+      "name": "SHIRT CFDTRFM221",
+      "category": "Блузки, рубашки жен",
+      "qty": 4.0,
+      "amount": 280.0
+    },
+    {
+      "brand": "TRANSIT",
+      "gender": "жен",
+      "source": "TRANSIT жен.xlsx",
+      "name": "TROUSERS CFDTRFO246",
+      "category": "Брюки, джинсы жен",
+      "qty": 2.0,
+      "amount": 190.0
+    },
+    {
+      "brand": "TRANSIT",
+      "gender": "жен",
+      "source": "TRANSIT жен.xlsx",
+      "name": "JACKET CFDTRFB110",
+      "category": "Пиджаки, жакеты, бомбер жен",
+      "qty": 3.0,
+      "amount": 399.0
+    },
+    {
+      "brand": "TRANSIT",
+      "gender": "жен",
+      "source": "TRANSIT жен.xlsx",
+      "name": "WAISTCOAT CFDTRFB112",
+      "category": "Пиджаки, жакеты, бомбер жен",
+      "qty": 3.0,
+      "amount": 264.0
+    },
+    {
+      "brand": "TRANSIT",
+      "gender": "жен",
+      "source": "TRANSIT жен.xlsx",
+      "name": "TROUSERS CFDTRFB111",
+      "category": "Брюки, джинсы жен",
+      "qty": 3.0,
+      "amount": 372.0
+    },
+    {
+      "brand": "TRANSIT",
+      "gender": "жен",
+      "source": "TRANSIT жен.xlsx",
+      "name": "SKIRT CFDTRFO247",
+      "category": "Юбки жен",
+      "qty": 2.0,
+      "amount": 154.0
+    },
+    {
+      "brand": "TRANSIT",
+      "gender": "жен",
+      "source": "TRANSIT жен.xlsx",
+      "name": "JACKET CFDTRFN230",
+      "category": "Пиджаки, жакеты, бомбер жен",
+      "qty": 3.0,
+      "amount": 297.0
+    },
+    {
+      "brand": "TRANSIT",
+      "gender": "жен",
+      "source": "TRANSIT жен.xlsx",
+      "name": "SKIRT CFDTRFM226",
+      "category": "Юбки жен",
+      "qty": 3.0,
+      "amount": 231.0
+    },
+    {
+      "brand": "TRANSIT",
+      "gender": "жен",
+      "source": "TRANSIT жен.xlsx",
+      "name": "TROUSERS CFDTRFN232",
+      "category": "Брюки, джинсы жен",
+      "qty": 3.0,
+      "amount": 225.0
+    },
+    {
+      "brand": "TRANSIT",
+      "gender": "жен",
+      "source": "TRANSIT жен.xlsx",
+      "name": "TROUSERS CFDTRFD138",
+      "category": "Брюки, джинсы жен",
+      "qty": 3.0,
+      "amount": 288.0
+    },
+    {
+      "brand": "TRANSIT",
+      "gender": "жен",
+      "source": "TRANSIT жен.xlsx",
+      "name": "SHIRT CFDTRFE144",
+      "category": "Блузки, рубашки жен",
+      "qty": 2.0,
+      "amount": 210.0
+    },
+    {
+      "brand": "TRANSIT",
+      "gender": "жен",
+      "source": "TRANSIT жен.xlsx",
+      "name": "SHIRT CFDTRFM223",
+      "category": "Блузки, рубашки жен",
+      "qty": 2.0,
+      "amount": 208.0
+    },
+    {
+      "brand": "TRANSIT",
+      "gender": "жен",
+      "source": "TRANSIT жен.xlsx",
+      "name": "JACKET CFDTRF5409",
+      "category": "Пиджаки, жакеты, бомбер жен",
+      "qty": 3.0,
+      "amount": 450.0
+    },
+    {
+      "brand": "TRANSIT",
+      "gender": "жен",
+      "source": "TRANSIT жен.xlsx",
+      "name": "TROUSERS CFDTRF54001",
+      "category": "Брюки, джинсы жен",
+      "qty": 3.0,
+      "amount": 267.0
+    },
+    {
+      "brand": "TRANSIT",
+      "gender": "муж",
+      "source": "TRANSIT муж.xlsx",
+      "name": "JACKET CFUTRFJ191",
+      "category": "Пиджаки, жакеты, бомбер муж",
+      "qty": 2.0,
+      "amount": 358.0
+    },
+    {
+      "brand": "TRANSIT",
+      "gender": "муж",
+      "source": "TRANSIT муж.xlsx",
+      "name": "TROUSERS CFUTRFJ192",
+      "category": "Брюки, джинсы муж",
+      "qty": 2.0,
+      "amount": 230.0
+    },
+    {
+      "brand": "TRANSIT",
+      "gender": "муж",
+      "source": "TRANSIT муж.xlsx",
+      "name": "TROUSERS CFUTRFH174",
+      "category": "Брюки, джинсы муж",
+      "qty": 3.0,
+      "amount": 309.0
+    },
+    {
+      "brand": "TRANSIT",
+      "gender": "муж",
+      "source": "TRANSIT муж.xlsx",
+      "name": "WAISTCOAT CFUTRFH172",
+      "category": "Пиджаки, жакеты, бомбер муж",
+      "qty": 2.0,
+      "amount": 148.0
+    },
+    {
+      "brand": "TRANSIT",
+      "gender": "муж",
+      "source": "TRANSIT муж.xlsx",
+      "name": "TROUSERS CFUTRFF151",
+      "category": "Брюки, джинсы муж",
+      "qty": 3.0,
+      "amount": 261.0
+    },
+    {
+      "brand": "TRANSIT",
+      "gender": "муж",
+      "source": "TRANSIT муж.xlsx",
+      "name": "T-SHIRT CFUTRF3381",
+      "category": "Футболки, поло муж",
+      "qty": 3.0,
+      "amount": 219.0
+    },
+    {
+      "brand": "TRANSIT",
+      "gender": "муж",
+      "source": "TRANSIT муж.xlsx",
+      "name": "TROUSERS CFUTRFB111",
+      "category": "Брюки, джинсы муж",
+      "qty": 3.0,
+      "amount": 255.0
+    },
+    {
+      "brand": "TRANSIT",
+      "gender": "муж",
+      "source": "TRANSIT муж.xlsx",
+      "name": "JACKET CFUTRFG162",
+      "category": "Пиджаки, жакеты, бомбер муж",
+      "qty": 2.0,
+      "amount": 338.0
+    },
+    {
+      "brand": "TRANSIT",
+      "gender": "муж",
+      "source": "TRANSIT муж.xlsx",
+      "name": "TROUSERS CFUTRFG163",
+      "category": "Брюки, джинсы муж",
+      "qty": 2.0,
+      "amount": 218.0
+    },
+    {
+      "brand": "TRANSIT",
+      "gender": "муж",
+      "source": "TRANSIT муж.xlsx",
+      "name": "T-SHIRT CFUTRF8430",
+      "category": "Футболки, поло муж",
+      "qty": 3.0,
+      "amount": 210.0
+    },
+    {
+      "brand": "TRANSIT",
+      "gender": "муж",
+      "source": "TRANSIT муж.xlsx",
+      "name": "JACKET CFUTRFW323",
+      "category": "Пиджаки, жакеты, бомбер муж",
+      "qty": 3.0,
+      "amount": 387.0
+    },
+    {
+      "brand": "TRANSIT",
+      "gender": "муж",
+      "source": "TRANSIT муж.xlsx",
+      "name": "SHIRT CFUTRFV312",
+      "category": "Рубашки",
+      "qty": 2.0,
+      "amount": 198.0
+    },
+    {
+      "brand": "TRANSIT",
+      "gender": "муж",
+      "source": "TRANSIT муж.xlsx",
+      "name": "TROUSERS CFUTRFD130",
+      "category": "Брюки, джинсы муж",
+      "qty": 3.0,
+      "amount": 276.0
+    },
+    {
+      "brand": "TRANSIT",
+      "gender": "муж",
+      "source": "TRANSIT муж.xlsx",
+      "name": "TROUSERS CFUTRFD139",
+      "category": "Брюки, джинсы муж",
+      "qty": 2.0,
+      "amount": 166.0
+    },
+    {
+      "brand": "TRANSIT",
+      "gender": "муж",
+      "source": "TRANSIT муж.xlsx",
+      "name": "JACKET CFUTRFD138",
+      "category": "Пиджаки, жакеты, бомбер муж",
+      "qty": 2.0,
+      "amount": 358.0
+    },
+    {
+      "brand": "TRANSIT",
+      "gender": "муж",
+      "source": "TRANSIT муж.xlsx",
+      "name": "JACKET CFUTRFM223WR",
+      "category": "Пиджаки, жакеты, бомбер муж",
+      "qty": 2.0,
+      "amount": 300.0
+    },
+    {
+      "brand": "TRANSIT",
+      "gender": "муж",
+      "source": "TRANSIT муж.xlsx",
+      "name": "JUMPER CFUTRF11461",
+      "category": "Трикотаж муж",
+      "qty": 3.0,
+      "amount": 255.0
+    }
+  ]
+}

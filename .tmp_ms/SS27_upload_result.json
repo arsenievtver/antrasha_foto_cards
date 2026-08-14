@@ -1,0 +1,656 @@
+[
+  {
+    "id": "8d856aee-a84f-4382-9751-3eeb80f07584",
+    "season_id": "a72b6022-9e29-430b-9818-e035963ae9e2",
+    "season_name": "Весна-лето 2027",
+    "brand_id": "0435a9b5-bd0d-4274-9a10-ba816eb212c9",
+    "brand_name": "Aeronautica",
+    "gender": "men",
+    "ordered_on": "2026-08-14",
+    "amount_eur": "5364.50",
+    "eur_rub_rate": "100.0000",
+    "amount_rub": "536450.00",
+    "has_prepayment": false,
+    "prepayment_amount_eur": null,
+    "prepayment_due_on": null,
+    "comment": "Импорт заказов SS27 из PDF/XLSX: Aeronautica муж",
+    "created_at": "2026-08-14T14:23:13.039201Z",
+    "updated_at": "2026-08-14T14:23:13.039201Z",
+    "lines": [
+      {
+        "id": "f4d9d94d-6d82-4717-acef-351412fca758",
+        "category_id": "2e3cc9f4-cf75-49c2-95ea-25ddd300e013",
+        "category_name": "Брюки, джинсы муж",
+        "category_gender": "men",
+        "amount_eur": "1275.00",
+        "comment": null
+      },
+      {
+        "id": "1559341c-ed38-4729-992c-377ddff641b4",
+        "category_id": "7c0ed91c-9272-484a-9a92-9e95ad087627",
+        "category_name": "Бриджи, шорты муж",
+        "category_gender": "men",
+        "amount_eur": "398.00",
+        "comment": null
+      },
+      {
+        "id": "91da0dd8-d09f-4bfe-a061-26c11c81d872",
+        "category_id": "bfad6eb5-ad00-4a19-a05c-40ff4825d6d2",
+        "category_name": "Футболки, поло муж",
+        "category_gender": "men",
+        "amount_eur": "908.00",
+        "comment": null
+      },
+      {
+        "id": "a7fc3937-7cf0-48aa-9cd5-0bacb1665c95",
+        "category_id": "40cf3e15-4dca-4d2e-9ca0-2fece21851b2",
+        "category_name": "Рубашки",
+        "category_gender": "men",
+        "amount_eur": "565.00",
+        "comment": null
+      },
+      {
+        "id": "f0b11720-a68f-47ac-bb69-bf8675c6ee8c",
+        "category_id": "10004226-b5dd-47ea-881f-0d9d1161ad4c",
+        "category_name": "Пиджаки, жакеты, бомбер муж",
+        "category_gender": "men",
+        "amount_eur": "554.00",
+        "comment": null
+      },
+      {
+        "id": "8832ed12-e23f-4004-80e3-a1100754a825",
+        "category_id": "4f538da8-826b-4560-8c83-791eee914887",
+        "category_name": "Трикотаж муж",
+        "category_gender": "men",
+        "amount_eur": "501.00",
+        "comment": null
+      },
+      {
+        "id": "425f9a7c-4b5e-4705-b0bb-4b7a6f1b04af",
+        "category_id": "bee2cfb7-665f-46c2-bf72-2ef5df96cf1a",
+        "category_name": "Верхняя одежда муж",
+        "category_gender": "men",
+        "amount_eur": "864.00",
+        "comment": null
+      },
+      {
+        "id": "b719c67a-394a-471d-8b78-02e843c0f6fe",
+        "category_id": "9ca2a9ae-0d12-4ff5-b914-0ff1c314cae8",
+        "category_name": "Обувь муж",
+        "category_gender": "men",
+        "amount_eur": "199.50",
+        "comment": null
+      },
+      {
+        "id": "ec34c5b7-de09-414c-8cc6-a09da8c60d71",
+        "category_id": "216b244d-3714-46b5-a473-2d9467f95f51",
+        "category_name": "Аксессуары муж",
+        "category_gender": "men",
+        "amount_eur": "100.00",
+        "comment": null
+      }
+    ],
+    "paid_eur": "0.00",
+    "prepaid_eur": "0.00",
+    "shipped_eur": "0.00",
+    "balance_to_pay_eur": "5364.50",
+    "balance_to_ship_eur": "5364.50",
+    "prepayment_outstanding_eur": "0"
+  },
+  {
+    "id": "12d63d18-4301-490e-8e41-5a5dd4fc965f",
+    "season_id": "a72b6022-9e29-430b-9818-e035963ae9e2",
+    "season_name": "Весна-лето 2027",
+    "brand_id": "58cf6df6-6cfa-4dc9-a655-3524e78c8bec",
+    "brand_name": "Diktat",
+    "gender": "men",
+    "ordered_on": "2026-08-14",
+    "amount_eur": "1997.30",
+    "eur_rub_rate": "100.0000",
+    "amount_rub": "199730.00",
+    "has_prepayment": false,
+    "prepayment_amount_eur": null,
+    "prepayment_due_on": null,
+    "comment": "Импорт заказов SS27 из PDF/XLSX: Diktat муж",
+    "created_at": "2026-08-14T14:23:13.297134Z",
+    "updated_at": "2026-08-14T14:23:13.297134Z",
+    "lines": [
+      {
+        "id": "662b7022-a08d-452e-aa2e-4efcea0dc5bc",
+        "category_id": "bfad6eb5-ad00-4a19-a05c-40ff4825d6d2",
+        "category_name": "Футболки, поло муж",
+        "category_gender": "men",
+        "amount_eur": "1446.10",
+        "comment": null
+      },
+      {
+        "id": "622d5056-6743-49fa-af3e-38c0dbcbfff6",
+        "category_id": "10004226-b5dd-47ea-881f-0d9d1161ad4c",
+        "category_name": "Пиджаки, жакеты, бомбер муж",
+        "category_gender": "men",
+        "amount_eur": "551.20",
+        "comment": null
+      }
+    ],
+    "paid_eur": "0.00",
+    "prepaid_eur": "0.00",
+    "shipped_eur": "0.00",
+    "balance_to_pay_eur": "1997.30",
+    "balance_to_ship_eur": "1997.30",
+    "prepayment_outstanding_eur": "0"
+  },
+  {
+    "id": "15d782fd-0771-4013-8dd8-d0295517aafc",
+    "season_id": "a72b6022-9e29-430b-9818-e035963ae9e2",
+    "season_name": "Весна-лето 2027",
+    "brand_id": "e792c701-66c5-4b1b-b034-68da8122efd8",
+    "brand_name": "Duno",
+    "gender": "women",
+    "ordered_on": "2026-08-14",
+    "amount_eur": "4342.00",
+    "eur_rub_rate": "100.0000",
+    "amount_rub": "434200.00",
+    "has_prepayment": false,
+    "prepayment_amount_eur": null,
+    "prepayment_due_on": null,
+    "comment": "Импорт заказов SS27 из PDF/XLSX: Duno жен",
+    "created_at": "2026-08-14T14:23:13.550499Z",
+    "updated_at": "2026-08-14T14:23:13.550499Z",
+    "lines": [
+      {
+        "id": "137cbe84-4efe-4a68-8b7d-61a0857cd79b",
+        "category_id": "7dd07edf-93f0-4622-ab16-816e96ff416d",
+        "category_name": "Брюки, джинсы жен",
+        "category_gender": "women",
+        "amount_eur": "716.00",
+        "comment": null
+      },
+      {
+        "id": "e119b053-5a11-4d22-acca-9685d537d44a",
+        "category_id": "4f2509da-bbe8-4cb9-a589-222bf4430201",
+        "category_name": "Пиджаки, жакеты, бомбер жен",
+        "category_gender": "women",
+        "amount_eur": "2465.00",
+        "comment": null
+      },
+      {
+        "id": "72bbb7fe-8bad-41aa-964e-9e83c04ff416",
+        "category_id": "b9dad08e-83b5-44f4-bf45-ef38518d3dac",
+        "category_name": "Верхняя одежда жен",
+        "category_gender": "women",
+        "amount_eur": "1161.00",
+        "comment": null
+      }
+    ],
+    "paid_eur": "0.00",
+    "prepaid_eur": "0.00",
+    "shipped_eur": "0.00",
+    "balance_to_pay_eur": "4342.00",
+    "balance_to_ship_eur": "4342.00",
+    "prepayment_outstanding_eur": "0"
+  },
+  {
+    "id": "c9917701-0d9e-4c89-979b-2d5434434367",
+    "season_id": "a72b6022-9e29-430b-9818-e035963ae9e2",
+    "season_name": "Весна-лето 2027",
+    "brand_id": "e792c701-66c5-4b1b-b034-68da8122efd8",
+    "brand_name": "Duno",
+    "gender": "men",
+    "ordered_on": "2026-08-14",
+    "amount_eur": "5876.00",
+    "eur_rub_rate": "100.0000",
+    "amount_rub": "587600.00",
+    "has_prepayment": false,
+    "prepayment_amount_eur": null,
+    "prepayment_due_on": null,
+    "comment": "Импорт заказов SS27 из PDF/XLSX: Duno муж",
+    "created_at": "2026-08-14T14:23:13.800922Z",
+    "updated_at": "2026-08-14T14:23:13.800922Z",
+    "lines": [
+      {
+        "id": "2f040fd1-cca9-4124-b4cc-8a390d7ebc71",
+        "category_id": "2e3cc9f4-cf75-49c2-95ea-25ddd300e013",
+        "category_name": "Брюки, джинсы муж",
+        "category_gender": "men",
+        "amount_eur": "1663.00",
+        "comment": null
+      },
+      {
+        "id": "7c2a8523-c430-4da7-b872-c2afa1c22632",
+        "category_id": "bfad6eb5-ad00-4a19-a05c-40ff4825d6d2",
+        "category_name": "Футболки, поло муж",
+        "category_gender": "men",
+        "amount_eur": "267.00",
+        "comment": null
+      },
+      {
+        "id": "824a30d1-847e-40a5-8223-660ce8ef680a",
+        "category_id": "10004226-b5dd-47ea-881f-0d9d1161ad4c",
+        "category_name": "Пиджаки, жакеты, бомбер муж",
+        "category_gender": "men",
+        "amount_eur": "2639.00",
+        "comment": null
+      },
+      {
+        "id": "25ae3ea9-d6a9-49f9-bcb8-808f11460c1b",
+        "category_id": "bee2cfb7-665f-46c2-bf72-2ef5df96cf1a",
+        "category_name": "Верхняя одежда муж",
+        "category_gender": "men",
+        "amount_eur": "871.00",
+        "comment": null
+      },
+      {
+        "id": "0d7feb50-38a6-44b1-990c-25b4e81e7247",
+        "category_id": "216b244d-3714-46b5-a473-2d9467f95f51",
+        "category_name": "Аксессуары муж",
+        "category_gender": "men",
+        "amount_eur": "436.00",
+        "comment": null
+      }
+    ],
+    "paid_eur": "0.00",
+    "prepaid_eur": "0.00",
+    "shipped_eur": "0.00",
+    "balance_to_pay_eur": "5876.00",
+    "balance_to_ship_eur": "5876.00",
+    "prepayment_outstanding_eur": "0"
+  },
+  {
+    "id": "7aef83a8-d36e-44c9-9eed-d0cc0eadc4dd",
+    "season_id": "a72b6022-9e29-430b-9818-e035963ae9e2",
+    "season_name": "Весна-лето 2027",
+    "brand_id": "9caf4c0b-ba5a-4b36-a8ed-2e6adf4c89ce",
+    "brand_name": "Gardeur",
+    "gender": "women",
+    "ordered_on": "2026-08-14",
+    "amount_eur": "1999.50",
+    "eur_rub_rate": "100.0000",
+    "amount_rub": "199950.00",
+    "has_prepayment": false,
+    "prepayment_amount_eur": null,
+    "prepayment_due_on": null,
+    "comment": "Импорт заказов SS27 из PDF/XLSX: Gardeur жен",
+    "created_at": "2026-08-14T14:23:14.050466Z",
+    "updated_at": "2026-08-14T14:23:14.050466Z",
+    "lines": [
+      {
+        "id": "d5f79a20-1556-485a-8e35-a61d5c5b64d9",
+        "category_id": "7dd07edf-93f0-4622-ab16-816e96ff416d",
+        "category_name": "Брюки, джинсы жен",
+        "category_gender": "women",
+        "amount_eur": "1820.50",
+        "comment": null
+      },
+      {
+        "id": "36b88e4f-7ac7-4bf8-85d0-58bc1fa69500",
+        "category_id": "20e7c246-1af6-420e-ae1c-dae52cf0c959",
+        "category_name": "Юбки жен",
+        "category_gender": "women",
+        "amount_eur": "179.00",
+        "comment": null
+      }
+    ],
+    "paid_eur": "0.00",
+    "prepaid_eur": "0.00",
+    "shipped_eur": "0.00",
+    "balance_to_pay_eur": "1999.50",
+    "balance_to_ship_eur": "1999.50",
+    "prepayment_outstanding_eur": "0"
+  },
+  {
+    "id": "7e925a71-bf1a-4b4d-9fbf-c6df0db58fb2",
+    "season_id": "a72b6022-9e29-430b-9818-e035963ae9e2",
+    "season_name": "Весна-лето 2027",
+    "brand_id": "9caf4c0b-ba5a-4b36-a8ed-2e6adf4c89ce",
+    "brand_name": "Gardeur",
+    "gender": "men",
+    "ordered_on": "2026-08-14",
+    "amount_eur": "3232.50",
+    "eur_rub_rate": "100.0000",
+    "amount_rub": "323250.00",
+    "has_prepayment": false,
+    "prepayment_amount_eur": null,
+    "prepayment_due_on": null,
+    "comment": "Импорт заказов SS27 из PDF/XLSX: Gardeur муж",
+    "created_at": "2026-08-14T14:23:14.295644Z",
+    "updated_at": "2026-08-14T14:23:14.295644Z",
+    "lines": [
+      {
+        "id": "819cc09a-eae9-4c72-9d72-b0825caea2db",
+        "category_id": "2e3cc9f4-cf75-49c2-95ea-25ddd300e013",
+        "category_name": "Брюки, джинсы муж",
+        "category_gender": "men",
+        "amount_eur": "3092.50",
+        "comment": null
+      },
+      {
+        "id": "40d1253a-453e-4f66-a89a-04a801956eff",
+        "category_id": "7c0ed91c-9272-484a-9a92-9e95ad087627",
+        "category_name": "Бриджи, шорты муж",
+        "category_gender": "men",
+        "amount_eur": "140.00",
+        "comment": null
+      }
+    ],
+    "paid_eur": "0.00",
+    "prepaid_eur": "0.00",
+    "shipped_eur": "0.00",
+    "balance_to_pay_eur": "3232.50",
+    "balance_to_ship_eur": "3232.50",
+    "prepayment_outstanding_eur": "0"
+  },
+  {
+    "id": "4ae64650-e48b-4f33-8e54-e938a6aa3f50",
+    "season_id": "a72b6022-9e29-430b-9818-e035963ae9e2",
+    "season_name": "Весна-лето 2027",
+    "brand_id": "a0a15343-1b80-4460-9fbe-ad79a9678d66",
+    "brand_name": "Riani",
+    "gender": "women",
+    "ordered_on": "2026-08-14",
+    "amount_eur": "5848.00",
+    "eur_rub_rate": "100.0000",
+    "amount_rub": "584800.00",
+    "has_prepayment": false,
+    "prepayment_amount_eur": null,
+    "prepayment_due_on": null,
+    "comment": "Импорт заказов SS27 из PDF/XLSX: RIANI жен",
+    "created_at": "2026-08-14T14:23:14.542833Z",
+    "updated_at": "2026-08-14T14:23:14.542833Z",
+    "lines": [
+      {
+        "id": "3d8ab444-d92c-40b8-9da4-3e50d17a9fa2",
+        "category_id": "a588b2b1-3a34-411b-86ad-e1f17e696d2f",
+        "category_name": "Бриджи, шорты жен",
+        "category_gender": "women",
+        "amount_eur": "507.00",
+        "comment": null
+      },
+      {
+        "id": "43b7c956-7800-47fc-b9f2-bc9e32e78a28",
+        "category_id": "7dd07edf-93f0-4622-ab16-816e96ff416d",
+        "category_name": "Брюки, джинсы жен",
+        "category_gender": "women",
+        "amount_eur": "1190.00",
+        "comment": null
+      },
+      {
+        "id": "4e504707-d237-426b-ae0f-5d0c9f1d638f",
+        "category_id": "a8328676-182a-4f0c-bfce-a33de02213d2",
+        "category_name": "Футболки, поло, топы жен",
+        "category_gender": "women",
+        "amount_eur": "342.00",
+        "comment": null
+      },
+      {
+        "id": "e8d9015c-e39d-41aa-ad34-9deeab284cde",
+        "category_id": "af9d92b1-d73a-4e49-86dc-862a24856514",
+        "category_name": "Блузки, рубашки жен",
+        "category_gender": "women",
+        "amount_eur": "1534.00",
+        "comment": null
+      },
+      {
+        "id": "86a78913-36fa-4a02-ac62-3bcc5d963984",
+        "category_id": "d0c5f8c5-628c-4a9f-9be6-4ea5998b191d",
+        "category_name": "Платья жен",
+        "category_gender": "women",
+        "amount_eur": "1258.00",
+        "comment": null
+      },
+      {
+        "id": "dbea6700-fbc4-467c-9358-1fed225207ba",
+        "category_id": "4f2509da-bbe8-4cb9-a589-222bf4430201",
+        "category_name": "Пиджаки, жакеты, бомбер жен",
+        "category_gender": "women",
+        "amount_eur": "1017.00",
+        "comment": null
+      }
+    ],
+    "paid_eur": "0.00",
+    "prepaid_eur": "0.00",
+    "shipped_eur": "0.00",
+    "balance_to_pay_eur": "5848.00",
+    "balance_to_ship_eur": "5848.00",
+    "prepayment_outstanding_eur": "0"
+  },
+  {
+    "id": "8d6c4502-c66d-4da5-98b9-443e8ad12010",
+    "season_id": "a72b6022-9e29-430b-9818-e035963ae9e2",
+    "season_name": "Весна-лето 2027",
+    "brand_id": "916e4532-6f50-467f-90c2-5d47f4c28c86",
+    "brand_name": "Roy Robson",
+    "gender": "men",
+    "ordered_on": "2026-08-14",
+    "amount_eur": "9255.10",
+    "eur_rub_rate": "100.0000",
+    "amount_rub": "925510.00",
+    "has_prepayment": false,
+    "prepayment_amount_eur": null,
+    "prepayment_due_on": null,
+    "comment": "Импорт заказов SS27 из PDF/XLSX: Roy Robson муж",
+    "created_at": "2026-08-14T14:23:14.797215Z",
+    "updated_at": "2026-08-14T14:23:14.797215Z",
+    "lines": [
+      {
+        "id": "9571d037-a5cb-4572-8904-6087bd7eef03",
+        "category_id": "2e3cc9f4-cf75-49c2-95ea-25ddd300e013",
+        "category_name": "Брюки, джинсы муж",
+        "category_gender": "men",
+        "amount_eur": "2501.80",
+        "comment": null
+      },
+      {
+        "id": "a5ac1cf8-9d8c-4429-b70c-46e128bc7fad",
+        "category_id": "7c0ed91c-9272-484a-9a92-9e95ad087627",
+        "category_name": "Бриджи, шорты муж",
+        "category_gender": "men",
+        "amount_eur": "128.40",
+        "comment": null
+      },
+      {
+        "id": "8b69283a-7b30-49d2-ab6a-ba57199eb42c",
+        "category_id": "bfad6eb5-ad00-4a19-a05c-40ff4825d6d2",
+        "category_name": "Футболки, поло муж",
+        "category_gender": "men",
+        "amount_eur": "1401.00",
+        "comment": null
+      },
+      {
+        "id": "50042d19-ec54-44e9-a84c-0ed88c7a4696",
+        "category_id": "10004226-b5dd-47ea-881f-0d9d1161ad4c",
+        "category_name": "Пиджаки, жакеты, бомбер муж",
+        "category_gender": "men",
+        "amount_eur": "1758.00",
+        "comment": null
+      },
+      {
+        "id": "52dbb422-4c7f-43bd-bef2-f952c70fbbf9",
+        "category_id": "4f538da8-826b-4560-8c83-791eee914887",
+        "category_name": "Трикотаж муж",
+        "category_gender": "men",
+        "amount_eur": "359.40",
+        "comment": null
+      },
+      {
+        "id": "696644c7-3c1a-4404-8976-61576d2ecfb8",
+        "category_id": "87e9ce2d-a530-4836-a028-78890867ef1e",
+        "category_name": "Костюмы муж",
+        "category_gender": "men",
+        "amount_eur": "2080.50",
+        "comment": null
+      },
+      {
+        "id": "1325f479-bb5a-4c2b-b30a-2a66e8576135",
+        "category_id": "9ca2a9ae-0d12-4ff5-b914-0ff1c314cae8",
+        "category_name": "Обувь муж",
+        "category_gender": "men",
+        "amount_eur": "1026.00",
+        "comment": null
+      }
+    ],
+    "paid_eur": "0.00",
+    "prepaid_eur": "0.00",
+    "shipped_eur": "0.00",
+    "balance_to_pay_eur": "9255.10",
+    "balance_to_ship_eur": "9255.10",
+    "prepayment_outstanding_eur": "0"
+  },
+  {
+    "id": "16ba1e5c-fbca-49f8-8a5f-6f01a748bd9f",
+    "season_id": "a72b6022-9e29-430b-9818-e035963ae9e2",
+    "season_name": "Весна-лето 2027",
+    "brand_id": "bf378e60-3265-4210-83b5-2fc482fd82a7",
+    "brand_name": "SeidenSticker",
+    "gender": "men",
+    "ordered_on": "2026-08-14",
+    "amount_eur": "2279.20",
+    "eur_rub_rate": "100.0000",
+    "amount_rub": "227920.00",
+    "has_prepayment": false,
+    "prepayment_amount_eur": null,
+    "prepayment_due_on": null,
+    "comment": "Импорт заказов SS27 из PDF/XLSX: SeidenSticker муж",
+    "created_at": "2026-08-14T14:23:15.051536Z",
+    "updated_at": "2026-08-14T14:23:15.051536Z",
+    "lines": [
+      {
+        "id": "0450e479-1340-49af-bc18-d504e5468d05",
+        "category_id": "40cf3e15-4dca-4d2e-9ca0-2fece21851b2",
+        "category_name": "Рубашки",
+        "category_gender": "men",
+        "amount_eur": "2279.20",
+        "comment": null
+      }
+    ],
+    "paid_eur": "0.00",
+    "prepaid_eur": "0.00",
+    "shipped_eur": "0.00",
+    "balance_to_pay_eur": "2279.20",
+    "balance_to_ship_eur": "2279.20",
+    "prepayment_outstanding_eur": "0"
+  },
+  {
+    "id": "021f2150-43ef-450b-8cb8-d5f483478836",
+    "season_id": "a72b6022-9e29-430b-9818-e035963ae9e2",
+    "season_name": "Весна-лето 2027",
+    "brand_id": "c23cc141-3cff-4b50-98c6-34e93e97249b",
+    "brand_name": "Transit",
+    "gender": "women",
+    "ordered_on": "2026-08-14",
+    "amount_eur": "5369.00",
+    "eur_rub_rate": "100.0000",
+    "amount_rub": "536900.00",
+    "has_prepayment": false,
+    "prepayment_amount_eur": null,
+    "prepayment_due_on": null,
+    "comment": "Импорт заказов SS27 из PDF/XLSX: TRANSIT жен",
+    "created_at": "2026-08-14T14:23:15.301111Z",
+    "updated_at": "2026-08-14T14:23:15.301111Z",
+    "lines": [
+      {
+        "id": "6dcca9b3-2801-4ae3-be3e-ee1e157900eb",
+        "category_id": "7dd07edf-93f0-4622-ab16-816e96ff416d",
+        "category_name": "Брюки, джинсы жен",
+        "category_gender": "women",
+        "amount_eur": "2144.00",
+        "comment": null
+      },
+      {
+        "id": "2afef6fa-fba9-44e8-8780-a329efd68ef2",
+        "category_id": "af9d92b1-d73a-4e49-86dc-862a24856514",
+        "category_name": "Блузки, рубашки жен",
+        "category_gender": "women",
+        "amount_eur": "698.00",
+        "comment": null
+      },
+      {
+        "id": "9809ab2c-370b-4940-abd4-43e036e4d45f",
+        "category_id": "20e7c246-1af6-420e-ae1c-dae52cf0c959",
+        "category_name": "Юбки жен",
+        "category_gender": "women",
+        "amount_eur": "697.00",
+        "comment": null
+      },
+      {
+        "id": "515f2cb0-2d0d-48ae-a505-c1498781d7e8",
+        "category_id": "4f2509da-bbe8-4cb9-a589-222bf4430201",
+        "category_name": "Пиджаки, жакеты, бомбер жен",
+        "category_gender": "women",
+        "amount_eur": "1830.00",
+        "comment": null
+      }
+    ],
+    "paid_eur": "0.00",
+    "prepaid_eur": "0.00",
+    "shipped_eur": "0.00",
+    "balance_to_pay_eur": "5369.00",
+    "balance_to_ship_eur": "5369.00",
+    "prepayment_outstanding_eur": "0"
+  },
+  {
+    "id": "6d0ca4fc-f663-4170-8965-5ac7214af6d3",
+    "season_id": "a72b6022-9e29-430b-9818-e035963ae9e2",
+    "season_name": "Весна-лето 2027",
+    "brand_id": "c23cc141-3cff-4b50-98c6-34e93e97249b",
+    "brand_name": "Transit",
+    "gender": "men",
+    "ordered_on": "2026-08-14",
+    "amount_eur": "4486.00",
+    "eur_rub_rate": "100.0000",
+    "amount_rub": "448600.00",
+    "has_prepayment": false,
+    "prepayment_amount_eur": null,
+    "prepayment_due_on": null,
+    "comment": "Импорт заказов SS27 из PDF/XLSX: TRANSIT муж",
+    "created_at": "2026-08-14T14:23:15.552379Z",
+    "updated_at": "2026-08-14T14:23:15.552379Z",
+    "lines": [
+      {
+        "id": "24d9ea49-d98c-44a8-b562-619430768766",
+        "category_id": "2e3cc9f4-cf75-49c2-95ea-25ddd300e013",
+        "category_name": "Брюки, джинсы муж",
+        "category_gender": "men",
+        "amount_eur": "1715.00",
+        "comment": null
+      },
+      {
+        "id": "96e43349-9ab1-40b7-80f3-e072f849fb63",
+        "category_id": "bfad6eb5-ad00-4a19-a05c-40ff4825d6d2",
+        "category_name": "Футболки, поло муж",
+        "category_gender": "men",
+        "amount_eur": "429.00",
+        "comment": null
+      },
+      {
+        "id": "f61284b5-0a5c-453b-bc06-ab7102716d48",
+        "category_id": "40cf3e15-4dca-4d2e-9ca0-2fece21851b2",
+        "category_name": "Рубашки",
+        "category_gender": "men",
+        "amount_eur": "198.00",
+        "comment": null
+      },
+      {
+        "id": "1b38093e-11fa-4d74-a8b9-61a6671cb8ba",
+        "category_id": "10004226-b5dd-47ea-881f-0d9d1161ad4c",
+        "category_name": "Пиджаки, жакеты, бомбер муж",
+        "category_gender": "men",
+        "amount_eur": "1889.00",
+        "comment": null
+      },
+      {
+        "id": "8f39899c-1448-4701-95e7-2d7a96c1a5b8",
+        "category_id": "4f538da8-826b-4560-8c83-791eee914887",
+        "category_name": "Трикотаж муж",
+        "category_gender": "men",
+        "amount_eur": "255.00",
+        "comment": null
+      }
+    ],
+    "paid_eur": "0.00",
+    "prepaid_eur": "0.00",
+    "shipped_eur": "0.00",
+    "balance_to_pay_eur": "4486.00",
+    "balance_to_ship_eur": "4486.00",
+    "prepayment_outstanding_eur": "0"
+  }
+]

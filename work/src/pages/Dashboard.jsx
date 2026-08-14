@@ -234,20 +234,114 @@ function BrandPieBlock({ items }) {
 }
 
 function CategoryPieBlock({ title, items }) {
+  const withAmount = useMemo(
+    () => (items || []).filter((it) => num(it.amount_eur) > 0),
+    [items],
+  );
   const mapped = useMemo(
     () =>
-      (items || []).map((it) => ({
+      withAmount.map((it) => ({
         key: it.category_id,
         label: it.category_name,
         amount: it.amount_eur,
       })),
+    [withAmount],
+  );
+  const showPlan = (items || []).some((it) => it.plan_eur != null);
+
+  return (
+    <>
+      <PieBlock title={title} items={mapped} emptyLabel="Категории не заданы" />
+      {showPlan ? <CategoryPlanList items={items} /> : null}
+    </>
+  );
+}
+
+function formatSignedEur(value) {
+  const n = num(value);
+  const abs = eur(Math.abs(n));
+  if (n > 0) return `+${abs}`;
+  if (n < 0) return `−${abs}`;
+  return abs;
+}
+
+function CategoryPlanList({ items }) {
+  const rows = useMemo(
+    () =>
+      (items || []).filter((it) => it.plan_eur != null),
     [items],
   );
-  return <PieBlock title={title} items={mapped} emptyLabel="Категории не заданы" />;
+  if (!rows.length) return null;
+
+  return (
+    <div className="dash-card dash-plan">
+      <h3 className="dash-card__title">План · факт</h3>
+      <div className="dash-plan__table-wrap">
+        <table className="dash-plan__table">
+          <thead>
+            <tr>
+              <th>Категория</th>
+              <th>План</th>
+              <th>Факт</th>
+              <th>Разница</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => {
+              const delta = num(row.delta_eur);
+              const tone =
+                delta > 0 ? "dash-plan__delta--over" : delta < 0 ? "dash-plan__delta--under" : "";
+              return (
+                <tr key={row.category_id}>
+                  <td>{row.category_name}</td>
+                  <td>{eur(row.plan_eur)}</td>
+                  <td>{eur(row.amount_eur)}</td>
+                  <td className={tone}>{formatSignedEur(delta)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <p className="field-hint" style={{ marginBottom: 0 }}>
+        Разница = факт − план: «−» недобор, «+» перезаказ
+      </p>
+    </div>
+  );
+}
+
+function SeasonSection({ data }) {
+  return (
+    <section className="dash-season-block">
+      <div className="dash-season">
+        <div className="dash-season__name">{data.season_name}</div>
+        <div className="dash-season__code">{data.season_code}</div>
+      </div>
+
+      <div className="dash-card">
+        <h3 className="dash-card__title">Заказ · Оплата · Поставки</h3>
+        <TotalsBarChart totals={data.totals} />
+        <p className="field-hint" style={{ marginBottom: 0 }}>
+          Заказов: {data.totals.orders_count} · к оплате {eur(data.totals.balance_to_pay_eur)} · к
+          поставке {eur(data.totals.balance_to_ship_eur)}
+        </p>
+      </div>
+
+      <div className="dash-card">
+        <h3 className="dash-card__title">Заказ: муж / жен</h3>
+        <GenderProgress byGender={data.by_gender} />
+      </div>
+
+      <BrandPieBlock items={data.by_brand} />
+
+      <CategoryPieBlock title="Категории · муж" items={data.by_category_men} />
+      <CategoryPieBlock title="Категории · жен" items={data.by_category_women} />
+    </section>
+  );
 }
 
 export default function Dashboard() {
-  const [data, setData] = useState(null);
+  const [items, setItems] = useState([]);
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -256,7 +350,7 @@ export default function Dashboard() {
     setLoading(true);
     fetchSeasonDashboard()
       .then((res) => {
-        if (active) setData(res);
+        if (active) setItems(res.items || []);
       })
       .catch((e) => {
         if (active) setErr(e.message);
@@ -271,36 +365,13 @@ export default function Dashboard() {
 
   if (loading) return <p className="loading">Загрузка…</p>;
   if (err) return <p className="error">{err}</p>;
-  if (!data) return <p className="empty">Нет данных</p>;
+  if (!items.length) return <p className="empty">Нет сезонов на дашборде</p>;
 
   return (
     <div className="dash">
-      <div className="dash-season">
-        <div className="dash-season__name">{data.season_name}</div>
-        <div className="dash-season__code">
-          {data.season_code}
-          {data.is_primary ? " · основной" : ""}
-        </div>
-      </div>
-
-      <section className="dash-card">
-        <h3 className="dash-card__title">Заказ · Оплата · Поставки</h3>
-        <TotalsBarChart totals={data.totals} />
-        <p className="field-hint" style={{ marginBottom: 0 }}>
-          Заказов: {data.totals.orders_count} · к оплате {eur(data.totals.balance_to_pay_eur)} · к
-          поставке {eur(data.totals.balance_to_ship_eur)}
-        </p>
-      </section>
-
-      <section className="dash-card">
-        <h3 className="dash-card__title">Заказ: муж / жен</h3>
-        <GenderProgress byGender={data.by_gender} />
-      </section>
-
-      <BrandPieBlock items={data.by_brand} />
-
-      <CategoryPieBlock title="Категории · муж" items={data.by_category_men} />
-      <CategoryPieBlock title="Категории · жен" items={data.by_category_women} />
+      {items.map((data) => (
+        <SeasonSection key={data.season_id} data={data} />
+      ))}
     </div>
   );
 }

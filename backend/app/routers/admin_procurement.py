@@ -63,6 +63,7 @@ from app.schemas.procurement import (
     SeasonBrandStatOut,
     SeasonCategoryStatOut,
     SeasonCreateRequest,
+    SeasonDashboardListResponse,
     SeasonDashboardOut,
     SeasonDashboardTotalsOut,
     SeasonGenderStatOut,
@@ -294,19 +295,35 @@ def _assert_order_matches(order: BrandOrder, season_id: uuid.UUID, brand_id: uui
 # --- Сезоны ---------------------------------------------------------------
 
 
-def _clear_other_primary_seasons(db: Session, keep_id: uuid.UUID | None = None) -> None:
-    stmt = update(Season).where(Season.is_primary.is_(True)).values(is_primary=False)
+def _clear_other_order_plan_seasons(db: Session, keep_id: uuid.UUID | None = None) -> None:
+    stmt = update(Season).where(Season.is_order_plan.is_(True)).values(is_order_plan=False)
     if keep_id is not None:
         stmt = stmt.where(Season.id != keep_id)
     db.execute(stmt)
 
 
-def _resolve_dashboard_season(db: Session, season_id: uuid.UUID | None) -> Season:
+def _order_plan_season(db: Session) -> Season | None:
+    return db.scalars(
+        select(Season).where(Season.is_order_plan.is_(True)).limit(1)
+    ).first()
+
+
+def _list_dashboard_seasons(
+    db: Session, season_id: uuid.UUID | None
+) -> list[Season]:
+    """Сезоны для PWA-дашборда: один по id или все с is_primary по sort_order."""
     if season_id is not None:
-        return _get_season(db, season_id)
-    primary = db.scalars(select(Season).where(Season.is_primary.is_(True)).limit(1)).first()
-    if primary:
-        return primary
+        return [_get_season(db, season_id)]
+    rows = list(
+        db.scalars(
+            select(Season)
+            .where(Season.is_primary.is_(True))
+            .order_by(Season.sort_order.desc(), Season.created_at.desc())
+        ).all()
+    )
+    if rows:
+        return rows
+    # Совместимость: если никто не отмечен — один активный с наибольшим sort_order.
     fallback = db.scalars(
         select(Season)
         .where(Season.is_active.is_(True))
@@ -314,10 +331,10 @@ def _resolve_dashboard_season(db: Session, season_id: uuid.UUID | None) -> Seaso
         .limit(1)
     ).first()
     if fallback:
-        return fallback
+        return [fallback]
     raise HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,
-        detail="Нет сезонов для дашборда — создайте сезон и отметьте основной",
+        detail="Нет сезонов для дашборда — создайте сезон и отметьте его в колонке PWA",
     )
 
 
@@ -340,13 +357,14 @@ def create_season(
     _su: AdminPrincipal = Depends(require_permission("product")),
 ) -> SeasonOut:
     _ = _su
-    if body.is_primary:
-        _clear_other_primary_seasons(db)
+    if body.is_order_plan:
+        _clear_other_order_plan_seasons(db)
     row = Season(
         name=body.name.strip(),
         code=body.code.strip(),
         is_active=body.is_active,
         is_primary=body.is_primary,
+        is_order_plan=body.is_order_plan,
         sort_order=body.sort_order,
     )
     db.add(row)
@@ -380,11 +398,13 @@ def update_season(
     if body.sort_order is not None:
         row.sort_order = body.sort_order
     if body.is_primary is not None:
-        if body.is_primary:
-            _clear_other_primary_seasons(db, keep_id=season_id)
-            row.is_primary = True
+        row.is_primary = body.is_primary
+    if body.is_order_plan is not None:
+        if body.is_order_plan:
+            _clear_other_order_plan_seasons(db, keep_id=season_id)
+            row.is_order_plan = True
         else:
-            row.is_primary = False
+            row.is_order_plan = False
     try:
         db.commit()
     except IntegrityError as e:
@@ -1285,9 +1305,16 @@ def _brand_stats_for_season(
 
 
 def _category_stats_for_season(
-    db: Session, season_id: uuid.UUID, gender: str
+    db: Session,
+    season_id: uuid.UUID,
+    gender: str,
+    *,
+    with_plan: bool = False,
 ) -> list[SeasonCategoryStatOut]:
-    """Разбивка строк заказов сезона по категориям указанного пола (men/women)."""
+    """Разбивка строк заказов сезона по категориям указанного пола (men/women).
+
+    При with_plan подмешивает планы из order-guidance и категории с нулевым фактом.
+    """
     category_totals: dict[str, dict[str, object]] = {}
     for cid, name, cat_gender, ms_id, total in db.execute(
         select(
@@ -1305,32 +1332,93 @@ def _category_stats_for_season(
         .where(BrandOrder.season_id == season_id)
         .group_by(Category.id, Category.name, Category.gender, Category.moy_sklad_id)
     ).all():
-        canonical_ms_id = _canonical_ms_id(ms_id)
+        folder_ms = _canonical_ms_id(ms_id)
+        if not folder_ms and (name or "").casefold().startswith("аксессуар"):
+            folder_ms = _ACCESSORIES_MS_ID
         display_name, display_gender = _CANONICAL_CATEGORY_DISPLAY.get(
-            canonical_ms_id, (name, cat_gender)
+            folder_ms, (name, cat_gender)
         )
+        if folder_ms == _ACCESSORIES_MS_ID:
+            display_gender = cat_gender if cat_gender in ("men", "women") else gender
+            display_name = "Аксессуары жен" if display_gender == "women" else "Аксессуары муж"
         if display_gender != gender:
             continue
-        key = canonical_ms_id or str(cid)
+        key = f"{folder_ms or cid}:{display_gender}"
         entry = category_totals.setdefault(
             key,
             {
                 "category_id": cid,
                 "category_name": display_name,
                 "category_gender": display_gender,
+                "moy_sklad_id": folder_ms,
                 "amount_eur": ZERO,
+                "plan_eur": None,
             },
         )
         entry["amount_eur"] = Decimal(entry["amount_eur"]) + Decimal(total or 0)
 
+    if with_plan:
+        try:
+            payload = _load_order_guidance()
+        except (FileNotFoundError, json.JSONDecodeError, OSError):
+            payload = None
+        if payload:
+            cat_rows = db.scalars(select(Category).where(Category.is_active.is_(True))).all()
+            id_by_ms_gender: dict[tuple[str, str], uuid.UUID] = {}
+            for cat in cat_rows:
+                ms = _canonical_ms_id(cat.moy_sklad_id)
+                if not ms and (cat.name or "").casefold().startswith("аксессуар"):
+                    ms = _ACCESSORIES_MS_ID
+                if not ms:
+                    continue
+                cat_gender = cat.gender if cat.gender in ("men", "women") else None
+                if cat_gender:
+                    id_by_ms_gender.setdefault((ms, cat_gender), cat.id)
+
+            for gcat in payload.get("categories") or []:
+                g_gender = gcat.get("gender")
+                if g_gender != gender:
+                    continue
+                folder_ms = _canonical_ms_id(gcat.get("moy_sklad_id"))
+                if not folder_ms:
+                    continue
+                if folder_ms == _ACCESSORIES_MS_ID:
+                    display_name = (
+                        "Аксессуары жен" if gender == "women" else "Аксессуары муж"
+                    )
+                else:
+                    display_name, display_gender = _CANONICAL_CATEGORY_DISPLAY.get(
+                        folder_ms, (gcat.get("name") or folder_ms, gender)
+                    )
+                    if display_gender != gender:
+                        continue
+                key = f"{folder_ms}:{gender}"
+                plan = _money(gcat.get("order_amount_eur"))
+                entry = category_totals.get(key)
+                if entry is None:
+                    cat_id = id_by_ms_gender.get((folder_ms, gender))
+                    if cat_id is None:
+                        continue
+                    entry = {
+                        "category_id": cat_id,
+                        "category_name": display_name,
+                        "category_gender": gender,
+                        "moy_sklad_id": folder_ms,
+                        "amount_eur": ZERO,
+                        "plan_eur": plan,
+                    }
+                    category_totals[key] = entry
+                else:
+                    entry["plan_eur"] = plan
+                    entry["category_name"] = display_name
+
     total_amount = sum((Decimal(e["amount_eur"]) for e in category_totals.values()), ZERO)
-    items = []
-    for entry in sorted(
-        category_totals.values(),
-        key=lambda item: Decimal(item["amount_eur"]),
-        reverse=True,
-    ):
+    items: list[SeasonCategoryStatOut] = []
+    for entry in category_totals.values():
         amount = _money(entry["amount_eur"])
+        plan_raw = entry.get("plan_eur")
+        plan = _money(plan_raw) if plan_raw is not None else None
+        delta = _money(amount - plan) if plan is not None else None
         share = float(amount / total_amount) if total_amount > ZERO else 0.0
         items.append(
             SeasonCategoryStatOut(
@@ -1339,21 +1427,25 @@ def _category_stats_for_season(
                 category_gender=entry["category_gender"],
                 amount_eur=amount,
                 share=share,
+                plan_eur=plan,
+                delta_eur=delta,
             )
         )
+
+    if with_plan:
+        items.sort(
+            key=lambda x: (
+                abs(x.delta_eur) if x.delta_eur is not None else ZERO,
+                x.plan_eur or ZERO,
+            ),
+            reverse=True,
+        )
+    else:
+        items.sort(key=lambda x: x.amount_eur, reverse=True)
     return items
 
 
-@router.get("/procurement/season-dashboard", response_model=SeasonDashboardOut)
-def get_season_dashboard(
-    season_id: uuid.UUID | None = Query(default=None),
-    db: Session = Depends(get_db),
-    _su: AdminPrincipal = Depends(require_permission("product")),
-) -> SeasonDashboardOut:
-    """Сводка сезона для PWA: заказы/оплаты/поставки, пол и категории."""
-    _ = _su
-    season = _resolve_dashboard_season(db, season_id)
-
+def _build_season_dashboard(db: Session, season: Season) -> SeasonDashboardOut:
     orders_count = int(
         db.scalar(
             select(func.count()).select_from(BrandOrder).where(
@@ -1398,11 +1490,14 @@ def get_season_dashboard(
         key=lambda x: {"men": 0, "women": 1, "mixed": 2}.get(x.gender, 3),
     )
 
+    with_plan = bool(season.is_order_plan)
     return SeasonDashboardOut(
         season_id=season.id,
         season_name=season.name,
         season_code=season.code,
         is_primary=bool(season.is_primary),
+        is_order_plan=with_plan,
+        sort_order=int(season.sort_order or 0),
         totals=SeasonDashboardTotalsOut(
             orders_count=orders_count,
             orders_eur=orders_eur,
@@ -1413,8 +1508,26 @@ def get_season_dashboard(
         ),
         by_gender=by_gender,
         by_brand=_brand_stats_for_season(db, season.id),
-        by_category_men=_category_stats_for_season(db, season.id, "men"),
-        by_category_women=_category_stats_for_season(db, season.id, "women"),
+        by_category_men=_category_stats_for_season(
+            db, season.id, "men", with_plan=with_plan
+        ),
+        by_category_women=_category_stats_for_season(
+            db, season.id, "women", with_plan=with_plan
+        ),
+    )
+
+
+@router.get("/procurement/season-dashboard", response_model=SeasonDashboardListResponse)
+def get_season_dashboard(
+    season_id: uuid.UUID | None = Query(default=None),
+    db: Session = Depends(get_db),
+    _su: AdminPrincipal = Depends(require_permission("product")),
+) -> SeasonDashboardListResponse:
+    """Сводки сезонов для PWA: отмеченные в PWA, по sort_order (убыв.)."""
+    _ = _su
+    seasons = _list_dashboard_seasons(db, season_id)
+    return SeasonDashboardListResponse(
+        items=[_build_season_dashboard(db, season) for season in seasons]
     )
 
 
@@ -1714,9 +1827,10 @@ def _load_order_guidance() -> dict:
 
 @router.get("/procurement/order-guidance", response_model=OrderGuidanceOut)
 def get_order_guidance(
+    db: Session = Depends(get_db),
     _su: AdminPrincipal = Depends(require_permission("product")),
 ) -> OrderGuidanceOut:
-    """Подсказки по размерам для закупки VL2027: комментарии и графики продаж."""
+    """Подсказки по размерам для закупки: комментарии и графики продаж."""
     _ = _su
     try:
         payload = _load_order_guidance()
@@ -1731,7 +1845,13 @@ def get_order_guidance(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Не удалось прочитать подсказки для заказа",
         ) from exc
-    return OrderGuidanceOut.model_validate(payload)
+    out = OrderGuidanceOut.model_validate(payload)
+    season = _order_plan_season(db)
+    if season is not None:
+        out.season_id = season.id
+        out.season_name = season.name
+        out.season_code = season.code
+    return out
 
 
 def _category_ids_for_canonical_ms(

@@ -25,6 +25,7 @@ class SeasonOut(BaseModel):
     code: str
     is_active: bool
     is_primary: bool = False
+    is_order_plan: bool = False
     sort_order: int
     created_at: datetime
 
@@ -40,6 +41,7 @@ class SeasonCreateRequest(BaseModel):
     code: str = Field(min_length=1, max_length=32)
     is_active: bool = True
     is_primary: bool = False
+    is_order_plan: bool = False
     sort_order: int = 0
 
 
@@ -48,6 +50,7 @@ class SeasonUpdateRequest(BaseModel):
     code: str | None = Field(default=None, min_length=1, max_length=32)
     is_active: bool | None = None
     is_primary: bool | None = None
+    is_order_plan: bool | None = None
     sort_order: int | None = None
 
 
@@ -351,7 +354,9 @@ class SeasonCategoryStatOut(BaseModel):
     category_name: str
     category_gender: str
     amount_eur: Decimal
-    share: float = 0  # 0..1 от суммы категорий этого пола
+    share: float = 0  # 0..1 от суммы факта этого пола
+    plan_eur: Decimal | None = None
+    delta_eur: Decimal | None = None  # факт − план (+ перезаказ, − недобор)
 
 
 class SeasonBrandStatOut(BaseModel):
@@ -367,11 +372,17 @@ class SeasonDashboardOut(BaseModel):
     season_name: str
     season_code: str
     is_primary: bool
+    is_order_plan: bool = False
+    sort_order: int = 0
     totals: SeasonDashboardTotalsOut
     by_gender: list[SeasonGenderStatOut] = Field(default_factory=list)
     by_brand: list[SeasonBrandStatOut] = Field(default_factory=list)
     by_category_men: list[SeasonCategoryStatOut] = Field(default_factory=list)
     by_category_women: list[SeasonCategoryStatOut] = Field(default_factory=list)
+
+
+class SeasonDashboardListResponse(BaseModel):
+    items: list[SeasonDashboardOut]
 
 
 # --- Справочники для форм -------------------------------------------------
@@ -454,6 +465,9 @@ class OrderGuidanceMetaOut(BaseModel):
 class OrderGuidanceOut(BaseModel):
     meta: OrderGuidanceMetaOut
     categories: list[OrderGuidanceCategoryOut]
+    season_id: uuid.UUID | None = None
+    season_name: str | None = None
+    season_code: str | None = None
 
 
 class CategoryOrderBrandRowOut(BaseModel):

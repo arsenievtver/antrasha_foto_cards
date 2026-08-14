@@ -52,7 +52,10 @@ export default function OrderGuidance() {
   return (
     <div>
       <p className="sub" style={{ margin: "0 0 1rem" }}>
-        {data?.meta?.as_of ? `Остатки на ${data.meta.as_of}` : " "}
+        {data?.season_name || data?.season_code
+          ? `${data.season_name || ""}${data.season_code ? ` · ${data.season_code}` : ""} · `
+          : ""}
+        {data?.meta?.as_of ? `Остатки на ${data.meta.as_of}` : ""}
         {periodLabel ? ` · ВЛ2025+ВЛ2026 с ${periodLabel}` : ""}
         {" · только весна-лето"}
       </p>

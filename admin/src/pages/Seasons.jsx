@@ -105,11 +105,21 @@ export default function Seasons() {
     }
   }
 
-  async function onSetPrimary(row) {
-    if (row.is_primary) return;
+  async function onTogglePwa(row) {
     setErr("");
     try {
-      await updateSeason(row.id, { is_primary: true });
+      await updateSeason(row.id, { is_primary: !row.is_primary });
+      await reload();
+    } catch (e) {
+      setErr(e.message);
+    }
+  }
+
+  async function onSetOrderPlan(row) {
+    if (row.is_order_plan) return;
+    setErr("");
+    try {
+      await updateSeason(row.id, { is_order_plan: true });
       await reload();
     } catch (e) {
       setErr(e.message);
@@ -134,7 +144,10 @@ export default function Seasons() {
       <p style={{ color: "var(--muted)", maxWidth: 720 }}>
         Сезон закупки — ярлык, к которому привязываются заказы, оплаты и поставки.
         Код нужен для коротких подписей в отчётах, например <code>ВЛ2027</code>.
-        Основной сезон показывается на дашборде в PWA.
+        В колонке PWA отмечайте сезоны для дашборда в work PWA — можно несколько
+        (обычно текущий и следующий). Порядок на дашборде совпадает с «Порядком
+        сортировки»: чем больше число, тем выше сезон. Колонка «План» — один сезон
+        для раздела «Для заказа» и планов категорий на дашборде.
       </p>
 
       {err ? <p className="error">{err}</p> : null}
@@ -168,7 +181,8 @@ export default function Seasons() {
               onChange={(e) => set("sort_order", e.target.value)}
             />
             <span className="field-hint">
-              Чем больше число, тем выше сезон в списках и выпадающих полях.
+              Чем больше число, тем выше сезон в списках, выпадающих полях и на
+              дашборде PWA.
             </span>
           </label>
           <button type="submit" disabled={busy || !form.name.trim() || !form.code.trim()}>
@@ -188,6 +202,7 @@ export default function Seasons() {
             <thead>
               <tr>
                 <th>PWA</th>
+                <th>План</th>
                 <th>Название</th>
                 <th>Код</th>
                 <th>Порядок</th>
@@ -209,16 +224,36 @@ export default function Seasons() {
                           cursor: "pointer",
                           whiteSpace: "nowrap",
                         }}
-                        title="Основной сезон для дашборда PWA"
+                        title="Показывать на дашборде work PWA"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={Boolean(row.is_primary)}
+                          onChange={() => onTogglePwa(row)}
+                          disabled={busy}
+                        />
+                        {row.is_primary ? "Да" : ""}
+                      </label>
+                    </td>
+                    <td>
+                      <label
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "0.35rem",
+                          cursor: "pointer",
+                          whiteSpace: "nowrap",
+                        }}
+                        title="Сезон раздела «Для заказа» и планов категорий"
                       >
                         <input
                           type="radio"
-                          name="primary-season"
-                          checked={Boolean(row.is_primary)}
-                          onChange={() => onSetPrimary(row)}
+                          name="order-plan-season"
+                          checked={Boolean(row.is_order_plan)}
+                          onChange={() => onSetOrderPlan(row)}
                           disabled={busy}
                         />
-                        {row.is_primary ? "Основной" : ""}
+                        {row.is_order_plan ? "Да" : ""}
                       </label>
                     </td>
                     <td>
