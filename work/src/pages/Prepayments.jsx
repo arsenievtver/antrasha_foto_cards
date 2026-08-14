@@ -266,11 +266,7 @@ export default function Prepayments() {
     setLoading(true);
     fetchPrepaymentOverview()
       .then((res) => {
-        if (!active) return;
-        setData(res);
-        const t = res?.totals;
-        if (num(t?.overdue_count) > 0) setFilter("overdue");
-        else if (num(t?.due_soon_count) > 0) setFilter("due_soon");
+        if (active) setData(res);
       })
       .catch((e) => {
         if (active) setErr(e.message);
