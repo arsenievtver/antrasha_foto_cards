@@ -48,6 +48,11 @@ const CATEGORY_RULES = {
       ids: ["f8fae156-b37a-11e9-9ff4-3150003a11ec"],
       names: ["Обувь муж"],
     },
+    {
+      label: "Аксессуары муж",
+      ids: ["82adf299-8e8b-11e9-9ff4-31500007fc47"],
+      names: ["Аксессуары муж", "Аксессуары"],
+    },
   ],
   women: [
     {
@@ -115,6 +120,11 @@ const CATEGORY_RULES = {
       ids: ["79419e87-9e44-11e9-9ff4-31500007d6fe"],
       names: ["Обувь жен"],
     },
+    {
+      label: "Аксессуары жен",
+      ids: [],
+      names: ["Аксессуары жен", "Аксессуары"],
+    },
   ],
 };
 
@@ -126,7 +136,8 @@ function findCanonical(defs, categoryId) {
 export function normalizeCategoryId(categoryId, gender) {
   if (!categoryId || !gender || !CATEGORY_RULES[gender]) return categoryId;
   const canonical = findCanonical(CATEGORY_RULES[gender], categoryId);
-  return canonical ? canonical.ids[0] : categoryId;
+  if (!canonical || !canonical.ids[0]) return categoryId;
+  return canonical.ids[0];
 }
 
 export function getFormCategories(allCategories, gender) {
@@ -148,7 +159,9 @@ export function getFormCategories(allCategories, gender) {
       if (byRuleId) return { ...byId.get(byRuleId), name: def.label };
 
       const byRuleName = all.find(
-        (c) => c.gender === gender && def.names.includes(c.name),
+        (c) =>
+          def.names.includes(c.name) &&
+          (c.gender === gender || c.gender === "unisex"),
       );
       if (byRuleName) return { ...byRuleName, name: def.label };
       return null;

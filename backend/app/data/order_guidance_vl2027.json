@@ -1928,9 +1928,138 @@
       }
     },
     {
-      "key": "accessories",
-      "name": "Аксессуары",
-      "gender": "unisex",
+      "key": "accessories_men",
+      "name": "Аксессуары муж",
+      "gender": "men",
+      "moy_sklad_id": "82adf299-8e8b-11e9-9ff4-31500007fc47",
+      "order_amount_eur": 1223.2,
+      "comment": "Остатки: 145 шт (66;79) 66-ВЛ2026; 79-старые. Усилить: 39-42 (16;6), 43-46 (16;5). Ослабить: 90 (0;15), 95 (4;14).",
+      "reinforce_sizes": [
+        "39-42",
+        "43-46"
+      ],
+      "weaken_sizes": [
+        "90",
+        "95"
+      ],
+      "stock_totals": {
+        "total": 145,
+        "fresh_vl26": 66,
+        "old": 79
+      },
+      "size_summary_rows": [
+        {
+          "size": "39-42",
+          "received_total": 64,
+          "sold_total": 42,
+          "stock_total": 22
+        },
+        {
+          "size": "43-46",
+          "received_total": 60,
+          "sold_total": 39,
+          "stock_total": 21
+        },
+        {
+          "size": "46",
+          "received_total": 0,
+          "sold_total": 0,
+          "stock_total": 1
+        },
+        {
+          "size": "48",
+          "received_total": 0,
+          "sold_total": 0,
+          "stock_total": 1
+        },
+        {
+          "size": "90",
+          "received_total": 17,
+          "sold_total": 2,
+          "stock_total": 15
+        },
+        {
+          "size": "95",
+          "received_total": 23,
+          "sold_total": 5,
+          "stock_total": 18
+        },
+        {
+          "size": "100",
+          "received_total": 24,
+          "sold_total": 9,
+          "stock_total": 15
+        },
+        {
+          "size": "105",
+          "received_total": 24,
+          "sold_total": 7,
+          "stock_total": 17
+        },
+        {
+          "size": "110",
+          "received_total": 24,
+          "sold_total": 9,
+          "stock_total": 15
+        },
+        {
+          "size": "115",
+          "received_total": 14,
+          "sold_total": 6,
+          "stock_total": 8
+        },
+        {
+          "size": "120",
+          "received_total": 10,
+          "sold_total": 1,
+          "stock_total": 9
+        },
+        {
+          "size": "S",
+          "received_total": 0,
+          "sold_total": 0,
+          "stock_total": 3
+        }
+      ],
+      "size_sales_chart": {
+        "period": {
+          "from": "2025-02-01",
+          "to": "2026-07-29"
+        },
+        "axis_x": "size_asc",
+        "axis_y": "sellQuantity_pcs",
+        "seasons": [
+          "ВЛ2026",
+          "ВЛ2025"
+        ],
+        "labels": [
+          "39-42",
+          "43-46",
+          "90",
+          "95",
+          "100",
+          "105",
+          "110",
+          "115",
+          "120"
+        ],
+        "sellQuantity": [
+          42,
+          39,
+          2,
+          5,
+          9,
+          7,
+          9,
+          6,
+          1
+        ]
+      }
+    },
+    {
+      "key": "accessories_women",
+      "name": "Аксессуары жен",
+      "gender": "women",
       "moy_sklad_id": "82adf299-8e8b-11e9-9ff4-31500007fc47",
       "order_amount_eur": 1223.2,
       "comment": "Остатки: 145 шт (66;79) 66-ВЛ2026; 79-старые. Усилить: 39-42 (16;6), 43-46 (16;5). Ослабить: 90 (0;15), 95 (4;14).",

@@ -111,8 +111,10 @@ _CANONICAL_CATEGORY_DISPLAY = {
     "65dca14b-8bfd-11f1-0a80-0fbf000a6721": ("Платья жен", "women"),
     "26114fa1-a495-11e9-9ff4-3150000fa9a1": ("Юбки жен", "women"),
     "79419e87-9e44-11e9-9ff4-31500007d6fe": ("Обувь жен", "women"),
-    "82adf299-8e8b-11e9-9ff4-31500007fc47": ("Аксессуары", "unisex"),
+    "82adf299-8e8b-11e9-9ff4-31500007fc47": ("Аксессуары муж", "men"),
 }
+
+_ACCESSORIES_MS_ID = "82adf299-8e8b-11e9-9ff4-31500007fc47"
 
 
 def _money(value: Decimal | int | float | None) -> Decimal:
@@ -125,6 +127,34 @@ def _canonical_ms_id(ms_id: str | None) -> str | None:
     if not ms_id:
         return ms_id
     return _CATEGORY_ALIAS_TO_CANONICAL_MS_ID.get(ms_id, ms_id)
+
+
+def _guidance_folder_ms_id(category: Category) -> str | None:
+    """Папка МС для подсказок по остаткам. Женские аксессуары делят корневую папку с мужскими."""
+    ms_id = _canonical_ms_id(category.moy_sklad_id)
+    if ms_id:
+        return ms_id
+    name = (category.name or "").casefold()
+    if name.startswith("аксессуар"):
+        return _ACCESSORIES_MS_ID
+    return None
+
+
+def _guidance_category_for(
+    payload: dict, folder_ms_id: str | None, gender: str | None
+) -> dict | None:
+    if not folder_ms_id:
+        return None
+    fallback: dict | None = None
+    for cat in payload.get("categories") or []:
+        if _canonical_ms_id(cat.get("moy_sklad_id")) != folder_ms_id:
+            continue
+        cat_gender = cat.get("gender")
+        if cat_gender == gender:
+            return cat
+        if cat_gender in (None, "unisex") and fallback is None:
+            fallback = cat
+    return fallback
 
 
 def _category_out(category: Category) -> CategoryOut:
@@ -156,7 +186,8 @@ def _normalize_categories(rows: list[Category]) -> list[CategoryOut]:
             normalized[ms_id] = row
 
     ordered = sorted(normalized.values(), key=lambda r: (r.sort_order, r.name))
-    return [_category_out(row) for row in ordered] + passthrough
+    result = [_category_out(row) for row in ordered] + passthrough
+    return sorted(result, key=lambda c: (c.sort_order, c.name))
 
 
 def _to_rub(amount_eur: Decimal | None, rate: Decimal | None) -> Decimal | None:
@@ -1752,6 +1783,7 @@ def get_category_order_insight(
         canonical_ms_id, (category.name, category.gender)
     )
     related_ids = _category_ids_for_canonical_ms(db, canonical_ms_id, category.id)
+    guidance_ms_id = _guidance_folder_ms_id(category)
 
     brand_rows = db.execute(
         select(
@@ -1789,19 +1821,18 @@ def get_category_order_insight(
     remaining_eur: Decimal | None = None
     try:
         payload = _load_order_guidance()
-        for cat in payload.get("categories") or []:
-            if _canonical_ms_id(cat.get("moy_sklad_id")) == canonical_ms_id:
-                guidance_out = OrderGuidanceCategoryOut.model_validate(cat)
-                budget_eur = _money(guidance_out.order_amount_eur)
-                remaining_eur = _money(budget_eur - ordered_eur)
-                break
+        cat = _guidance_category_for(payload, guidance_ms_id, category.gender)
+        if cat:
+            guidance_out = OrderGuidanceCategoryOut.model_validate(cat)
+            budget_eur = _money(guidance_out.order_amount_eur)
+            remaining_eur = _money(budget_eur - ordered_eur)
     except (FileNotFoundError, json.JSONDecodeError, OSError, ValueError):
         log.exception("category-order-insight guidance load failed")
 
     return CategoryOrderInsightOut(
         category_id=category.id,
         category_name=display_name,
-        moy_sklad_id=canonical_ms_id,
+        moy_sklad_id=guidance_ms_id,
         season_id=season.id,
         budget_eur=budget_eur,
         ordered_eur=ordered_eur,
