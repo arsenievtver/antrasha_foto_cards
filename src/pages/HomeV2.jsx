@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { fetchActiveHeroBanners } from "../api/client.js";
+import { fetchActiveHeroBanners, fetchActivePromoBanner } from "../api/client.js";
 import { useAuth } from "../context/AuthContext";
+import PromoBannerModal from "../components/PromoBannerModal.jsx";
 import UserMenu from "../components/UserMenu";
 import { isPushSubscribedLocally } from "../push/notifications.js";
 import AccentBlocks from "../components/home-v2/AccentBlocks";
@@ -20,6 +21,8 @@ export default function HomeV2() {
 	const navigate = useNavigate();
 	const { profile } = useAuth();
 	const [heroes, setHeroes] = useState([HOME_V2_DEFAULT_HERO]);
+	const [promoBanner, setPromoBanner] = useState(null);
+	const [promoDismissed, setPromoDismissed] = useState(false);
 	const [userOpen, setUserOpen] = useState(false);
 	const [notifyOpen, setNotifyOpen] = useState(false);
 	const [leadOpen, setLeadOpen] = useState(false);
@@ -42,6 +45,21 @@ export default function HomeV2() {
 				}
 			} catch {
 				if (!cancelled) setHeroes([HOME_V2_DEFAULT_HERO]);
+			}
+		})();
+		return () => {
+			cancelled = true;
+		};
+	}, []);
+
+	useEffect(() => {
+		let cancelled = false;
+		(async () => {
+			try {
+				const data = await fetchActivePromoBanner();
+				if (!cancelled) setPromoBanner(data.banner ?? null);
+			} catch {
+				/* сеть — главная без попапа */
 			}
 		})();
 		return () => {
@@ -109,6 +127,13 @@ export default function HomeV2() {
 			</div>
 
 			<PwaInstallPrompt onInstalled={onPwaInstalled} />
+
+			{promoBanner && !promoDismissed ? (
+				<PromoBannerModal
+					banner={promoBanner}
+					onClose={() => setPromoDismissed(true)}
+				/>
+			) : null}
 
 			<UserMenu
 				hideTrigger

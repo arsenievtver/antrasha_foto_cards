@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<title>Потеряшки после SMS: кто купил</title>
+<style>
+  @page { size: A4; margin: 14mm 14mm 16mm 14mm; }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    color: #1a1a1a;
+    font-size: 11px;
+    line-height: 1.4;
+    background: #fff;
+  }
+  h1 { font-size: 20px; font-weight: 650; margin: 0 0 4px; letter-spacing: -0.02em; }
+  h2 { font-size: 13px; font-weight: 650; margin: 18px 0 8px; }
+  .sub { color: #5c5c5c; font-size: 11px; margin-bottom: 14px; }
+  .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 12px 0 14px; }
+  .kpi {
+    border: 1px solid #e4e4e4;
+    padding: 10px 12px 9px;
+  }
+  .kpi .v { font-size: 18px; font-weight: 650; letter-spacing: -0.03em; }
+  .kpi .l { color: #5c5c5c; font-size: 10px; margin-top: 2px; }
+  .note {
+    border: 1px solid #e4e4e4;
+    background: #f7f7f7;
+    padding: 9px 12px;
+    color: #333;
+    margin-bottom: 6px;
+  }
+  .note b { display: block; margin-bottom: 3px; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 4px 6px; border-bottom: 1px solid #ececec; vertical-align: top; }
+  th { font-size: 10px; color: #5c5c5c; font-weight: 600; text-transform: none; border-bottom: 1px solid #ccc; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td.ctr, th.ctr { text-align: center; }
+  tbody tr:nth-child(even) { background: #fafafa; }
+  tr.warn td { color: #6b5a00; }
+  .charts { display: grid; grid-template-columns: 1.35fr 0.65fr; gap: 16px; align-items: start; margin-top: 4px; }
+  .bar-row { display: grid; grid-template-columns: 72px 1fr 78px; gap: 8px; align-items: center; margin: 6px 0; }
+  .bar-track { height: 10px; background: #eee; }
+  .bar-fill { height: 10px; background: #1a1a1a; }
+  .muted { color: #5c5c5c; font-size: 10px; }
+  .day-chart { margin-top: 4px; }
+  .cols { display: flex; align-items: flex-end; gap: 3px; height: 88px; }
+  .col { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; height: 88px; }
+  .col .s { background: #d8d8d8; width: 100%; }
+  .col .l { background: #1a1a1a; width: 100%; margin-top: 1px; }
+  .day-labels { display: flex; gap: 3px; margin-top: 4px; }
+  .day-labels span { flex: 1; font-size: 7.5px; color: #5c5c5c; text-align: center; transform: rotate(-45deg); transform-origin: top center; height: 22px; }
+  .legend { display: flex; gap: 14px; font-size: 10px; color: #5c5c5c; margin: 6px 0 0; }
+  .sw { display: inline-block; width: 9px; height: 9px; margin-right: 5px; vertical-align: -1px; }
+  .footer { margin-top: 10px; color: #888; font-size: 9px; }
+  .page-break { page-break-before: always; }
+  .name-note { color: #5c5c5c; font-size: 9px; }
+</style>
+</head>
+<body>
+  <h1>Потеряшки после SMS: кто купил</h1>
+  <div class="sub">Розница МойСклад 31.07–17.08.2026 · телефоны чеков vs вкладка «Все с телефоном» (1 685 номеров)</div>
+
+  <div class="kpis">
+    <div class="kpi"><div class="v">29</div><div class="l">человек из списка</div></div>
+    <div class="kpi"><div class="v">785 294,50 ₽</div><div class="l">выручка нетто</div></div>
+    <div class="kpi"><div class="v">1,7%</div><div class="l">конверсия списка</div></div>
+    <div class="kpi"><div class="v">46,4%</div><div class="l">доля выручки магазина</div></div>
+  </div>
+
+  <div class="note">
+    <b>Как считали</b>
+    Проведённые розничные продажи с 31.07 по 17.08, телефон клиента нормализован и сверен со столбцом «Телефон».
+    Совпали 34 чека / 29 человек. Один чек (Грэй Яна, 6 137 ₽) полностью вернули в тот же день — в нетто 0.
+    Отгрузок оптом за период не было. Это совпадение списка и покупок, не доказательство, что пришли именно из-за SMS.
+  </div>
+
+  <div class="charts">
+    <div>
+      <h2>Выручка потеряшек по сегменту</h2>
+      <div class="bar-row"><div>VIP · 13 чел.</div><div class="bar-track"><div class="bar-fill" style="width:100%"></div></div><div class="num">503 385 ₽</div></div>
+      <div class="bar-row"><div>Обычные · 13</div><div class="bar-track"><div class="bar-fill" style="width:37.4%"></div></div><div class="num">188 150 ₽</div></div>
+      <div class="bar-row"><div>Слабые · 3</div><div class="bar-track"><div class="bar-fill" style="width:18.6%"></div></div><div class="num">93 760 ₽</div></div>
+      <div class="muted">Нетто = сумма чеков минус возврат Грэй. 13 VIP дали 64% нетто потеряшек.</div>
+    </div>
+    <div>
+      <h2>Магазин за период</h2>
+      <table>
+        <tr><td>Чеков всего</td><td class="num">74</td></tr>
+        <tr><td>Нетто магазина</td><td class="num">1 692 367 ₽</td></tr>
+        <tr><td>Нетто потеряшек</td><td class="num">785 295 ₽</td></tr>
+        <tr><td>Чеков потеряшек</td><td class="num">34</td></tr>
+        <tr><td>Средний чек потеряшек</td><td class="num">23 277 ₽</td></tr>
+        <tr><td>Средний чек магазина</td><td class="num">23 184 ₽</td></tr>
+        <tr><td>Возвраты потеряшек</td><td class="num">6 137 ₽</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <h2>Конверсия списка</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Группа</th><th class="num">В списке</th><th class="num">Вернулись</th><th class="num">Конверсия</th><th class="num">Нетто, ₽</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>Все с телефоном</td><td class="num">1 685</td><td class="num">29</td><td class="num">1,7%</td><td class="num">785 295</td></tr>
+      <tr><td>VIP</td><td class="num">295</td><td class="num">13</td><td class="num">4,4%</td><td class="num">503 385</td></tr>
+      <tr><td>Обычные</td><td class="num">696</td><td class="num">13</td><td class="num">1,9%</td><td class="num">188 150</td></tr>
+      <tr><td>Слабые</td><td class="num">694</td><td class="num">3</td><td class="num">0,4%</td><td class="num">93 760</td></tr>
+      <tr><td>Ж</td><td class="num">942</td><td class="num">21</td><td class="num">2,2%</td><td class="num">543 767</td></tr>
+      <tr><td>М</td><td class="num">629</td><td class="num">7</td><td class="num">1,1%</td><td class="num">214 848</td></tr>
+      <tr><td>Пол ?</td><td class="num">114</td><td class="num">1</td><td class="num">0,9%</td><td class="num">26 680</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Выручка по дням: магазин и потеряшки (тыс. ₽, брутто)</h2>
+  <div class="day-chart">
+    <div class="cols" id="cols"></div>
+    <div class="day-labels" id="labs"></div>
+    <div class="legend">
+      <span><span class="sw" style="background:#d8d8d8"></span>Магазин</span>
+      <span><span class="sw" style="background:#1a1a1a"></span>Потеряшки</span>
+    </div>
+  </div>
+  <div class="muted">03.08 продаж не было. Пики потеряшек: 04.08 (Юзепчук) и 08.08 (6 человек).</div>
+
+  <div class="page-break"></div>
+  <h1>Кто вернулся</h1>
+  <div class="sub">Сортировка по нетто. «Последняя до SMS» — дата из файла рассылки (срез 22.07.2026).</div>
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Клиент</th>
+        <th>Телефон</th>
+        <th class="ctr">Пол</th>
+        <th>Сегмент</th>
+        <th>Последняя до SMS</th>
+        <th class="num">Чеков</th>
+        <th class="num">Нетто, ₽</th>
+      </tr>
+    </thead>
+    <tbody id="people"></tbody>
+  </table>
+  <div class="footer">Источник: МойСклад, розничные продажи 31.07–17.08.2026 · список «Потеряшки_рассылка 2.xlsx», вкладка «Все с телефоном»</div>
+
+<script>
+const DAYS = [
+  ["31.07", 148131.5, 96456.5],
+  ["01.08", 140065, 14490],
+  ["02.08", 161898, 11815],
+  ["04.08", 176580, 162360],
+  ["05.08", 29820, 7170],
+  ["06.08", 77600, 26680],
+  ["07.08", 46590, 18800],
+  ["08.08", 190777, 167827],
+  ["09.08", 81797, 6137],
+  ["10.08", 222838, 59110],
+  ["11.08", 6950, 0],
+  ["12.08", 29741, 25520],
+  ["13.08", 37385, 37385],
+  ["14.08", 71060, 40340],
+  ["15.08", 157280, 70140],
+  ["16.08", 28360, 3000],
+  ["17.08", 108721, 44201],
+];
+const max = Math.max(...DAYS.map(d => d[1]));
+const cols = document.getElementById("cols");
+const labs = document.getElementById("labs");
+DAYS.forEach(([lab, store, lost]) => {
+  const wrap = document.createElement("div");
+  wrap.className = "col";
+  const s = document.createElement("div");
+  s.className = "s";
+  s.style.height = Math.max(1, (store / max) * 88) + "px";
+  const l = document.createElement("div");
+  l.className = "l";
+  l.style.height = Math.max(lost ? 1 : 0, (lost / max) * 88) + "px";
+  wrap.appendChild(s);
+  wrap.appendChild(l);
+  cols.appendChild(wrap);
+  const sp = document.createElement("span");
+  sp.textContent = lab;
+  labs.appendChild(sp);
+});
+
+const CLIENTS = [
+  ["Юзепчук Любовь Юрьевна", "+79106404900", "Ж", "VIP", "10.05.2025", 1, "142 480"],
+  ["Андреев Илья Юрьевич", "+79520896368", "М", "VIP", "06.12.2025", 1, "83 247"],
+  ["Богатырев Роман Александрович", "+79106475823", "М", "VIP", "11.08.2024", 2, "71 730"],
+  ["Косарева Ирина", "+79201754964", "Ж", "VIP", "03.03.2023", 1, "59 110"],
+  ["миколенко светлана", "+79036957348", "Ж", "Обычные", "20.12.2020", 2, "54 050"],
+  ["марина", "+79301708220", "Ж", "Слабые", "15.08.2021", 1, "46 760"],
+  ["Карина", "+79201530027", "Ж", "Слабые", "16.11.2022", 1, "39 980"],
+  ["Федулова", "+79128139594", "?", "VIP", "03.07.2022", 2, "26 680"],
+  ["Гончарова Анастасия Игоревна", "+79206820556", "Ж", "Обычные", "02.12.2024", 1, "25 935"],
+  ["Яковлева Александра Михайловна", "+79157166097", "Ж", "Обычные", "21.06.2022", 1, "25 520"],
+  ["Петрова Татьяна Николаевна", "+79108471763", "Ж", "VIP", "16.12.2024", 2, "24 726,50"],
+  ["Жукова Юлия Александровна", "+79201617049", "Ж", "VIP", "02.05.2025", 1, "23 940"],
+  ["Рогозин Сергей Николаевич", "+79108300028", "М", "VIP", "22.12.2022", 2, "21 780"],
+  ["Ильясова Ольга", "+79778590817", "Ж", "Обычные", "02.03.2024", 1, "20 600"],
+  ["Овсянников Николай", "+79106485440", "М", "VIP", "20.10.2024", 1, "18 800"],
+  ["Кунарева Галина Юрьевна", "+79106484974", "Ж", "VIP", "23.05.2025", 1, "16 400"],
+  ["Людмила", "+79108432712", "Ж", "Обычные", "18.08.2024", 1, "15 420"],
+  ["исса мария", "+79201578570", "Ж", "Обычные", "23.05.2021", 1, "11 815"],
+  ["кудинов сергей викторович", "+79107772275", "М", "Обычные", "30.07.2021", 1, "9 800"],
+  ["Галина", "+79206953436", "Ж", "Обычные", "07.05.2023", 1, "7 470"],
+  ["Морозова Юлия Владимировна", "+79670439915", "Ж", "Слабые", "16.08.2025", 1, "7 020"],
+  ["Полуйко Ирина Юрьевна", "+79106484170", "Ж", "Обычные", "21.04.2025", 1, "6 560"],
+  ["Анастасова Наталья Игоревна", "+79206936534", "Ж", "Обычные", "06.12.2025", 1, "6 450"],
+  ["Исаев Руслан Могамедович", "+79201948007", "М", "VIP", "14.07.2025", 1, "5 270"],
+  ["Аваева Юлия", "+79037501215", "Ж", "VIP", "19.10.2024", 1, "5 000"],
+  ["Крупенин Александр Владиславович", "+79622444444", "М", "VIP", "14.08.2025", 1, "4 221"],
+  ["Пичугина Наталья Алексеевна", "+79108335918", "Ж", "Обычные", "23.07.2025", 1, "3 000"],
+  ["Муравьева Светлана Владиславовна", "+79051282800", "Ж", "Обычные", "20.12.2025", 1, "1 530"],
+  ["Грэй Яна", "+79038025756", "Ж", "Обычные", "24.04.2021", 1, "0", "чек 6 137 ₽ и возврат в тот же день"],
+];
+const tb = document.getElementById("people");
+CLIENTS.forEach((c, i) => {
+  const tr = document.createElement("tr");
+  if (c[6] === "0") tr.className = "warn";
+  const name = c[7] ? c[0] + `<div class="name-note">${c[7]}</div>` : c[0];
+  tr.innerHTML = `<td class="num">${i+1}</td><td>${name}</td><td>${c[1]}</td><td class="ctr">${c[2]}</td><td>${c[3]}</td><td>${c[4]}</td><td class="num">${c[5]}</td><td class="num">${c[6]}</td>`;
+  tb.appendChild(tr);
+});
+</script>
+</body>
+</html>
