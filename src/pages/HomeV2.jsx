@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { fetchActiveHeroBanners, fetchActivePromoBanner } from "../api/client.js";
+import { wasPromoBannerSeenThisSession } from "../utils/promoBannerSession.js";
 import { useAuth } from "../context/AuthContext";
 import PromoBannerModal from "../components/PromoBannerModal.jsx";
 import UserMenu from "../components/UserMenu";
@@ -57,7 +58,14 @@ export default function HomeV2() {
 		(async () => {
 			try {
 				const data = await fetchActivePromoBanner();
-				if (!cancelled) setPromoBanner(data.banner ?? null);
+				const banner = data.banner ?? null;
+				if (!cancelled) {
+					setPromoBanner(
+						banner && !wasPromoBannerSeenThisSession(banner.id)
+							? banner
+							: null,
+					);
+				}
 			} catch {
 				/* сеть — главная без попапа */
 			}

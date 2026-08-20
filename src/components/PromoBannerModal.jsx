@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { useEffect, useRef } from "react";
 import { markPromoBannerSeen } from "../api/client.js";
+import { markPromoBannerSeenThisSession } from "../utils/promoBannerSession.js";
 import "./PromoBannerModal.css";
 
 /**
@@ -59,6 +60,7 @@ export default function PromoBannerModal({ banner, onClose }) {
 	useEffect(() => {
 		if (!banner || seenSent.current) return;
 		seenSent.current = true;
+		markPromoBannerSeenThisSession(banner.id);
 		markPromoBannerSeen(banner.id).catch(() => {});
 	}, [banner]);
 

@@ -10,7 +10,7 @@ import {
 const DISPLAY_MODES = [
   { value: "once", label: "Один раз" },
   { value: "twice", label: "Два раза" },
-  { value: "every_visit", label: "При каждом заходе на главную" },
+  { value: "every_visit", label: "Повторно, не чаще чем раз в 2 часа" },
 ];
 
 function toDatetimeLocal(iso) {

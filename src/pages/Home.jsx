@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { MaleShape, FemaleShape } from "../components/DiagonalCards";
 import PromoBannerModal from "../components/PromoBannerModal.jsx";
 import { ensureSessionId, fetchActivePromoBanner } from "../api/client.js";
+import { wasPromoBannerSeenThisSession } from "../utils/promoBannerSession.js";
 import logo from "../assets/image/лого А на черном-cropped.svg";
 import "./Home.css"
 import menImage from "../assets/image/2m.webp";
@@ -20,7 +21,12 @@ export default function Home() {
       try {
         await ensureSessionId();
         const data = await fetchActivePromoBanner();
-        if (!cancelled) setPromoBanner(data.banner ?? null);
+        const banner = data.banner ?? null;
+        if (!cancelled) {
+          setPromoBanner(
+            banner && !wasPromoBannerSeenThisSession(banner.id) ? banner : null,
+          );
+        }
       } catch {
         /* сеть — главная без баннера */
       }

@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.promo_banner import PromoBanner, PromoBannerDisplayMode, PromoBannerImpression
+
+# «every_visit» — не при каждом mount главной, а не чаще чем раз в N часов
+EVERY_VISIT_COOLDOWN = timedelta(hours=2)
 
 
 def _utcnow() -> datetime:
@@ -21,6 +24,14 @@ def _banner_in_schedule(banner: PromoBanner, now: datetime) -> bool:
     return True
 
 
+def _as_utc(dt: datetime | None) -> datetime | None:
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
 def _should_show(banner: PromoBanner, impression: PromoBannerImpression | None) -> bool:
     if not banner.is_active:
         return False
@@ -29,7 +40,10 @@ def _should_show(banner: PromoBanner, impression: PromoBannerImpression | None) 
         return False
     view_count = impression.view_count if impression else 0
     if banner.display_mode == PromoBannerDisplayMode.every_visit:
-        return True
+        last = _as_utc(impression.last_seen_at) if impression else None
+        if last is None:
+            return True
+        return (now - last) >= EVERY_VISIT_COOLDOWN
     if banner.display_mode == PromoBannerDisplayMode.once:
         return view_count < 1
     if banner.display_mode == PromoBannerDisplayMode.twice:
@@ -105,8 +119,6 @@ def record_banner_seen(
     session_id: uuid.UUID,
     user_id: uuid.UUID | None,
 ) -> None:
-    if banner.display_mode == PromoBannerDisplayMode.every_visit:
-        return
     row = get_or_create_impression(db, banner.id, session_id, user_id)
     row.view_count += 1
     row.last_seen_at = _utcnow()
