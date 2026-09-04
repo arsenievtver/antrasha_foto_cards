@@ -5,6 +5,7 @@ import {
   fetchBrandOrders,
   fetchProcurementRefs,
   fetchShipments,
+  updateShipment,
 } from "../api.js";
 import { dateRu, eur, kg, num, rate as fmtRate, rub } from "../utils/money.js";
 
@@ -21,6 +22,9 @@ const EMPTY_FORM = {
   weight_kg: "",
   eur_rub_rate: "",
   comment: "",
+  logistics_amount_rub: "",
+  logistics_paid_on: "",
+  is_delivered: true,
 };
 
 export default function Shipments() {
@@ -32,6 +36,7 @@ export default function Shipments() {
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [toggleId, setToggleId] = useState(null);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -98,6 +103,9 @@ export default function Shipments() {
         weight_kg: form.weight_kg || null,
         eur_rub_rate: form.eur_rub_rate || null,
         comment: form.comment.trim() || null,
+        logistics_amount_rub: form.logistics_amount_rub || null,
+        logistics_paid_on: form.logistics_paid_on || null,
+        is_delivered: form.is_delivered,
       });
       setForm({
         ...EMPTY_FORM,
@@ -110,6 +118,19 @@ export default function Shipments() {
       setErr(e.message);
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function onToggleDelivered(row) {
+    setToggleId(row.id);
+    setErr("");
+    try {
+      await updateShipment(row.id, { is_delivered: !row.is_delivered });
+      await reload();
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setToggleId(null);
     }
   }
 
@@ -135,8 +156,9 @@ export default function Shipments() {
     <div>
       <h2 style={{ marginTop: 0 }}>Поставки</h2>
       <p style={{ color: "var(--muted)", maxWidth: 760 }}>
-        Что и когда бренд реально отгрузил: сумма в евро и вес. Привязка к заказу
-        показывает, сколько по нему осталось поставить.
+        Что и когда бренд отгрузил: сумма в евро и вес. Логистика (рубли и дата оплаты) хранится
+        здесь отдельно от оплат бренду. Пока поставка «в пути», она не уменьшает «осталось
+        поставить» по заказу.
       </p>
 
       {err ? <p className="error">{err}</p> : null}
@@ -239,6 +261,52 @@ export default function Shipments() {
             </label>
           </div>
 
+          <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "flex-end" }}>
+            <label style={{ flex: "1 1 150px" }}>
+              Сумма логистики, ₽
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={form.logistics_amount_rub}
+                onChange={(e) => set("logistics_amount_rub", e.target.value)}
+              />
+            </label>
+            <label style={{ flex: "1 1 150px" }}>
+              Дата оплаты логистики
+              <input
+                type="date"
+                value={form.logistics_paid_on}
+                onChange={(e) => set("logistics_paid_on", e.target.value)}
+              />
+            </label>
+            <div style={{ flex: "1 1 180px", paddingBottom: "0.35rem" }}>
+              <span
+                style={{
+                  display: "block",
+                  fontSize: "0.85rem",
+                  color: "var(--muted)",
+                  marginBottom: "0.35rem",
+                }}
+              >
+                Статус
+              </span>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <button
+                  type="button"
+                  className="switch-toggle"
+                  role="switch"
+                  aria-checked={form.is_delivered}
+                  aria-label={form.is_delivered ? "Поставлено" : "В пути"}
+                  onClick={() => set("is_delivered", !form.is_delivered)}
+                >
+                  <span className="switch-thumb" aria-hidden />
+                </button>
+                <span>{form.is_delivered ? "Поставлено" : "В пути"}</span>
+              </div>
+            </div>
+          </div>
+
           <label>
             Комментарий
             <input
@@ -305,6 +373,9 @@ export default function Shipments() {
                 <th>Вес</th>
                 <th>Курс</th>
                 <th>В рублях</th>
+                <th>Логистика</th>
+                <th>Оплата лог.</th>
+                <th>Статус</th>
                 <th>Заказ</th>
                 <th>Комментарий</th>
                 <th />
@@ -320,6 +391,26 @@ export default function Shipments() {
                   <td>{kg(row.weight_kg)}</td>
                   <td>{fmtRate(row.eur_rub_rate)}</td>
                   <td>{rub(row.amount_rub)}</td>
+                  <td>{rub(row.logistics_amount_rub)}</td>
+                  <td>{row.logistics_paid_on ? dateRu(row.logistics_paid_on) : "—"}</td>
+                  <td>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                      <button
+                        type="button"
+                        className="switch-toggle"
+                        role="switch"
+                        aria-checked={row.is_delivered}
+                        aria-label={row.is_delivered ? "Поставлено" : "В пути"}
+                        disabled={toggleId === row.id}
+                        onClick={() => onToggleDelivered(row)}
+                      >
+                        <span className="switch-thumb" aria-hidden />
+                      </button>
+                      <span style={{ fontSize: "0.85rem" }}>
+                        {row.is_delivered ? "Поставлено" : "В пути"}
+                      </span>
+                    </div>
+                  </td>
                   <td>{row.order_id ? "Привязана" : "—"}</td>
                   <td>{row.comment || "—"}</td>
                   <td>

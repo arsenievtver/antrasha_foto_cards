@@ -257,6 +257,9 @@ class ShipmentOut(BaseModel):
     eur_rub_rate: Decimal | None = None
     amount_rub: Decimal | None = None
     comment: str | None = None
+    logistics_amount_rub: Decimal | None = None
+    logistics_paid_on: date | None = None
+    is_delivered: bool = True
     created_at: datetime
 
 
@@ -274,6 +277,9 @@ class ShipmentCreateRequest(BaseModel):
     weight_kg: Decimal | None = Field(default=None, ge=0)
     eur_rub_rate: Decimal | None = Field(default=None, gt=0)
     comment: str | None = None
+    logistics_amount_rub: Decimal | None = Field(default=None, ge=0)
+    logistics_paid_on: date | None = None
+    is_delivered: bool = True
 
 
 class ShipmentUpdateRequest(BaseModel):
@@ -285,6 +291,9 @@ class ShipmentUpdateRequest(BaseModel):
     weight_kg: Decimal | None = Field(default=None, ge=0)
     eur_rub_rate: Decimal | None = Field(default=None, gt=0)
     comment: str | None = None
+    logistics_amount_rub: Decimal | None = Field(default=None, ge=0)
+    logistics_paid_on: date | None = None
+    is_delivered: bool | None = None
     clear_order: bool = False
 
 

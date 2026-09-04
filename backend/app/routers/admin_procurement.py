@@ -90,6 +90,8 @@ router = APIRouter(prefix="/admin", tags=["admin-procurement"])
 
 ZERO = Decimal("0")
 _CENTS = Decimal("0.01")
+# В «осталось поставить» и shipped_eur — только доставленные поставки.
+_SHIPMENT_DELIVERED = Shipment.is_delivered.is_(True)
 
 _CATEGORY_ALIAS_TO_CANONICAL_MS_ID = {
     "463e7bec-34dd-11f1-0a80-148d00118078": "79292943-9e44-11e9-9ff4-31500007d6f3",
@@ -635,7 +637,7 @@ def _order_facts(
         oid: Decimal(total or 0)
         for oid, total in db.execute(
             select(Shipment.order_id, func.sum(Shipment.amount_eur))
-            .where(Shipment.order_id.in_(order_ids))
+            .where(Shipment.order_id.in_(order_ids), _SHIPMENT_DELIVERED)
             .group_by(Shipment.order_id)
         ).all()
     }
@@ -1111,6 +1113,9 @@ def _shipment_out(row: Shipment) -> ShipmentOut:
         eur_rub_rate=row.eur_rub_rate,
         amount_rub=row.amount_rub,
         comment=row.comment,
+        logistics_amount_rub=row.logistics_amount_rub,
+        logistics_paid_on=row.logistics_paid_on,
+        is_delivered=bool(row.is_delivered),
         created_at=row.created_at,
     )
 
@@ -1199,6 +1204,13 @@ def create_shipment(
         eur_rub_rate=rate,
         amount_rub=_to_rub(body.amount_eur, rate),
         comment=body.comment.strip() if body.comment else None,
+        logistics_amount_rub=(
+            _money(body.logistics_amount_rub)
+            if body.logistics_amount_rub is not None
+            else None
+        ),
+        logistics_paid_on=body.logistics_paid_on,
+        is_delivered=body.is_delivered,
     )
     db.add(row)
     db.commit()
@@ -1240,6 +1252,12 @@ def update_shipment(
         row.eur_rub_rate = body.eur_rub_rate
     if body.comment is not None:
         row.comment = body.comment.strip() if body.comment else None
+    if body.logistics_amount_rub is not None:
+        row.logistics_amount_rub = _money(body.logistics_amount_rub)
+    if body.logistics_paid_on is not None:
+        row.logistics_paid_on = body.logistics_paid_on
+    if body.is_delivered is not None:
+        row.is_delivered = body.is_delivered
 
     if row.order_id:
         _assert_order_matches(_get_order(db, row.order_id), row.season_id, row.brand_id)
@@ -1472,7 +1490,9 @@ def _build_season_dashboard(db: Session, season: Season) -> SeasonDashboardOut:
     )
     shipped_eur = _money(
         db.scalar(
-            select(func.sum(Shipment.amount_eur)).where(Shipment.season_id == season.id)
+            select(func.sum(Shipment.amount_eur)).where(
+                Shipment.season_id == season.id, _SHIPMENT_DELIVERED
+            )
         )
     )
 
@@ -1732,7 +1752,11 @@ def list_brand_stats(
     _ = _su
     order_filter = [BrandOrder.season_id == season_id] if season_id else []
     payment_filter = [Payment.season_id == season_id] if season_id else []
-    shipment_filter = [Shipment.season_id == season_id] if season_id else []
+    shipment_filter = (
+        [Shipment.season_id == season_id, _SHIPMENT_DELIVERED]
+        if season_id
+        else [_SHIPMENT_DELIVERED]
+    )
 
     orders_eur = _sum_by_brand(db, BrandOrder.amount_eur, BrandOrder, *order_filter)
     counts_stmt = select(BrandOrder.brand_id, func.count()).group_by(BrandOrder.brand_id)
@@ -1813,12 +1837,16 @@ def get_brand_procurement_stats(
     )
     shipped_total = _money(
         db.scalar(
-            select(func.sum(Shipment.amount_eur)).where(Shipment.brand_id == brand_id)
+            select(func.sum(Shipment.amount_eur)).where(
+                Shipment.brand_id == brand_id, _SHIPMENT_DELIVERED
+            )
         )
     )
     shipped_kg = _money(
         db.scalar(
-            select(func.sum(Shipment.weight_kg)).where(Shipment.brand_id == brand_id)
+            select(func.sum(Shipment.weight_kg)).where(
+                Shipment.brand_id == brand_id, _SHIPMENT_DELIVERED
+            )
         )
     )
 
@@ -1834,7 +1862,7 @@ def get_brand_procurement_stats(
         sid: Decimal(total or 0)
         for sid, total in db.execute(
             select(Shipment.season_id, func.sum(Shipment.amount_eur))
-            .where(Shipment.brand_id == brand_id)
+            .where(Shipment.brand_id == brand_id, _SHIPMENT_DELIVERED)
             .group_by(Shipment.season_id)
         ).all()
     }

@@ -2,7 +2,7 @@ import uuid
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Date, DateTime, ForeignKey, Numeric, Text, func
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Numeric, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -41,6 +41,11 @@ class Shipment(Base):
     eur_rub_rate: Mapped[Decimal | None] = mapped_column(Numeric(12, 4), nullable=True)
     amount_rub: Mapped[Decimal | None] = mapped_column(Numeric(16, 2), nullable=True)
     comment: Mapped[str | None] = mapped_column(Text, nullable=True)
+    logistics_amount_rub: Mapped[Decimal | None] = mapped_column(
+        Numeric(16, 2), nullable=True
+    )
+    logistics_paid_on: Mapped[date | None] = mapped_column(Date, nullable=True)
+    is_delivered: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
