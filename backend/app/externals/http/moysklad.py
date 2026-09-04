@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import logging
 import re
 from dataclasses import dataclass
@@ -260,3 +261,81 @@ class MoySkladClient(BaseApiClient):
         if isinstance(parsed, dict) and isinstance(parsed.get("rows"), list):
             return parsed["rows"]
         raise RuntimeError(f"MoySklad: unexpected images response: {type(parsed)}")
+
+    async def list_product_images(self, product_id: str) -> list[dict[str, Any]]:
+        pid = product_id.strip()
+        if not pid:
+            return []
+        try:
+            resp = await self.get(f"/entity/product/{pid}/images")
+        except ApiClientAbortableException as e:
+            if e.response.status == 404:
+                return []
+            log.warning(
+                "moysklad list images product=%s HTTP %s",
+                pid,
+                e.response.status,
+            )
+            return []
+        parsed = resp.parsed_response
+        if isinstance(parsed, dict) and isinstance(parsed.get("rows"), list):
+            return [r for r in parsed["rows"] if isinstance(r, dict)]
+        if isinstance(parsed, list):
+            return [r for r in parsed if isinstance(r, dict)]
+        return []
+
+    @staticmethod
+    def _preview_href_from_image_row(row: dict[str, Any]) -> str | None:
+        for key in ("tiny", "miniature"):
+            block = row.get(key)
+            if isinstance(block, dict):
+                href = block.get("href")
+                if href is not None and str(href).strip():
+                    return str(href).strip()
+        meta = row.get("meta") if isinstance(row.get("meta"), dict) else {}
+        href = meta.get("downloadHref") or meta.get("downloadhref")
+        if href is not None and str(href).strip():
+            return str(href).strip()
+        return None
+
+    async def _download_url(self, url: str) -> tuple[bytes, str]:
+        async with self.session.request("GET", url, raise_for_status=False) as response:
+            parsed: dict | list | None = None
+            if response.status >= 400:
+                try:
+                    parsed = await self._parse(response)
+                except Exception:
+                    parsed = None
+                await self.handle_errors(response, parsed)
+            data = await response.read()
+            ctype = (response.headers.get("Content-Type") or "image/jpeg").split(";")[0].strip()
+            return data, ctype or "image/jpeg"
+
+    async def product_existing_image_preview(
+        self,
+        product_id: str,
+    ) -> tuple[int, str | None]:
+        """Кол-во фото в карточке и data URL первого (tiny/miniature)."""
+        rows = await self.list_product_images(product_id)
+        count = len(rows)
+        if not rows:
+            return 0, None
+        href = self._preview_href_from_image_row(rows[0])
+        if not href:
+            return count, None
+        try:
+            data, mime = await self._download_url(href)
+        except ApiClientAbortableException as e:
+            log.warning(
+                "moysklad image preview product=%s HTTP %s",
+                product_id,
+                e.response.status,
+            )
+            return count, None
+        except Exception:
+            log.warning("moysklad image preview product=%s download failed", product_id)
+            return count, None
+        if not data:
+            return count, None
+        b64 = base64.b64encode(data).decode("ascii")
+        return count, f"data:{mime};base64,{b64}"

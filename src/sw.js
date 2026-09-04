@@ -11,9 +11,43 @@ setCacheNameDetails({
 cleanupOutdatedCaches();
 precacheAndRoute(self.__WB_MANIFEST);
 
+/** iOS добавляет «from ANTRASHA» — не дублируем бренд в title. */
+const BRAND_TITLE = /^antrasha$/i;
+
+function normalizePushDisplay({ title = "", body = "" } = {}) {
+	const trimmedTitle = String(title).trim();
+	const trimmedBody = String(body).trim();
+
+	if (trimmedTitle && !BRAND_TITLE.test(trimmedTitle)) {
+		return { title: trimmedTitle, body: trimmedBody };
+	}
+
+	if (!trimmedBody) {
+		return { title: "Новинки", body: "" };
+	}
+
+	const newline = trimmedBody.indexOf("\n");
+	if (newline >= 0) {
+		return {
+			title: trimmedBody.slice(0, newline).trim(),
+			body: trimmedBody.slice(newline + 1).trim(),
+		};
+	}
+
+	const sentenceEnd = trimmedBody.search(/[.!?](?:\s+|$)/);
+	if (sentenceEnd >= 0 && sentenceEnd < 120) {
+		return {
+			title: trimmedBody.slice(0, sentenceEnd + 1).trim(),
+			body: trimmedBody.slice(sentenceEnd + 1).trim(),
+		};
+	}
+
+	return { title: trimmedBody, body: "" };
+}
+
 self.addEventListener("push", (event) => {
 	let payload = {
-		title: "ANTRASHA",
+		title: "",
 		body: "Новые образы — оцените новинки",
 		url: "/",
 		tag: "antrasha-new-photos",
@@ -26,9 +60,11 @@ self.addEventListener("push", (event) => {
 		/* ignore malformed payload */
 	}
 
+	const display = normalizePushDisplay(payload);
+
 	event.waitUntil(
-		self.registration.showNotification(payload.title, {
-			body: payload.body,
+		self.registration.showNotification(display.title, {
+			body: display.body,
 			icon: "/web-app-manifest-192x192.png",
 			badge: "/web-app-manifest-192x192.png",
 			tag: payload.tag || "antrasha-new-photos",

@@ -316,6 +316,38 @@ export default function OutletPhoto() {
                 ? ` · модификация ${product.variant_id}`
                 : ""}
             </div>
+            {product.existing_images_count > 0 ? (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                  marginTop: "0.65rem",
+                  padding: "0.45rem 0.55rem",
+                  borderRadius: 8,
+                  background: "rgba(255, 193, 7, 0.08)",
+                  border: "1px solid rgba(255, 193, 7, 0.25)",
+                }}
+              >
+                {product.existing_image_preview ? (
+                  <img
+                    src={product.existing_image_preview}
+                    alt=""
+                    style={{
+                      width: 48,
+                      height: 48,
+                      objectFit: "cover",
+                      borderRadius: 6,
+                      border: "1px solid var(--border)",
+                      flexShrink: 0,
+                    }}
+                  />
+                ) : null}
+                <span style={{ fontSize: "0.85rem", color: "var(--muted)" }}>
+                  В МойСклад уже {product.existing_images_count} фото
+                </span>
+              </div>
+            ) : null}
             {step !== STEPS.SUCCESS && (
               <button
                 type="button"

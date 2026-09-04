@@ -27,6 +27,8 @@ class OutletPhotoLookupOut(BaseModel):
     variant_id: str | None = None
     path_name: str | None = None
     gender: str | None = None
+    existing_images_count: int = 0
+    existing_image_preview: str | None = None
 
 
 class OutletPhotoGenerateOut(BaseModel):

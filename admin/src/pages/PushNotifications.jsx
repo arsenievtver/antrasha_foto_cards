@@ -19,7 +19,7 @@ export default function PushNotifications() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
-  const [title, setTitle] = useState("ANTRASHA");
+  const [title, setTitle] = useState("");
   const [body, setBody] = useState("Новые образы — оцените новинки");
   const [urlPreset, setUrlPreset] = useState("");
   const [urlCustom, setUrlCustom] = useState("");
@@ -58,7 +58,7 @@ export default function PushNotifications() {
     setBusy(true);
     try {
       const data = await broadcastPush({
-        title: title.trim() || "ANTRASHA",
+        title: title.trim(),
         body: body.trim(),
         url,
         audience,
@@ -117,13 +117,17 @@ export default function PushNotifications() {
         <h2 style={{ marginTop: 0, fontSize: "1.05rem" }}>Отправить</h2>
 
         <label>
-          Заголовок
+          Заголовок (необязательно)
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             maxLength={80}
-            required
+            placeholder="Пусто — на iPhone возьмётся первая строка текста"
           />
+          <span className="muted" style={{ display: "block", marginTop: "0.35rem" }}>
+            Не пишите «ANTRASHA»: на iPhone под заголовком и так будет «from
+            ANTRASHA».
+          </span>
         </label>
 
         <label>

@@ -303,6 +303,20 @@ export default function OutletPhoto() {
                   ? "мужской"
                   : "не определён"}
             </div>
+            {product.existing_images_count > 0 ? (
+              <div className="outlet-product__existing">
+                {product.existing_image_preview ? (
+                  <img
+                    src={product.existing_image_preview}
+                    alt=""
+                    className="outlet-product__thumb"
+                  />
+                ) : null}
+                <span className="muted small">
+                  В МойСклад уже {product.existing_images_count} фото
+                </span>
+              </div>
+            ) : null}
             {step !== STEPS.SUCCESS ? (
               <button
                 type="button"

@@ -49,7 +49,7 @@ def format_new_photos_message(count: int) -> tuple[str, str]:
         phrase = f"{n} новых образа"
     else:
         phrase = f"{n} новых образов"
-    return "ANTRASHA", f"{phrase} — оцените новинки"
+    return f"{phrase} — оцените новинки", ""
 
 
 def merge_session_push_subscriptions(
@@ -340,7 +340,7 @@ def broadcast_admin_push(
             settings, row.gender_scope
         )
         payload = {
-            "title": title.strip() or "ANTRASHA",
+            "title": title.strip(),
             "body": body.strip() or "Новинки — загляните",
             "url": link,
             "tag": tag,

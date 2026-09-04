@@ -40,7 +40,7 @@ class AdminPushStatsResponse(BaseModel):
 
 
 class AdminPushBroadcastRequest(BaseModel):
-    title: str = Field(default="ANTRASHA", max_length=80)
+    title: str = Field(default="", max_length=80)
     body: str = Field(min_length=1, max_length=200)
     url: str | None = Field(default=None, max_length=500)
     audience: AdminPushAudience = "all"

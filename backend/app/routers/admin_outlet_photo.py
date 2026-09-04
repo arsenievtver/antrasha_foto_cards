@@ -182,9 +182,10 @@ async def outlet_photo_lookup(
     if not barcode:
         raise HTTPException(status_code=400, detail="Укажите штрихкод")
 
-    client = MoySkladClient(token)
+    client = MoySkladClient(token, keep_session=True)
     try:
         ref = await client.find_by_barcode(barcode)
+        images_count, image_preview = await client.product_existing_image_preview(ref.product_id)
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
     except ValueError as e:
@@ -212,6 +213,8 @@ async def outlet_photo_lookup(
         variant_id=ref.variant_id,
         path_name=ref.path_name,
         gender=ref.gender,
+        existing_images_count=images_count,
+        existing_image_preview=image_preview,
     )
 
 
