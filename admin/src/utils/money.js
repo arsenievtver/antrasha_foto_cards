@@ -26,9 +26,19 @@ export function kg(value) {
   return `${format(value, 3)} кг`;
 }
 
+export function kgShort(value) {
+  if (value === null || value === undefined || value === "") return "—";
+  return `${format(value, 1)} кг`;
+}
+
 export function rate(value) {
   if (value === null || value === undefined || value === "") return "—";
   return format(value, 4);
+}
+
+export function rateShort(value) {
+  if (value === null || value === undefined || value === "") return "—";
+  return format(value, 1);
 }
 
 export function dateRu(value) {

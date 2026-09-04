@@ -701,6 +701,89 @@ td {
   border-bottom: 1px solid var(--border);
 }
 
+.shipments-table {
+  font-size: 0.82rem;
+  table-layout: fixed;
+}
+
+.shipments-table th,
+.shipments-table td {
+  padding: 0.45rem 0.35rem;
+  vertical-align: middle;
+}
+
+.cell-stack__primary {
+  font-weight: 500;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cell-stack__secondary {
+  font-size: 0.78rem;
+  color: var(--muted);
+  line-height: 1.2;
+  margin-top: 0.12rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.shipments-info-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.65rem;
+  height: 1.65rem;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  font-weight: 700;
+  font-size: 0.85rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.shipments-info-btn:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--text);
+}
+
+.shipments-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  align-items: stretch;
+}
+
+.shipments-actions button {
+  font-size: 0.75rem;
+  padding: 0.22rem 0.4rem;
+  white-space: nowrap;
+}
+
+.shipments-table .col-status {
+  width: 3rem;
+  text-align: center;
+}
+
+.shipments-table .col-info {
+  width: 2.5rem;
+  text-align: center;
+}
+
+.shipments-table .col-actions {
+  width: 5.5rem;
+}
+
+.shipments-table .col-weight {
+  width: 4.5rem;
+  white-space: nowrap;
+}
+
 /* Настройка ленты на странице «Фото и теги»: полная ширина контента + свитч */
 .feed-policy-card {
   width: 100%;
