@@ -444,6 +444,8 @@ export default function Payments() {
               <tr>
                 <th>Дата</th>
                 <th>Бренд</th>
+                <th>€</th>
+                <th>Заказ</th>
                 <th>Категория</th>
                 <th>₽</th>
                 <th className="col-info" aria-label="Подробнее" />
@@ -456,9 +458,9 @@ export default function Payments() {
                   <td>
                     <CellStack primary={dateRu(row.paid_on)} secondary={row.season_name} />
                   </td>
-                  <td>
-                    <CellStack primary={row.brand_name} secondary={eur(row.amount_eur)} />
-                  </td>
+                  <td>{row.brand_name}</td>
+                  <td>{eur(row.amount_eur)}</td>
+                  <td>{row.order_id ? "Привязана" : "—"}</td>
                   <td>{paymentKindLabel(row.kind)}</td>
                   <td>
                     <CellStack
