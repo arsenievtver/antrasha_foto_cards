@@ -106,6 +106,7 @@ export default function ShipmentsList() {
                 subtitle={parts.join(" · ")}
                 metric={eur(row.amount_eur)}
                 badges={[status]}
+                noOrderHint={!row.order_id}
               />
             );
           })}

@@ -1,6 +1,15 @@
 import { Link } from "react-router-dom";
 
-export default function EntityRow({ to, title, subtitle, metric, metricSub, style, badges }) {
+export default function EntityRow({
+  to,
+  title,
+  subtitle,
+  metric,
+  metricSub,
+  style,
+  badges,
+  noOrderHint,
+}) {
   return (
     <Link to={to} className="entity-row">
       <div className="entity-row__body">
@@ -21,6 +30,15 @@ export default function EntityRow({ to, title, subtitle, metric, metricSub, styl
           {metric}
         </div>
         {metricSub ? <div className="entity-row__metric-sub">{metricSub}</div> : null}
+        {noOrderHint ? (
+          <span
+            className="entity-row__order-hint"
+            title="Без привязки к заказу"
+            aria-label="Без привязки к заказу"
+          >
+            ?
+          </span>
+        ) : null}
       </div>
     </Link>
   );

@@ -106,6 +106,7 @@ export default function PaymentsList() {
                 row.season_name ? ` · ${row.season_name}` : ""
               }`}
               metric={eur(row.amount_eur)}
+              noOrderHint={!row.order_id}
             />
           ))}
         </div>
