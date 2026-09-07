@@ -6,6 +6,7 @@ import {
   fetchProcurementRefs,
 } from "../api.js";
 import BrandSelect from "../components/BrandSelect.jsx";
+import ShipmentLogisticsSection from "../components/ShipmentLogisticsSection.jsx";
 import { dateRu, eur, num, rub, today } from "../utils/money.js";
 
 const EMPTY = {
@@ -17,6 +18,9 @@ const EMPTY = {
   weight_kg: "",
   eur_rub_rate: "",
   comment: "",
+  logistics_amount_rub: "",
+  logistics_paid_on: "",
+  is_delivered: true,
 };
 
 export default function ShipmentCreate() {
@@ -76,6 +80,9 @@ export default function ShipmentCreate() {
         weight_kg: form.weight_kg || null,
         eur_rub_rate: form.eur_rub_rate || null,
         comment: form.comment.trim() || null,
+        logistics_amount_rub: form.logistics_amount_rub || null,
+        logistics_paid_on: form.logistics_paid_on || null,
+        is_delivered: form.is_delivered,
       });
       nav(`/shipments/${row.id}`, { replace: true });
     } catch (ex) {
@@ -187,6 +194,8 @@ export default function ShipmentCreate() {
             {amountRub !== null ? `Будет ${rub(amountRub)}` : "Пусто — из справочника"}
           </span>
         </label>
+
+        <ShipmentLogisticsSection form={form} setField={set} />
 
         <label>
           Комментарий

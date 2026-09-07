@@ -7,6 +7,7 @@ import {
   updateShipment,
 } from "../api.js";
 import BrandSelect from "../components/BrandSelect.jsx";
+import ShipmentLogisticsSection from "../components/ShipmentLogisticsSection.jsx";
 import { dateRu, eur, num, rub } from "../utils/money.js";
 
 export default function ShipmentEdit() {
@@ -23,6 +24,9 @@ export default function ShipmentEdit() {
     weight_kg: "",
     eur_rub_rate: "",
     comment: "",
+    logistics_amount_rub: "",
+    logistics_paid_on: "",
+    is_delivered: true,
   });
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(true);
@@ -43,6 +47,10 @@ export default function ShipmentEdit() {
           weight_kg: row.weight_kg || "",
           eur_rub_rate: row.eur_rub_rate || "",
           comment: row.comment || "",
+          logistics_amount_rub:
+            row.logistics_amount_rub != null ? String(row.logistics_amount_rub) : "",
+          logistics_paid_on: row.logistics_paid_on || "",
+          is_delivered: !!row.is_delivered,
         });
       })
       .catch((e) => setErr(e.message))
@@ -90,6 +98,9 @@ export default function ShipmentEdit() {
         weight_kg: form.weight_kg || null,
         eur_rub_rate: form.eur_rub_rate || null,
         comment: form.comment,
+        logistics_amount_rub: form.logistics_amount_rub || null,
+        logistics_paid_on: form.logistics_paid_on || null,
+        is_delivered: form.is_delivered,
       });
       nav(`/shipments/${row.id}`, { replace: true });
     } catch (ex) {
@@ -201,6 +212,8 @@ export default function ShipmentEdit() {
             {amountRub !== null ? `Будет ${rub(amountRub)}` : "Пусто — из справочника"}
           </span>
         </label>
+
+        <ShipmentLogisticsSection form={form} setField={set} />
 
         <label>
           Комментарий

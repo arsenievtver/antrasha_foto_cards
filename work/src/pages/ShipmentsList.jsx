@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { fetchProcurementRefs, fetchShipments } from "../api.js";
 import EntityRow from "../components/EntityRow.jsx";
-import { dateRu, eur, kg } from "../utils/money.js";
+import { dateRu, eur, kg, rub } from "../utils/money.js";
+import { shipmentStatusMeta } from "../utils/shipment.js";
 
 export default function ShipmentsList() {
   const [refs, setRefs] = useState(null);
@@ -86,17 +87,28 @@ export default function ShipmentsList() {
         <p className="empty">Поставок нет</p>
       ) : (
         <div className="entity-list">
-          {data.items.map((row) => (
-            <EntityRow
-              key={row.id}
-              to={`/shipments/${row.id}`}
-              title={row.brand_name}
-              subtitle={`${dateRu(row.shipped_on)}${
-                row.season_name ? ` · ${row.season_name}` : ""
-              }${row.weight_kg != null && row.weight_kg !== "" ? ` · ${kg(row.weight_kg)}` : ""}`}
-              metric={eur(row.amount_eur)}
-            />
-          ))}
+          {data.items.map((row) => {
+            const status = shipmentStatusMeta(row.is_delivered);
+            const parts = [
+              dateRu(row.shipped_on),
+              row.season_name || null,
+              row.weight_kg != null && row.weight_kg !== "" ? kg(row.weight_kg) : null,
+              row.logistics_amount_rub != null && row.logistics_amount_rub !== ""
+                ? `лог. ${rub(row.logistics_amount_rub)}`
+                : null,
+            ].filter(Boolean);
+
+            return (
+              <EntityRow
+                key={row.id}
+                to={`/shipments/${row.id}`}
+                title={row.brand_name}
+                subtitle={parts.join(" · ")}
+                metric={eur(row.amount_eur)}
+                badges={[status]}
+              />
+            );
+          })}
         </div>
       )}
     </div>
