@@ -205,8 +205,9 @@ export async function fetchStats() {
   return data;
 }
 
-export async function fetchCampaigns() {
-  const res = await fetch(apiUrl("/admin/campaigns"), { headers: headersJson() });
+export async function fetchCampaigns(product = "antrasha") {
+  const q = new URLSearchParams({ product });
+  const res = await fetch(`${apiUrl("/admin/campaigns")}?${q}`, { headers: headersJson() });
   const data = await parseResponseJson(res);
   if (!res.ok) throw new Error(detail(data, res.statusText));
   return data;
@@ -222,11 +223,26 @@ export async function fetchAttributionDebug({ limit = 25 } = {}) {
   return data;
 }
 
-export async function createCampaign({ name, slug, path }) {
+export async function fetchXfashionAttributionDebug({ limit = 25 } = {}) {
+  const q = new URLSearchParams({ limit: String(limit) });
+  const res = await fetch(`${apiUrl("/admin/xfashion/campaigns/attribution-debug")}?${q}`, {
+    headers: headersJson(),
+  });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
+export async function createCampaign({ name, slug, path, product = "antrasha" }) {
   const res = await fetch(apiUrl("/admin/campaigns"), {
     method: "POST",
     headers: headersJson(),
-    body: JSON.stringify({ name, slug: slug || null, path: path || "/" }),
+    body: JSON.stringify({
+      name,
+      slug: slug || null,
+      path: path || "/",
+      product: product || "antrasha",
+    }),
   });
   const data = await parseResponseJson(res);
   if (!res.ok) throw new Error(detail(data, res.statusText));

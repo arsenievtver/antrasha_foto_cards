@@ -33,9 +33,15 @@ class MarketingCampaign(Base):
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     slug: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
     path: Mapped[str] = mapped_column(String(200), nullable=False, default="/")
+    product: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="antrasha", index=True,
+    )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(),
     )
 
     sessions = relationship("UserSession", back_populates="campaign")
+    xfashion_visits = relationship(
+        "XfashionLandingVisit", back_populates="campaign", cascade="all, delete-orphan",
+    )

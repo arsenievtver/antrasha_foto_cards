@@ -13,6 +13,7 @@ import OutletPhoto from "./pages/OutletPhoto.jsx";
 import OutletTransfer from "./pages/OutletTransfer.jsx";
 import FittingRequests from "./pages/FittingRequests.jsx";
 import Campaigns from "./pages/Campaigns.jsx";
+import XfashionCampaigns from "./pages/XfashionCampaigns.jsx";
 import PromoBanners from "./pages/PromoBanners.jsx";
 import HeroBanners from "./pages/HeroBanners.jsx";
 import HomeV2GenderCards from "./pages/HomeV2GenderCards.jsx";
@@ -155,6 +156,14 @@ export default function App() {
             element={
               <PermissionRoute permission="ads">
                 <Campaigns />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/xfashion-campaigns"
+            element={
+              <PermissionRoute permission="ads">
+                <XfashionCampaigns />
               </PermissionRoute>
             }
           />

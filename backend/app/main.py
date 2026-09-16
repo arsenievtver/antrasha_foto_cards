@@ -35,6 +35,7 @@ from app.routers import (
     push,
     sessions,
     try_on_experiment,
+    xfashion_public,
     ximilar,
 )
 from app.services.ai_ingest_worker import reset_stale_processing_jobs
@@ -113,6 +114,7 @@ app.add_middleware(
 
 app.include_router(sessions.router)
 app.include_router(guest.router)
+app.include_router(xfashion_public.router)
 app.include_router(brands.router)
 app.include_router(feed.router)
 app.include_router(interactions.router)

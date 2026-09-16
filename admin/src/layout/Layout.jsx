@@ -97,6 +97,7 @@ export default function Layout() {
 
           <NavGroup title="Реклама">
             {can("ads") && <NavItem to="/campaigns">Рекламные ссылки</NavItem>}
+            {can("ads") && <NavItem to="/xfashion-campaigns">Xfashion — ссылки</NavItem>}
             {can("ads") && <NavItem to="/promo-banners">Баннеры на главной</NavItem>}
             {can("ads") && <NavItem to="/hero-banners">Hero-баннеры (/v2)</NavItem>}
             {can("ads") && <NavItem to="/videos">Видео в модалке</NavItem>}

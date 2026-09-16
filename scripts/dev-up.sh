@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Запуск Postgres (Docker), миграции, API, основного Vite и админки.
+# Запуск Postgres (Docker), миграции, API, Vite: client, admin, work, xfashion.
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck disable=SC1091
@@ -12,16 +12,19 @@ BACKEND_PORT="${BACKEND_PORT:-8000}"
 FRONTEND_PORT="${FRONTEND_PORT:-5173}"
 ADMIN_PORT="${ADMIN_PORT:-5174}"
 WORK_PORT="${WORK_PORT:-5175}"
+XFASHION_PORT="${XFASHION_PORT:-5176}"
 PID_BACKEND="$SCRIPT_DIR/.backend.pid"
 PID_INGEST="$SCRIPT_DIR/.ai-ingest-worker.pid"
 PID_FRONT="$SCRIPT_DIR/.frontend.pid"
 PID_ADMIN="$SCRIPT_DIR/.admin.pid"
 PID_WORK="$SCRIPT_DIR/.work.pid"
+PID_XFASHION="$SCRIPT_DIR/.xfashion.pid"
 LOG_BACKEND="$SCRIPT_DIR/logs-backend.txt"
 LOG_INGEST="$SCRIPT_DIR/logs-ai-ingest-worker.txt"
 LOG_FRONT="$SCRIPT_DIR/logs-frontend.txt"
 LOG_ADMIN="$SCRIPT_DIR/logs-admin.txt"
 LOG_WORK="$SCRIPT_DIR/logs-work.txt"
+LOG_XFASHION="$SCRIPT_DIR/logs-xfashion.txt"
 
 ensure_backend_venv
 # shellcheck disable=SC1091
@@ -117,11 +120,27 @@ else
 	echo "[up] рабочее http://127.0.0.1:${WORK_PORT} (лог: $LOG_WORK, PID: $PID_WORK)"
 fi
 
+if [[ "${SKIP_XFASHION:-0}" == "1" ]]; then
+	echo "[up] SKIP_XFASHION=1 — лендинг Xfashion не поднимаю"
+elif [[ ! -d "$REPO_ROOT/xfashion/node_modules" ]]; then
+	echo "[up] Xfashion пропущен: нет xfashion/node_modules — npm run dev:install  или  npm install --prefix xfashion"
+elif [[ -f "$PID_XFASHION" ]] && kill -0 "$(cat "$PID_XFASHION")" 2>/dev/null; then
+	echo "[up] Xfashion уже запущен (PID $(cat "$PID_XFASHION")) — пропуск"
+else
+	(
+		cd "$REPO_ROOT/xfashion"
+		nohup npm run dev -- --host --port "$XFASHION_PORT" >"$LOG_XFASHION" 2>&1 &
+		echo $! >"$PID_XFASHION"
+	)
+	echo "[up] Xfashion http://127.0.0.1:${XFASHION_PORT} (лог: $LOG_XFASHION, PID: $PID_XFASHION)"
+fi
+
 echo
 echo "──────────────────────────────────────────────────────────────"
 echo "Приложение:   http://127.0.0.1:${FRONTEND_PORT}"
 echo "Админка:      http://127.0.0.1:${ADMIN_PORT}"
 echo "Рабочее:      http://127.0.0.1:${WORK_PORT}"
+echo "Xfashion:     http://127.0.0.1:${XFASHION_PORT}"
 echo "С телефона (та же Wi‑Fi), открой в браузере:"
 n=0
 while read -r lan_ip; do
@@ -130,11 +149,13 @@ while read -r lan_ip; do
 	echo "              приложение http://${lan_ip}:${FRONTEND_PORT}"
 	echo "              админка    http://${lan_ip}:${ADMIN_PORT}"
 	echo "              рабочее    http://${lan_ip}:${WORK_PORT}"
+	echo "              Xfashion   http://${lan_ip}:${XFASHION_PORT}"
 done < <(list_lan_ipv4 | sort -u)
 if ((n == 0)); then
 	echo "              (IP не определён — в macOS: ipconfig getifaddr en0  или вручную IP из «Системные настройки → Сеть»)"
 fi
 echo "(API: Vite — только proxy /api → :${BACKEND_PORT}; VITE_BACKEND_ORIGIN/VITE_API_BASE для dev очищены — см. vite_dev_clear_direct_api_env в scripts/lib.sh)"
-echo "(Firewall: TCP ${FRONTEND_PORT}, ${ADMIN_PORT}, ${WORK_PORT}; прямой доступ к API с телефона — при необходимости откройте ${BACKEND_PORT})"
+echo "(Firewall: TCP ${FRONTEND_PORT}, ${ADMIN_PORT}, ${WORK_PORT}, ${XFASHION_PORT}; API — ${BACKEND_PORT})"
+echo "(Только Xfashion: npm run dev:xfashion:up / dev:xfashion:down)"
 echo "──────────────────────────────────────────────────────────────"
 echo "Готово. Остановка: scripts/dev-down.sh"

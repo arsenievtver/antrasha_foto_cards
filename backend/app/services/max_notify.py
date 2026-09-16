@@ -26,6 +26,7 @@ def max_notify_configured() -> bool:
 
 def _format_fitting_request_text(
     *,
+    heading: str,
     request_id: uuid.UUID,
     display_name: str | None,
     phone: str,
@@ -43,7 +44,7 @@ def _format_fitting_request_text(
     stats = f"{likes} / {total} ({pct}%)" if total > 0 else "без свайпов"
 
     lines = [
-        "Новая заявка на примерку",
+        heading,
         "",
         f"Имя: {name_line}",
         f"Телефон: {phone}",
@@ -86,11 +87,13 @@ def send_fitting_request_notification(
     is_guest: bool,
     liked_photo_urls: list[str],
     created_at: datetime,
+    heading: str = "Новая заявка на примерку",
 ) -> None:
     if not max_notify_configured():
         return
 
     text = _format_fitting_request_text(
+        heading=heading,
         request_id=request_id,
         display_name=display_name,
         phone=phone,

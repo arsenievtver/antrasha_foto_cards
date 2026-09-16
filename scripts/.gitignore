@@ -2,9 +2,11 @@
 .frontend.pid
 .admin.pid
 .work.pid
+.xfashion.pid
 logs-backend.txt
 logs-frontend.txt
 logs-admin.txt
 logs-work.txt
+logs-xfashion.txt
 logs-ai-ingest-worker.txt
 .ai-ingest-worker.pid

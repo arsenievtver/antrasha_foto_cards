@@ -267,6 +267,7 @@ class AdminCampaignOut(BaseModel):
     name: str
     slug: str
     path: str
+    product: str
     is_active: bool
     created_at: datetime
     tracking_url: str
@@ -275,6 +276,7 @@ class AdminCampaignOut(BaseModel):
 
 class AdminCampaignListResponse(BaseModel):
     public_app_url: str
+    public_xfashion_url: str
     items: list[AdminCampaignOut]
 
 
@@ -282,6 +284,7 @@ class AdminCampaignCreateRequest(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     slug: str | None = Field(default=None, max_length=64)
     path: str = Field(default="/", max_length=200)
+    product: str = Field(default="antrasha", max_length=32)
 
 
 class AdminAttributionDebugSession(BaseModel):
@@ -294,6 +297,19 @@ class AdminAttributionDebugSession(BaseModel):
 class AdminAttributionDebugOut(BaseModel):
     campaigns: list[AdminCampaignOut]
     recent_attributed_sessions: list[AdminAttributionDebugSession]
+    hint: str
+
+
+class AdminXfashionAttributionDebugVisit(BaseModel):
+    visit_id: uuid.UUID
+    created_at: datetime
+    campaign_slug: str | None
+    campaign_name: str | None
+
+
+class AdminXfashionAttributionDebugOut(BaseModel):
+    campaigns: list[AdminCampaignOut]
+    recent_visits: list[AdminXfashionAttributionDebugVisit]
     hint: str
 
 

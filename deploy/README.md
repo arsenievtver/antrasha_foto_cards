@@ -47,6 +47,30 @@ curl -fsS http://127.0.0.1/health
 docker compose -f deploy/docker-compose.prod.yml --project-directory deploy ps
 ```
 
+## 5a) Xfashion landing only
+
+Лендинг — отдельный контейнер `xfashion`, деплой без пересборки всего антраша:
+
+```bash
+bash deploy/scripts/update-xfashion.sh
+```
+
+После изменений API (`/public/xfashion/*`, миграции):
+
+```bash
+WITH_BACKEND=1 bash deploy/scripts/update-xfashion.sh
+```
+
+Первый TLS для `XFASHION_DOMAIN` (когда DNS уже на VM):
+
+```bash
+bash deploy/scripts/tls-add-xfashion.sh
+```
+
+В `deploy/env/.env.prod`: `XFASHION_DOMAIN`, опционально `XFASHION_VIDEO_URL` (CDN).  
+В `deploy/env/.env.backend.prod`: `PUBLIC_XFASHION_URL=https://xfashion.pro`, CORS с xfashion.pro.  
+Рекламные ссылки Xfashion — в админке: **Xfashion — ссылки**.
+
 ## 5) Updates (one command)
 
 На сервере из каталога репозитория (например `/opt/antrasha_tinder`):

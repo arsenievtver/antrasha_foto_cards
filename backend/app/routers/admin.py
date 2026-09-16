@@ -30,6 +30,7 @@ from app.models import (
     UserSession,
     UserTagPairWeight,
     UserTagWeight,
+    XfashionLandingVisit,
 )
 from app.models.marketing_campaign import normalize_campaign_slug
 from app.schemas.admin import (
@@ -54,6 +55,8 @@ from app.schemas.admin import (
     AdminBrandOut,
     AdminAttributionDebugOut,
     AdminAttributionDebugSession,
+    AdminXfashionAttributionDebugOut,
+    AdminXfashionAttributionDebugVisit,
     AdminCampaignCreateRequest,
     AdminCampaignListResponse,
     AdminCampaignOut,
@@ -294,36 +297,50 @@ def _viewer_id(principal: AdminPrincipal) -> uuid.UUID | None:
     return principal.user.id if principal.user else None
 
 
-def _campaign_visit_rows(db: Session) -> list[tuple[uuid.UUID, str, str, int]]:
-    return list(
-        db.execute(
-            select(
-                MarketingCampaign.id,
-                MarketingCampaign.name,
-                MarketingCampaign.slug,
-                func.count(UserSession.id),
-            )
-            .outerjoin(UserSession, UserSession.campaign_id == MarketingCampaign.id)
-            .group_by(
-                MarketingCampaign.id,
-                MarketingCampaign.name,
-                MarketingCampaign.slug,
-            )
-            .order_by(func.count(UserSession.id).desc(), MarketingCampaign.name),
-        ).all(),
-    )
+def _antrasha_session_visit_map(db: Session) -> dict[uuid.UUID, int]:
+    rows = db.execute(
+        select(UserSession.campaign_id, func.count(UserSession.id))
+        .where(UserSession.campaign_id.is_not(None))
+        .group_by(UserSession.campaign_id),
+    ).all()
+    return {r[0]: int(r[1]) for r in rows}
 
 
-def _campaign_out(c: MarketingCampaign, *, visits: int) -> AdminCampaignOut:
+def _xfashion_landing_visit_map(db: Session) -> dict[uuid.UUID, int]:
+    rows = db.execute(
+        select(XfashionLandingVisit.campaign_id, func.count(XfashionLandingVisit.id))
+        .group_by(XfashionLandingVisit.campaign_id),
+    ).all()
+    return {r[0]: int(r[1]) for r in rows}
+
+
+def _campaign_visits(
+    c: MarketingCampaign,
+    *,
+    antrasha_map: dict[uuid.UUID, int],
+    xfashion_map: dict[uuid.UUID, int],
+) -> int:
+    if c.product == "xfashion":
+        return xfashion_map.get(c.id, 0)
+    return antrasha_map.get(c.id, 0)
+
+
+def _campaign_out(
+    c: MarketingCampaign,
+    *,
+    antrasha_map: dict[uuid.UUID, int],
+    xfashion_map: dict[uuid.UUID, int],
+) -> AdminCampaignOut:
     return AdminCampaignOut(
         id=c.id,
         name=c.name,
         slug=c.slug,
         path=c.path,
+        product=c.product,
         is_active=c.is_active,
         created_at=c.created_at,
         tracking_url=build_tracking_url(c),
-        visits=visits,
+        visits=_campaign_visits(c, antrasha_map=antrasha_map, xfashion_map=xfashion_map),
     )
 
 
@@ -1745,18 +1762,23 @@ def list_fitting_requests(
 def list_campaigns(
     db: Session = Depends(get_db),
     _su: AdminPrincipal = Depends(require_permission("ads")),
+    product: str = Query(default="antrasha", max_length=32),
 ) -> AdminCampaignListResponse:
     _ = _su
-    visit_map = {
-        cid: visits for cid, _name, _slug, visits in _campaign_visit_rows(db)
-    }
+    product_norm = product.strip().lower() or "antrasha"
+    antrasha_map = _antrasha_session_visit_map(db)
+    xfashion_map = _xfashion_landing_visit_map(db)
     campaigns = db.scalars(
-        select(MarketingCampaign).order_by(MarketingCampaign.created_at.desc()),
+        select(MarketingCampaign)
+        .where(MarketingCampaign.product == product_norm)
+        .order_by(MarketingCampaign.created_at.desc()),
     ).all()
     return AdminCampaignListResponse(
         public_app_url=settings.public_app_url.rstrip("/"),
+        public_xfashion_url=settings.public_xfashion_url.rstrip("/"),
         items=[
-            _campaign_out(c, visits=visit_map.get(c.id, 0)) for c in campaigns
+            _campaign_out(c, antrasha_map=antrasha_map, xfashion_map=xfashion_map)
+            for c in campaigns
         ],
     )
 
@@ -1777,7 +1799,18 @@ def create_campaign(
         slug = normalize_campaign_slug(raw_slug)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
-    c = MarketingCampaign(name=body.name.strip(), slug=slug, path=path)
+    product = (body.product or "antrasha").strip().lower()
+    if product not in ("antrasha", "xfashion"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="product должен быть antrasha или xfashion",
+        )
+    c = MarketingCampaign(
+        name=body.name.strip(),
+        slug=slug,
+        path=path,
+        product=product,
+    )
     db.add(c)
     try:
         db.commit()
@@ -1788,7 +1821,7 @@ def create_campaign(
             detail="Кампания с таким slug уже есть",
         ) from None
     db.refresh(c)
-    return _campaign_out(c, visits=0)
+    return _campaign_out(c, antrasha_map={}, xfashion_map={})
 
 
 @router.get("/campaigns/attribution-debug", response_model=AdminAttributionDebugOut)
@@ -1798,11 +1831,12 @@ def attribution_debug(
     limit: int = Query(25, ge=1, le=100),
 ) -> AdminAttributionDebugOut:
     _ = _su
-    visit_map = {
-        cid: visits for cid, _name, _slug, visits in _campaign_visit_rows(db)
-    }
+    antrasha_map = _antrasha_session_visit_map(db)
+    xfashion_map = _xfashion_landing_visit_map(db)
     campaigns = db.scalars(
-        select(MarketingCampaign).order_by(MarketingCampaign.created_at.desc()),
+        select(MarketingCampaign)
+        .where(MarketingCampaign.product == "antrasha")
+        .order_by(MarketingCampaign.created_at.desc()),
     ).all()
     rows = db.execute(
         select(
@@ -1817,7 +1851,10 @@ def attribution_debug(
         .limit(limit),
     ).all()
     return AdminAttributionDebugOut(
-        campaigns=[_campaign_out(c, visits=visit_map.get(c.id, 0)) for c in campaigns],
+        campaigns=[
+            _campaign_out(c, antrasha_map=antrasha_map, xfashion_map=xfashion_map)
+            for c in campaigns
+        ],
         recent_attributed_sessions=[
             AdminAttributionDebugSession(
                 session_id=r[0],
@@ -1831,6 +1868,55 @@ def attribution_debug(
             "Заход считается при создании сессии с ?ref= (без регистрации). "
             "Повторный визит в том же браузере не создаёт новую сессию — для теста "
             "используйте режим инкогнито или очистите данные сайта."
+        ),
+    )
+
+
+@router.get(
+    "/xfashion/campaigns/attribution-debug",
+    response_model=AdminXfashionAttributionDebugOut,
+)
+def xfashion_attribution_debug(
+    db: Session = Depends(get_db),
+    _su: AdminPrincipal = Depends(require_permission("ads")),
+    limit: int = Query(25, ge=1, le=100),
+) -> AdminXfashionAttributionDebugOut:
+    _ = _su
+    antrasha_map = _antrasha_session_visit_map(db)
+    xfashion_map = _xfashion_landing_visit_map(db)
+    campaigns = db.scalars(
+        select(MarketingCampaign)
+        .where(MarketingCampaign.product == "xfashion")
+        .order_by(MarketingCampaign.created_at.desc()),
+    ).all()
+    rows = db.execute(
+        select(
+            XfashionLandingVisit.id,
+            XfashionLandingVisit.created_at,
+            MarketingCampaign.slug,
+            MarketingCampaign.name,
+        )
+        .join(MarketingCampaign, MarketingCampaign.id == XfashionLandingVisit.campaign_id)
+        .order_by(XfashionLandingVisit.created_at.desc())
+        .limit(limit),
+    ).all()
+    return AdminXfashionAttributionDebugOut(
+        campaigns=[
+            _campaign_out(c, antrasha_map=antrasha_map, xfashion_map=xfashion_map)
+            for c in campaigns
+        ],
+        recent_visits=[
+            AdminXfashionAttributionDebugVisit(
+                visit_id=r[0],
+                created_at=r[1],
+                campaign_slug=r[2],
+                campaign_name=r[3],
+            )
+            for r in rows
+        ],
+        hint=(
+            "Заход на xfashion.pro считается при первом открытии страницы с ?ref= "
+            "в этой вкладке (sessionStorage). Для чистого теста — инкогнито."
         ),
     )
 
