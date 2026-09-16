@@ -140,6 +140,9 @@ services:
     restart: unless-stopped
     env_file:
       - ./env/.env.prod
+    environment:
+      # иначе envsubst оставляет ${XFASHION_DOMAIN} и nginx падает: unknown "xfashion_domain"
+      XFASHION_DOMAIN: ${XFASHION_DOMAIN:-xfashion.pro}
     depends_on:
       backend:
         condition: service_healthy

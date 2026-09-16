@@ -61,6 +61,8 @@ bash deploy/scripts/update-xfashion.sh
 WITH_BACKEND=1 bash deploy/scripts/update-xfashion.sh
 ```
 
+Перед первым `update.sh` с xfashion добавь в `deploy/env/.env.prod` строку `XFASHION_DOMAIN=xfashion.pro` — без неё nginx не стартует (весь сайт, не только лендинг).
+
 Первый TLS для `XFASHION_DOMAIN` (когда DNS уже на VM):
 
 ```bash
