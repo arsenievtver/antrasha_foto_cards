@@ -1,6 +1,9 @@
+import { getSiteOrigin } from "../config/siteOrigin.js";
+
 export default function BlogArticleJsonLd({ article }) {
   if (!article) return null;
-  const url = `https://xfashion.pro/blog/${article.slug}`;
+  const origin = getSiteOrigin();
+  const url = `${origin}/blog/${article.slug}`;
   const data = {
     "@context": "https://schema.org",
     "@type": "Article",
@@ -12,12 +15,12 @@ export default function BlogArticleJsonLd({ article }) {
     author: {
       "@type": "Organization",
       name: "Xfashion",
-      url: "https://xfashion.pro/",
+      url: `${origin}/`,
     },
     publisher: {
       "@type": "Organization",
       name: "Xfashion",
-      url: "https://xfashion.pro/",
+      url: `${origin}/`,
     },
   };
   return <script type="application/ld+json">{JSON.stringify(data)}</script>;

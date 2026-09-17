@@ -8,6 +8,7 @@ source "$(cd "$(dirname "$0")" && pwd)/lib.sh"
 
 require_cmd docker
 require_cmd git
+require_cmd curl
 ensure_compose
 ensure_env_files
 
@@ -31,24 +32,23 @@ set -a
 # shellcheck disable=SC1091
 source "$DEPLOY_DIR/env/.env.prod"
 set +a
-ACTIVE_TEMPLATE="$DEPLOY_DIR/nginx/templates/default.conf.template"
-
-tls_cert_present() {
-  [[ -n "${APP_DOMAIN:-}" ]] || return 1
-  compose run --rm --no-deps --entrypoint sh certbot \
-    -c "test -f \"/etc/letsencrypt/live/$APP_DOMAIN/fullchain.pem\"" \
-    >/dev/null 2>&1
-}
-
-if tls_cert_present; then
-  cp "$DEPLOY_DIR/nginx/default.tls.conf.template" "$ACTIVE_TEMPLATE"
-else
-  cp "$DEPLOY_DIR/nginx/default.http.conf.template" "$ACTIVE_TEMPLATE"
-fi
+materialize_nginx_template_from_certs
 
 echo "[step] up xfashion + nginx"
 compose up -d xfashion
 compose up -d --force-recreate nginx
 
+DOMAIN="$(xfashion_domain_resolved)"
+warn_xfashion_tls_if_placeholder
+
+if curl -fsS -o /dev/null --max-time 15 -H "Host: ${DOMAIN}" "http://127.0.0.1/" 2>/dev/null; then
+  hdr="$(curl -sS -I --max-time 15 -H "Host: ${DOMAIN}" "http://127.0.0.1/" | tr -d '\r' | awk -F': ' 'tolower($1)=="x-antrasha-app"{print $2; exit}')"
+  if [[ "$hdr" == "xfashion" ]]; then
+    echo "[ok] nginx → xfashion (X-Antrasha-App=xfashion)"
+  else
+    echo "[warn] Host ${DOMAIN} → X-Antrasha-App='${hdr:-<empty>}' (ожидали xfashion)"
+  fi
+fi
+
 echo "[ok] xfashion deploy complete"
-echo "Hint: curl -I https://${XFASHION_DOMAIN:-xfashion.pro}/"
+echo "Hint: bash deploy/scripts/check-xfashion-tls.sh"

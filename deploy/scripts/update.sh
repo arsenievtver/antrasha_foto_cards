@@ -49,67 +49,7 @@ set -a
 # shellcheck disable=SC1091
 source "$DEPLOY_DIR/env/.env.prod"
 set +a
-ACTIVE_TEMPLATE="$DEPLOY_DIR/nginx/templates/default.conf.template"
-
-tls_cert_present() {
-  [[ -n "${APP_DOMAIN:-}" ]] || return 1
-  # `compose run --rm certbot` использует сервис certbot из compose.yml (он уже
-  # монтирует ./nginx/letsencrypt:/etc/letsencrypt) и запускается под root.
-  # --no-deps чтобы не поднимать зависимости, --entrypoint sh чтобы заменить
-  # дефолтный certbot-вызов на простой test -f.
-  compose run --rm --no-deps --entrypoint sh certbot \
-    -c "test -f \"/etc/letsencrypt/live/$APP_DOMAIN/fullchain.pem\"" \
-    >/dev/null 2>&1
-}
-
-if [[ -z "${XFASHION_DOMAIN:-}" ]]; then
-  echo "  WARNING: XFASHION_DOMAIN не задан в .env.prod — используем xfashion.pro"
-  XFASHION_DOMAIN=xfashion.pro
-  export XFASHION_DOMAIN
-fi
-
-xfashion_cert_present() {
-  [[ -n "${XFASHION_DOMAIN:-}" ]] || return 1
-  compose run --rm --no-deps --entrypoint sh certbot \
-    -c "test -f \"/etc/letsencrypt/live/$XFASHION_DOMAIN/fullchain.pem\"" \
-    >/dev/null 2>&1
-}
-
-if tls_cert_present; then
-  echo "  using TLS template (cert найден внутри контейнера certbot)"
-  cp "$DEPLOY_DIR/nginx/default.tls.conf.template" "$ACTIVE_TEMPLATE"
-  if ! xfashion_cert_present; then
-    echo "[step] placeholder TLS cert for ${XFASHION_DOMAIN} (иначе nginx не стартует)"
-    compose run --rm --no-deps --entrypoint sh certbot -c "
-      set -e
-      mkdir -p /etc/letsencrypt/live/$XFASHION_DOMAIN
-      openssl req -x509 -nodes -newkey rsa:2048 -days 3 \
-        -keyout /etc/letsencrypt/live/$XFASHION_DOMAIN/privkey.pem \
-        -out /etc/letsencrypt/live/$XFASHION_DOMAIN/fullchain.pem \
-        -subj '/CN=$XFASHION_DOMAIN'
-    "
-  fi
-elif [[ -f "$ACTIVE_TEMPLATE" ]] && grep -q "listen 443" "$ACTIVE_TEMPLATE"; then
-  # Защитный фолбэк: cert не нашли, но активный шаблон СЕЙЧАС уже TLS.
-  # Это значит, что прод реально работает на TLS, а наша проверка по какой-то
-  # причине дала false. Не ломаем прод — оставляем TLS-шаблон.
-  echo "  WARNING: cert не виден из контейнера, но активный шаблон уже TLS — оставляем TLS"
-  cp "$DEPLOY_DIR/nginx/default.tls.conf.template" "$ACTIVE_TEMPLATE"
-  if ! xfashion_cert_present; then
-    echo "[step] placeholder TLS cert for ${XFASHION_DOMAIN} (иначе nginx не стартует)"
-    compose run --rm --no-deps --entrypoint sh certbot -c "
-      set -e
-      mkdir -p /etc/letsencrypt/live/$XFASHION_DOMAIN
-      openssl req -x509 -nodes -newkey rsa:2048 -days 3 \
-        -keyout /etc/letsencrypt/live/$XFASHION_DOMAIN/privkey.pem \
-        -out /etc/letsencrypt/live/$XFASHION_DOMAIN/fullchain.pem \
-        -subj '/CN=$XFASHION_DOMAIN'
-    "
-  fi
-else
-  echo "  using HTTP template (нет TLS-серта для ${APP_DOMAIN:-<unset>})"
-  cp "$DEPLOY_DIR/nginx/default.http.conf.template" "$ACTIVE_TEMPLATE"
-fi
+materialize_nginx_template_from_certs
 
 echo "[step] restarting services"
 compose up -d --remove-orphans
@@ -148,6 +88,7 @@ for _ in 1 2 3 4 5 6 7 8 9 10; do
       exit 1
     fi
     echo "[ok] app identity: frontend=client, work=work"
+    warn_xfashion_tls_if_placeholder
     echo "[ok] update complete (nginx)"
     exit 0
   fi

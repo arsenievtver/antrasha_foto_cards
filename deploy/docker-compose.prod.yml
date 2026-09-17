@@ -131,6 +131,7 @@ services:
       args:
         VITE_XFASHION_VIDEO_URL: ${XFASHION_VIDEO_URL:-}
         VITE_XFASHION_VIDEO_MOBILE_URL: ${XFASHION_VIDEO_MOBILE_URL:-}
+        VITE_SITE_ORIGIN: ${XFASHION_PUBLIC_URL:-https://xfashion.pro}
     restart: unless-stopped
     networks:
       - antrasha_net

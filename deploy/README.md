@@ -69,6 +69,14 @@ WITH_BACKEND=1 bash deploy/scripts/update-xfashion.sh
 bash deploy/scripts/tls-add-xfashion.sh
 ```
 
+Пока не выпущен Let's Encrypt для xfashion, nginx может отдавать **self-signed placeholder** — сайт по `https://` открывается только после «продолжить» или не открывается вовсе. Проверка:
+
+```bash
+bash deploy/scripts/check-xfashion-tls.sh
+```
+
+В `deploy/env/.env.prod`: `XFASHION_PUBLIC_URL=https://xfashion.pro` (canonical/sitemap в сборке лендинга).
+
 В `deploy/env/.env.prod`: `XFASHION_DOMAIN`, опционально `XFASHION_VIDEO_URL` (CDN).  
 В `deploy/env/.env.backend.prod`: `PUBLIC_XFASHION_URL=https://xfashion.pro`, CORS с xfashion.pro.  
 Рекламные ссылки Xfashion — в админке: **Xfashion — ссылки**.

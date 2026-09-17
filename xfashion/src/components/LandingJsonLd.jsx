@@ -1,9 +1,12 @@
+import { getSiteOrigin } from "../config/siteOrigin.js";
+
 export default function LandingJsonLd() {
+  const origin = getSiteOrigin();
   const org = {
     "@context": "https://schema.org",
     "@type": "Organization",
     name: "Xfashion",
-    url: "https://xfashion.pro/",
+    url: `${origin}/`,
     description:
       "ИИ-лукбук и мобильное приложение для магазинов одежды: фото с вешалки, образы на модели, заявка на примерку.",
   };
@@ -11,15 +14,15 @@ export default function LandingJsonLd() {
     "@context": "https://schema.org",
     "@type": "WebSite",
     name: "Xfashion",
-    url: "https://xfashion.pro/",
+    url: `${origin}/`,
     inLanguage: "ru-RU",
-    publisher: { "@type": "Organization", name: "Xfashion", url: "https://xfashion.pro/" },
+    publisher: { "@type": "Organization", name: "Xfashion", url: `${origin}/` },
   };
   const product = {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
     name: "Xfashion",
-    url: "https://xfashion.pro/",
+    url: `${origin}/`,
     applicationCategory: "BusinessApplication",
     operatingSystem: "Web",
     description:

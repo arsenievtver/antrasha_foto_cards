@@ -36,6 +36,14 @@ has_any_cert_files() {
     >/dev/null 2>&1
 }
 
+live_cert_is_letsencrypt() {
+  compose run --rm --no-deps --entrypoint sh certbot -c "
+    test -f \"/etc/letsencrypt/live/$DOMAIN/fullchain.pem\" &&
+    openssl x509 -in \"/etc/letsencrypt/live/$DOMAIN/fullchain.pem\" -noout -issuer 2>/dev/null \
+      | grep -qi 'Let.s Encrypt'
+  " >/dev/null 2>&1
+}
+
 remove_placeholder_cert() {
   echo "[step] remove placeholder / stale live for ${DOMAIN}"
   compose run --rm --no-deps --entrypoint sh certbot -c "
@@ -59,8 +67,8 @@ write_placeholder_cert() {
   "
 }
 
-if has_letsencrypt_cert; then
-  echo "[info] Let's Encrypt для ${DOMAIN} уже выпущен"
+if has_letsencrypt_cert && live_cert_is_letsencrypt; then
+  echo "[info] Let's Encrypt для ${DOMAIN} уже на live/fullchain.pem"
   cp "$DEPLOY_DIR/nginx/default.tls.conf.template" \
     "$DEPLOY_DIR/nginx/templates/default.conf.template"
   compose up -d --force-recreate nginx
@@ -68,10 +76,14 @@ if has_letsencrypt_cert; then
   exit 0
 fi
 
-if ! has_any_cert_files; then
+if has_any_cert_files && ! live_cert_is_letsencrypt; then
+  echo "[warn] сертификат для ${DOMAIN} не от Let's Encrypt (placeholder или битый live/) — перевыпуск"
+  remove_placeholder_cert
+elif ! has_any_cert_files; then
   write_placeholder_cert
 else
-  echo "[info] есть файлы серта без renewal — считаем placeholder, заменим через ACME"
+  echo "[info] есть файлы серта без renewal — заменим через ACME"
+  remove_placeholder_cert
 fi
 
 cp "$DEPLOY_DIR/nginx/default.tls.conf.template" \
