@@ -32,7 +32,7 @@ export default function LandingJsonLd() {
       "Выдача lookbook в мобильном приложении магазина",
       "Заявка на примерку в приложении",
       "Контент для карточек Wildberries и Ozon",
-      "Интеграция с «МойСklad»",
+      "Интеграция с «Мой Склад»",
     ],
     offers: {
       "@type": "Offer",
