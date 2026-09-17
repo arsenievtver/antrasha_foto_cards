@@ -2,6 +2,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Link, Navigate, useParams } from "react-router-dom";
 import { getArticle } from "../content/articles.js";
+import BlogArticleJsonLd from "../components/BlogArticleJsonLd.jsx";
 import PageMeta from "../components/PageMeta.jsx";
 import SiteFooter from "../components/SiteFooter.jsx";
 import SiteHeader from "../components/SiteHeader.jsx";
@@ -19,6 +20,7 @@ export default function BlogArticle() {
         description={article.description}
         canonicalPath={`/blog/${article.slug}`}
       />
+      <BlogArticleJsonLd article={article} />
       <SiteHeader onCta={() => (window.location.href = "/#xf-lead")} />
       <main className="xf-article">
         <Link to="/blog" className="xf-back">

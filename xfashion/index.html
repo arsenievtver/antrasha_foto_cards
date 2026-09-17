@@ -4,10 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="xfashion-app" content="landing" />
-    <title>Xfashion — ИИ-лукбук и приложение для магазина одежды</title>
+    <title>Xfashion — lookbook из фото с телефона, приложение для клиентов</title>
     <meta
       name="description"
-      content="Создавайте фото одежды на моделях без фотосессии и сразу показывайте их в mobile app магазина. Карточки для Wildberries и Ozon. Россия, оплата в рублях."
+      content="Готовое решение для магазинов одежды: стильный lookbook из фото с телефона и своё приложение для клиентов. От 5 000 ₽/мес."
     />
     <meta
       name="keywords"
@@ -23,16 +23,61 @@
     />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Xfashion" />
-    <meta property="og:title" content="Xfashion — ИИ-продавец для магазина одежды" />
+    <meta
+      property="og:title"
+      content="Xfashion — lookbook из фото с телефона, приложение для клиентов"
+    />
     <meta
       property="og:description"
-      content="Лукбук нейросетью и mobile app для клиентов магазина. Без VPN, оплата в рублях."
+      content="Готовое решение для магазинов одежды: стильный lookbook из фото с телефона и своё приложение для клиентов. От 5 000 ₽/мес."
     />
     <meta property="og:url" content="https://xfashion.pro/" />
     <meta property="og:locale" content="ru_RU" />
+    <meta property="og:image" content="https://xfashion.pro/how/model.jpg" />
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+    <!-- Yandex.Metrika counter -->
+    <script type="text/javascript">
+      (function (m, e, t, r, i, k, a) {
+        m[i] =
+          m[i] ||
+          function () {
+            (m[i].a = m[i].a || []).push(arguments);
+          };
+        m[i].l = 1 * new Date();
+        for (var j = 0; j < document.scripts.length; j++) {
+          if (document.scripts[j].src === r) {
+            return;
+          }
+        }
+        k = e.createElement(t);
+        a = e.getElementsByTagName(t)[0];
+        k.async = 1;
+        k.src = r;
+        a.parentNode.insertBefore(k, a);
+      })(window, document, "script", "https://mc.yandex.ru/metrika/tag.js?id=112740119", "ym");
+
+      ym(112740119, "init", {
+        ssr: true,
+        webvisor: true,
+        clickmap: true,
+        ecommerce: "dataLayer",
+        referrer: document.referrer,
+        url: location.href,
+        accurateTrackBounce: true,
+        trackLinks: true,
+      });
+    </script>
+    <noscript
+      ><div>
+        <img
+          src="https://mc.yandex.ru/watch/112740119"
+          style="position: absolute; left: -9999px"
+          alt=""
+        /></div
+    ></noscript>
+    <!-- /Yandex.Metrika counter -->
   </body>
 </html>

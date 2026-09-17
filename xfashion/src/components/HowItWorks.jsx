@@ -19,7 +19,7 @@ const STEPS = [
   },
   {
     n: "03",
-    title: "Клиент уже листает",
+    title: "Клиент оценивает новинки",
     text: "Образы сразу в приложении вашего магазина. Покупатель выбирает лук у себя в телефоне — как в привычной ленте.",
     img: "/how/app-phone.png",
     alt: "Lookbook в мобильном приложении магазина",
@@ -92,8 +92,9 @@ export default function HowItWorks() {
         <header className="xf-flow__head" data-flow-anim>
           <p className="xf-eyebrow">Как это работает</p>
           <h2 id="xf-flow-title">От фото на вешалке — до заявки на примерку</h2>
-          <p className="xf-flow__lead">
-            Сняли в магазине, собрали lookbook — клиент листает образы в приложении и сам двигается к примерке.
+          <p className="xf-flow__lead xf-flow__lead--desktop">
+            Сняли в магазине, собрали lookbook — клиент оценивает образы в приложении, оставляет заявку и
+            совершает покупку в магазине.
           </p>
         </header>
 

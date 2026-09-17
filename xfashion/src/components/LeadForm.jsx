@@ -3,18 +3,9 @@ import { submitLead } from "../api.js";
 import { formatPhoneMask, normalizePhoneRu } from "../utils/masks.js";
 import { getStoredRef } from "../utils/ref.js";
 
-const CHANNELS = [
-  { id: "telegram", label: "Telegram" },
-  { id: "vk", label: "VK" },
-  { id: "phone", label: "Звонок" },
-  { id: "email", label: "Email" },
-  { id: "max", label: "MAX" },
-];
-
 export default function LeadForm({ id = "xf-lead" }) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [channel, setChannel] = useState("telegram");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -33,10 +24,12 @@ export default function LeadForm({ id = "xf-lead" }) {
       await submitLead({
         phone: norm,
         name: name.trim() || null,
-        contact_channel: CHANNELS.find((c) => c.id === channel)?.label || channel,
         message: message.trim() || null,
         ref: getStoredRef() || null,
       });
+      if (typeof window.ym === "function") {
+        window.ym(112740119, "reachGoal", "lead_submit");
+      }
       setDone(true);
     } catch (ex) {
       setErr(ex.message || "Ошибка отправки");
@@ -49,7 +42,7 @@ export default function LeadForm({ id = "xf-lead" }) {
     return (
       <div className="xf-lead xf-lead--done" id={id}>
         <h2>Заявка отправлена</h2>
-        <p>Мы свяжемся с вами выбранным способом в ближайшее время.</p>
+        <p>Мы свяжемся с вами в ближайшее время.</p>
       </div>
     );
   }
@@ -57,21 +50,7 @@ export default function LeadForm({ id = "xf-lead" }) {
   return (
     <form className="xf-lead" id={id} onSubmit={onSubmit}>
       <h2>Запросить презентацию</h2>
-      <p className="xf-lead__hint">Как с вами связаться?</p>
-      <div className="xf-channels" role="group" aria-label="Способ связи">
-        {CHANNELS.map((c) => (
-          <label key={c.id} className="xf-channel">
-            <input
-              type="radio"
-              name="channel"
-              value={c.id}
-              checked={channel === c.id}
-              onChange={() => setChannel(c.id)}
-            />
-            {c.label}
-          </label>
-        ))}
-      </div>
+      <p className="xf-lead__hint">Оставьте контакты — перезвоним и покажем, как это работает в вашем магазине.</p>
       <label>
         Имя
         <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Необязательно" />

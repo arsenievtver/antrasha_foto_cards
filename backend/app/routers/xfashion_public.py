@@ -70,7 +70,8 @@ def create_xfashion_lead(
     note_parts = ["[Xfashion]"]
     if body.name and body.name.strip():
         note_parts.append(f"Имя: {body.name.strip()}")
-    note_parts.append(f"Связь: {body.contact_channel.strip()}")
+    if body.contact_channel and body.contact_channel.strip():
+        note_parts.append(f"Связь: {body.contact_channel.strip()}")
     if body.ref and body.ref.strip():
         note_parts.append(f"ref={body.ref.strip()}")
     if body.message and body.message.strip():

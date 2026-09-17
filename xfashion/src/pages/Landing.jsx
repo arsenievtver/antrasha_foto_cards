@@ -3,23 +3,13 @@ import { Link } from "react-router-dom";
 import BenefitCards from "../components/BenefitCards.jsx";
 import FaqSection from "../components/FaqSection.jsx";
 import HowItWorks from "../components/HowItWorks.jsx";
+import LandingSeoIntro from "../components/LandingSeoIntro.jsx";
 import LandingJsonLd from "../components/LandingJsonLd.jsx";
 import LeadForm from "../components/LeadForm.jsx";
 import PageMeta from "../components/PageMeta.jsx";
 import SiteFooter from "../components/SiteFooter.jsx";
 import SiteHeader from "../components/SiteHeader.jsx";
 import VideoHero from "../components/VideoHero.jsx";
-
-const SEO_BLOCKS = [
-  {
-    title: "Фото на моделях без съёмок",
-    text: "Кадры для сайта, карточек Wildberries и Ozon и клиентского приложения — из одного пайплайна.",
-  },
-  {
-    title: "ИИ-лукбук и приложение в одной подписке",
-    text: "Отдельные генераторы фото не отдают результат в ваш mobile app — Xfashion закрывает цикл «контент → приложение».",
-  },
-];
 
 export default function Landing() {
   const scrollToLead = useCallback(() => {
@@ -41,24 +31,28 @@ export default function Landing() {
       </div>
 
       <main id="xf-after-hero">
+        <LandingSeoIntro />
         <HowItWorks />
         <BenefitCards />
-        {SEO_BLOCKS.map((s) => (
-          <section key={s.title} className="xf-section xf-block xf-block--compact">
-            <h2>{s.title}</h2>
-            <p>{s.text}</p>
-          </section>
-        ))}
-        <section className="xf-section xf-blog-teaser">
-          <h2>Гайды для владельцев магазинов</h2>
-          <p>Лукбуки, маркетплейсы и mobile app без Instagram.</p>
-          <Link to="/blog" className="xf-link">
-            Блог →
-          </Link>
-        </section>
         <FaqSection />
-        <section className="xf-section xf-lead-wrap">
-          <LeadForm />
+        <section className="xf-blog-teaser" aria-labelledby="xf-blog-teaser-title">
+          <div className="xf-blog-teaser__inner">
+            <header className="xf-blog-teaser__head">
+              <p className="xf-eyebrow">Блог</p>
+              <h2 id="xf-blog-teaser-title">Гайды для владельцев магазинов</h2>
+              <p className="xf-blog-teaser__lead">
+                Лукбуки, маркетплейсы и mobile app без Instagram.
+              </p>
+              <Link to="/blog" className="xf-link xf-blog-teaser__link">
+                Читать гайды →
+              </Link>
+            </header>
+          </div>
+        </section>
+        <section className="xf-lead-section">
+          <div className="xf-lead-section__inner">
+            <LeadForm />
+          </div>
         </section>
       </main>
       <SiteFooter />
