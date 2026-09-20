@@ -1,7 +1,8 @@
 """Версия и размерность векторов вкуса / фото (должны совпадать у photo_embeddings и user_taste_vectors)."""
 
-# OpenCLIP ViT-B/32 через fastembed ImageEmbedding — 512 измерений.
-EMBEDDING_MODEL_VERSION = "fastembed-vit-b-32"
+# CLIP ViT-B/32 vision encoder (fastembed) — 512 измерений.
+FASTEMBED_IMAGE_MODEL = "Qdrant/clip-ViT-B-32-vision"
+EMBEDDING_MODEL_VERSION = "fastembed-clip-vit-b-32-vision"
 EMBEDDING_DIM = 512
 
 # EMA профиля пользователя после лайка/дизлайка (k от view_time умножается отдельно).

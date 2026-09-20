@@ -278,9 +278,16 @@ function normalizeFeedPhotos(raw) {
 
 /** Пустая выдача: исчерпан каталог vs реально нет фото в коллекции. */
 function classifyEmptyFeed(meta) {
-	if (Number(meta?.catalog_exhausted) > 0) return "exhausted";
-	if (Number(meta?.total_active_for_gender) === 0) return "no_catalog";
-	return null;
+	if (!meta || typeof meta !== "object") return "exhausted";
+	if (Number(meta.catalog_exhausted) > 0) return "exhausted";
+	const total = Number(meta.total_active_for_gender);
+	const seen = Number(meta.seen_in_this_collection);
+	const candidates = Number(meta.candidates);
+	if (total > 0 && seen >= total) return "exhausted";
+	if (total > 0 && candidates === 0 && seen > 0) return "exhausted";
+	if (total === 0) return "no_catalog";
+	if (Number.isFinite(total) && total > 0) return "exhausted";
+	return "exhausted";
 }
 
 function CardImage({ url, fetchPriority, photoId, eager, onBroken }) {
@@ -513,12 +520,7 @@ export default function Swipe() {
 				const { list, meta } = await loadChunk(limit);
 				if (cancelled) return;
 				if (!list.length) {
-					const emptyKind = classifyEmptyFeed(meta);
-					if (emptyKind) {
-						openFeedEmpty(emptyKind, meta);
-					} else {
-						goThankYou(0, 0, []);
-					}
+					openFeedEmpty(classifyEmptyFeed(meta), meta);
 				}
 			} catch (e) {
 				if (!cancelled) setLoadError(e.message || String(e));
@@ -689,16 +691,7 @@ export default function Swipe() {
 		try {
 			const { list, meta } = await loadChunk(chunkSize);
 			if (!list.length) {
-				const emptyKind = classifyEmptyFeed(meta);
-				if (emptyKind) {
-					openFeedEmpty(emptyKind, meta);
-				} else {
-					goThankYou(
-						checkpoint.session.likes,
-						checkpoint.session.total,
-						checkpoint.likedPhotoIds,
-					);
-				}
+				openFeedEmpty(classifyEmptyFeed(meta), meta);
 			}
 		} catch (e) {
 			setLoadError(e.message || String(e));

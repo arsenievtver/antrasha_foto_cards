@@ -9,7 +9,11 @@ import requests
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.embedding_constants import EMBEDDING_DIM, EMBEDDING_MODEL_VERSION
+from app.embedding_constants import (
+    EMBEDDING_DIM,
+    EMBEDDING_MODEL_VERSION,
+    FASTEMBED_IMAGE_MODEL,
+)
 from app.models import PHOTO_SOURCE_YC_OBJECT_STORAGE, Photo, PhotoEmbedding
 
 log = logging.getLogger("app.photo_embedding")
@@ -28,7 +32,7 @@ def _get_image_model():
             "fastembed не установлен — worker эмбеддингов недоступен "
             "(pip install -r requirements-embeddings.txt)"
         ) from e
-    _IMAGE_MODEL = ImageEmbedding(model_name="ViT-B-32")
+    _IMAGE_MODEL = ImageEmbedding(model_name=FASTEMBED_IMAGE_MODEL)
     return _IMAGE_MODEL
 
 
