@@ -1,6 +1,14 @@
 import { setCacheNameDetails } from "workbox-core";
 import { cleanupOutdatedCaches, precacheAndRoute } from "workbox-precaching";
 
+self.addEventListener("install", (event) => {
+	event.waitUntil(self.skipWaiting());
+});
+
+self.addEventListener("activate", (event) => {
+	event.waitUntil(self.clients.claim());
+});
+
 setCacheNameDetails({
 	prefix: "antrasha-client",
 	suffix: "v1",

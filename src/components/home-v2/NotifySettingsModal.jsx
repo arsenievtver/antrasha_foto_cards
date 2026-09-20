@@ -29,48 +29,45 @@ export default function NotifySettingsModal({ open, onClose, onPushStateChange }
 	const [accountActive, setAccountActive] = useState(false);
 	const [accountScope, setAccountScope] = useState(null);
 	const [pushProbe, setPushProbe] = useState(null);
+	const [probeBusy, setProbeBusy] = useState(false);
 	const pushReady = pushProbe ? isPushReadyFromProbe(pushProbe) : null;
+
+	async function runPushProbe({ forceRetry = false } = {}) {
+		setProbeBusy(true);
+		setError("");
+		try {
+			const probe = await preparePushServiceWorker({ forceRetry });
+			setPushProbe(probe);
+			if (!isPushReadyFromProbe(probe)) {
+				setServerOk(false);
+				return;
+			}
+			const ok = await isPushAvailableOnServer();
+			setServerOk(ok);
+			const onDevice = await isPushActiveOnDevice();
+			setDeviceActive(onDevice);
+			if (isAuthenticated) {
+				const acc = await fetchPushAccountStatus();
+				setAccountActive(Boolean(acc?.active));
+				setAccountScope(acc?.gender_scope ?? null);
+				if (acc?.gender_scope) setGenderScope(acc.gender_scope);
+			}
+		} catch (e) {
+			setError(e.message || String(e));
+		} finally {
+			setProbeBusy(false);
+		}
+	}
 
 	useEffect(() => {
 		if (!open) return undefined;
-		let cancelled = false;
-		setError("");
 		setServerOk(null);
 		setDeviceActive(false);
 		setAccountActive(false);
 		setAccountScope(null);
 		setPushProbe(null);
-
-		(async () => {
-			try {
-				const probe = await preparePushServiceWorker();
-				if (cancelled) return;
-				setPushProbe(probe);
-				if (!isPushReadyFromProbe(probe)) {
-					setServerOk(false);
-					return;
-				}
-				const ok = await isPushAvailableOnServer();
-				if (cancelled) return;
-				setServerOk(ok);
-				const onDevice = await isPushActiveOnDevice();
-				if (cancelled) return;
-				setDeviceActive(onDevice);
-				if (isAuthenticated) {
-					const acc = await fetchPushAccountStatus();
-					if (cancelled) return;
-					setAccountActive(Boolean(acc?.active));
-					setAccountScope(acc?.gender_scope ?? null);
-					if (acc?.gender_scope) setGenderScope(acc.gender_scope);
-				}
-			} catch (e) {
-				if (!cancelled) setError(e.message || String(e));
-			}
-		})();
-
-		return () => {
-			cancelled = true;
-		};
+		void runPushProbe();
+		// eslint-disable-next-line react-hooks/exhaustive-deps -- только открытие модалки
 	}, [open, isAuthenticated]);
 
 	if (!open) return null;
@@ -126,10 +123,21 @@ export default function NotifySettingsModal({ open, onClose, onPushStateChange }
 				<h2 id="hv2-notify-title" className="hv2-notify-title">
 					Уведомления
 				</h2>
-				{pushReady === null ? (
+				{pushReady === null && probeBusy ? (
 					<p className="hv2-notify-text">Проверяем push и service worker…</p>
 				) : pushReady === false ? (
-					<p className="hv2-notify-text">{getPushUnsupportedHint(pushProbe)}</p>
+					<>
+						<p className="hv2-notify-text">{getPushUnsupportedHint(pushProbe)}</p>
+						{error ? <p className="hv2-notify-error">{error}</p> : null}
+						<button
+							type="button"
+							className="hv2-notify-btn"
+							disabled={probeBusy}
+							onClick={() => runPushProbe({ forceRetry: true })}
+						>
+							{probeBusy ? "Повтор…" : "Повторить (сбросить service worker)"}
+						</button>
+					</>
 				) : serverOk === false ? (
 					<p className="hv2-notify-text">Уведомления временно недоступны.</p>
 				) : pushEnabled ? (

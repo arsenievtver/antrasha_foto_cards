@@ -3,6 +3,12 @@ import { apiUrl, ensureSessionId, getAuthToken } from "../api/client.js";
 export const PUSH_PROMPT_DISMISSED_KEY = "antrasha_push_prompt_dismissed";
 export const PUSH_SUBSCRIBED_KEY = "antrasha_push_subscribed";
 
+const SW_URL = "/sw.js";
+const SW_SCOPE = "/";
+const SW_READY_MS = 25000;
+
+let swPreparePromise = null;
+
 export function isStandaloneDisplayMode() {
 	if (typeof window === "undefined") return false;
 	if (window.navigator.standalone === true) return true;
@@ -17,22 +23,44 @@ function isIosSafari() {
 	return /iPad|iPhone|iPod/.test(navigator.userAgent);
 }
 
-function isAntrashaPwaLaunchUrl() {
-	try {
-		return new URL(window.location.href).searchParams.get("pwa") === "antrasha-client";
-	} catch {
-		return false;
-	}
+function waitForWorkerState(worker, state, timeoutMs) {
+	return new Promise((resolve, reject) => {
+		if (!worker) {
+			reject(new Error("нет worker"));
+			return;
+		}
+		if (worker.state === state) {
+			resolve();
+			return;
+		}
+		const timer = window.setTimeout(() => {
+			worker.removeEventListener("statechange", onChange);
+			reject(new Error(`worker не перешёл в ${state}`));
+		}, timeoutMs);
+		function onChange() {
+			if (worker.state === state) {
+				window.clearTimeout(timer);
+				worker.removeEventListener("statechange", onChange);
+				resolve();
+			}
+		}
+		worker.addEventListener("statechange", onChange);
+	});
 }
 
-/** Синхронная проверка API (без ожидания регистрации SW). */
-export function isPushSupported() {
-	if (typeof window === "undefined") return false;
-	if (!window.isSecureContext) return false;
-	if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
-		return false;
+async function waitForActiveRegistration(reg, timeoutMs = SW_READY_MS) {
+	if (!reg) return null;
+	if (reg.active) return reg;
+	const pending = reg.installing || reg.waiting;
+	if (pending) {
+		await waitForWorkerState(pending, "activated", timeoutMs);
 	}
-	return true;
+	return (await navigator.serviceWorker.getRegistration(SW_SCOPE)) || reg;
+}
+
+function probeHasPushManager(probe, reg) {
+	if (probe.pushManagerApi) return true;
+	return Boolean(reg?.pushManager);
 }
 
 /**
@@ -41,100 +69,125 @@ export function isPushSupported() {
  * @property {boolean} serviceWorkerApi
  * @property {boolean} pushManagerApi
  * @property {boolean} standalone
- * @property {boolean} pwaLaunchUrl
  * @property {boolean} registrationReady
  * @property {string} [registerError]
  */
 
-/** Регистрация SW + ожидание ready (iOS PWA часто не успевает к первому тапу по колокольчику). */
-export async function preparePushServiceWorker() {
-	/** @type {PushEnvironmentProbe} */
-	const probe = {
-		secure: typeof window !== "undefined" && window.isSecureContext,
-		serviceWorkerApi: typeof navigator !== "undefined" && "serviceWorker" in navigator,
-		pushManagerApi: typeof window !== "undefined" && "PushManager" in window,
-		standalone: isStandaloneDisplayMode(),
-		pwaLaunchUrl: isAntrashaPwaLaunchUrl(),
-		registrationReady: false,
-	};
+/** Регистрация SW + ожидание active (iOS PWA). */
+export async function preparePushServiceWorker({ forceRetry = false } = {}) {
+	if (forceRetry) swPreparePromise = null;
 
-	if (!probe.secure || !probe.serviceWorkerApi) {
-		return probe;
+	if (!swPreparePromise) {
+		swPreparePromise = (async () => {
+			/** @type {PushEnvironmentProbe} */
+			const probe = {
+				secure: typeof window !== "undefined" && window.isSecureContext,
+				serviceWorkerApi:
+					typeof navigator !== "undefined" && "serviceWorker" in navigator,
+				pushManagerApi: typeof window !== "undefined" && "PushManager" in window,
+				standalone: isStandaloneDisplayMode(),
+				registrationReady: false,
+			};
+
+			if (!probe.secure || !probe.serviceWorkerApi) {
+				return probe;
+			}
+
+			try {
+				let reg = await navigator.serviceWorker.getRegistration(SW_SCOPE);
+				if (!reg || forceRetry) {
+					if (forceRetry) {
+						const all = await navigator.serviceWorker.getRegistrations();
+						await Promise.all(all.map((r) => r.unregister()));
+					}
+					reg = await navigator.serviceWorker.register(SW_URL, {
+						scope: SW_SCOPE,
+						updateViaCache: "none",
+					});
+				} else {
+					await reg.update().catch(() => {});
+				}
+
+				await Promise.race([
+					navigator.serviceWorker.ready,
+					new Promise((_, reject) => {
+						window.setTimeout(
+							() => reject(new Error("service worker не активировался вовремя")),
+							SW_READY_MS,
+						);
+					}),
+				]);
+
+				reg = (await waitForActiveRegistration(reg)) || reg;
+				probe.pushManagerApi = probeHasPushManager(probe, reg);
+				probe.registrationReady = Boolean(reg?.active);
+			} catch (e) {
+				probe.registerError = e?.message || String(e);
+			}
+
+			return probe;
+		})().finally(() => {
+			swPreparePromise = null;
+		});
 	}
 
-	try {
-		let reg = await navigator.serviceWorker.getRegistration("/");
-		if (!reg) {
-			reg = await navigator.serviceWorker.register("/sw.js", {
-				scope: "/",
-				updateViaCache: "none",
-			});
-		}
-		await Promise.race([
-			navigator.serviceWorker.ready,
-			new Promise((_, reject) => {
-				window.setTimeout(
-					() => reject(new Error("Service worker не активировался за 15 с")),
-					15000,
-				);
-			}),
-		]);
-		probe.registrationReady = Boolean(reg?.active || navigator.serviceWorker.controller);
-	} catch (e) {
-		probe.registerError = e?.message || String(e);
-	}
-
-	return probe;
+	return swPreparePromise;
 }
 
 /** Почему push недоступен — для текста в UI. */
 export function getPushUnsupportedHint(probe = null) {
 	if (typeof window === "undefined") return "Push недоступен в этом окружении.";
 	if (!window.isSecureContext) {
-		return "Нужно защищённое соединение (HTTPS). Откройте https://antrasha.ru и обновите страницу.";
+		return "Нужно HTTPS. Откройте https://antrasha.ru и обновите страницу.";
 	}
 
 	const ios = isIosSafari();
 	const standalone = probe?.standalone ?? isStandaloneDisplayMode();
-	const pwaUrl = probe?.pwaLaunchUrl ?? isAntrashaPwaLaunchUrl();
 	const swApi = probe?.serviceWorkerApi ?? "serviceWorker" in navigator;
 	const pushApi = probe?.pushManagerApi ?? "PushManager" in window;
 
-	if (!pushApi) {
-		return "Обновите iOS до 16.4 или новее — без этого push на iPhone недоступны.";
+	// Во вкладке Safari на iPhone нет PushManager и часто нет SW — это норма, не «старый iOS».
+	if (ios && !standalone) {
+		return "На iPhone push включаются только в приложении ANTRASHA с «Домашнего экрана»: откройте иконку (не Safari). Если иконка уже есть — полностью закройте Safari и запускайте только с экрана «Домой».";
 	}
 
-	if (!swApi) {
-		if (ios) {
-			if (standalone || pwaUrl) {
-				return "Service worker не стартовал в приложении с «Домашнего экрана». Полностью закройте ANTRASHA (смахните из переключателя приложений), откройте снова с иконки и повторите. Если не помогло — удалите ярлык и добавьте заново с «Открыть как веб-приложение».";
-			}
-			return "На iPhone push работают только из иконки ANTRASHA на «Домашнем экране» (не из вкладки Safari). Добавьте через Поделиться → «На экран Домой» с включённым «Открыть как веб-приложение».";
-		}
-		return "Service worker недоступен в этом браузере.";
+	if (ios && standalone && !swApi) {
+		return "В установленном приложении не доступен service worker. Удалите ярлык ANTRASHA, добавьте заново (Поделиться → «На экран Домой», «Открыть как веб-приложение») и откройте с иконки.";
 	}
 
 	if (probe?.registerError) {
-		return `Не удалось запустить service worker: ${probe.registerError}. Закройте приложение полностью и откройте с иконки ANTRASHA ещё раз.`;
+		return `Service worker не запустился: ${probe.registerError}. Нажмите «Повторить» ниже или удалите ярлык и установите PWA заново — после неудачного обновления сайта на iPhone такое бывает.`;
 	}
 
-	if (probe && swApi && pushApi && !probe.registrationReady) {
-		return "Service worker ещё не готов. Подождите пару секунд и нажмите «Уведомления» снова или перезапустите приложение с иконки.";
+	if (probe && swApi && !probe.registrationReady) {
+		return "Service worker ещё загружается. Подождите 3–5 секунд и нажмите «Повторить».";
 	}
 
-	if (ios && !standalone && !pwaUrl) {
-		return "Откройте ANTRASHA с иконки на «Домашнем экране» (не Safari) — затем включите уведомления.";
+	if (ios && standalone && !pushApi) {
+		return "Push API недоступен в этом приложении. Обновите iOS до последней версии, перезапустите iPhone и снова откройте ANTRASHA с иконки.";
+	}
+
+	if (!swApi || !pushApi) {
+		return "Этот браузер не поддерживает web push.";
 	}
 
 	return "Push-уведомления недоступны в этом режиме.";
 }
 
-/** Готовность push после попытки регистрации SW. */
 export function isPushReadyFromProbe(probe) {
-	if (!probe?.secure || !probe.serviceWorkerApi || !probe.pushManagerApi) return false;
+	if (!probe?.secure || !probe.serviceWorkerApi) return false;
 	if (!probe.registrationReady) return false;
-	if (isIosSafari() && !probe.standalone && !probe.pwaLaunchUrl) return false;
+	if (!probe.pushManagerApi) return false;
+	if (isIosSafari() && !probe.standalone) return false;
 	return true;
+}
+
+/** Быстрая проверка без ожидания SW. */
+export function isPushSupported() {
+	if (typeof window === "undefined") return false;
+	if (!window.isSecureContext) return false;
+	if (isIosSafari() && !isStandaloneDisplayMode()) return false;
+	return "serviceWorker" in navigator && "PushManager" in window;
 }
 
 export function isPushSubscribedLocally() {
@@ -198,11 +251,18 @@ async function pushAuthHeaders() {
 	return headers;
 }
 
+async function getServiceWorkerRegistrationForPush() {
+	const probe = await preparePushServiceWorker();
+	if (!isPushReadyFromProbe(probe)) {
+		throw new Error(getPushUnsupportedHint(probe));
+	}
+	return navigator.serviceWorker.ready;
+}
+
 /** Подписка в браузере на этом устройстве. */
 export async function getBrowserPushSubscription() {
-	if (!isPushSupported()) return null;
 	try {
-		const registration = await waitForServiceWorkerRegistration();
+		const registration = await getServiceWorkerRegistrationForPush();
 		return registration.pushManager.getSubscription();
 	} catch {
 		return null;
@@ -290,21 +350,12 @@ async function postPushSubscription(subscription, genderScope) {
 }
 
 export async function isPushAvailableOnServer() {
-	if (!isPushSupported()) return false;
 	try {
 		const key = await fetchVapidPublicKey();
 		return Boolean(key);
 	} catch {
 		return false;
 	}
-}
-
-async function waitForServiceWorkerRegistration() {
-	const probe = await preparePushServiceWorker();
-	if (!isPushReadyFromProbe(probe)) {
-		throw new Error(getPushUnsupportedHint(probe));
-	}
-	return navigator.serviceWorker.ready;
 }
 
 export async function subscribeToNewPhotosPush(genderScope = "both") {
@@ -320,10 +371,7 @@ export async function subscribeToNewPhotosPush(genderScope = "both") {
 	let permission = "default";
 	if ("Notification" in window) {
 		permission = await Notification.requestPermission();
-	} else if (
-		isIosSafari() &&
-		(isStandaloneDisplayMode() || isAntrashaPwaLaunchUrl())
-	) {
+	} else if (isIosSafari() && isStandaloneDisplayMode()) {
 		permission = "default";
 	} else {
 		throw new Error(getPushUnsupportedHint(probe));
@@ -337,7 +385,7 @@ export async function subscribeToNewPhotosPush(genderScope = "both") {
 		throw new Error("Уведомления временно недоступны");
 	}
 
-	const registration = await waitForServiceWorkerRegistration();
+	const registration = await getServiceWorkerRegistrationForPush();
 	const subscription = await registration.pushManager.subscribe({
 		userVisibleOnly: true,
 		applicationServerKey: urlBase64ToUint8Array(publicKey),
@@ -351,21 +399,23 @@ export async function subscribeToNewPhotosPush(genderScope = "both") {
 
 /** Отключить push на этом устройстве; для профиля — снять подписку на сервере. */
 export async function unsubscribeFromNewPhotosPush() {
-	if (!isPushSupported()) {
-		clearPushSubscribedLocally();
-		return;
-	}
-	const registration = await waitForServiceWorkerRegistration();
-	const sub = await registration.pushManager.getSubscription();
-	if (sub?.endpoint) {
-		await postPushUnsubscribe(sub.endpoint);
-		try {
-			await sub.unsubscribe();
-		} catch {
-			/* ignore */
+	try {
+		const registration = await getServiceWorkerRegistrationForPush();
+		const sub = await registration.pushManager.getSubscription();
+		if (sub?.endpoint) {
+			await postPushUnsubscribe(sub.endpoint);
+			try {
+				await sub.unsubscribe();
+			} catch {
+				/* ignore */
+			}
+		} else if (getAuthToken()) {
+			await postPushUnsubscribeAll();
 		}
-	} else if (getAuthToken()) {
-		await postPushUnsubscribeAll();
+	} catch {
+		if (getAuthToken()) {
+			await postPushUnsubscribeAll();
+		}
 	}
 	clearPushSubscribedLocally();
 }
