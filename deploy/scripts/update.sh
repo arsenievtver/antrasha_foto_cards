@@ -14,8 +14,11 @@ cd "$REPO_ROOT"
 echo "[step] git pull --ff-only"
 git pull --ff-only
 
-echo "[step] rebuilding images"
-compose build backend ai-ingest-worker frontend admin work xfashion
+echo "[step] rebuilding images (по одному сервису — меньше шанс OOM на VM 2 GB)"
+for _svc in backend ai-ingest-worker frontend admin work xfashion; do
+  echo "[step] docker build: $_svc"
+  compose build "$_svc"
+done
 
 echo "[step] ensuring postgres up"
 compose up -d postgres

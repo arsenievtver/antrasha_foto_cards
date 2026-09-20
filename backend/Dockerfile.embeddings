@@ -1,0 +1,17 @@
+FROM python:3.13-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements-embeddings.txt .
+RUN pip install --no-cache-dir --index-url https://pypi.org/simple/ -r requirements-embeddings.txt
+
+COPY . .
+
+CMD ["python", "-m", "jobs.photo_embedding_worker"]

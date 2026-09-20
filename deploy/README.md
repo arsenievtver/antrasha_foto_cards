@@ -211,3 +211,22 @@ Postgres image: `pgvector/pgvector:pg16` (extension `vector` создаётся 
 3. В админке **Feed settings** переключить `feed_ranking_mode`: `tags` → `hybrid` → `vectors` после того как большинство активных фото имеют embedding.
 
 **RAM на VM 2 GB:** API + Postgres + nginx умещаются; **воркер CLIP/fastembed на том же 2 GB не рекомендуется** (пик ~1–1.5 GB на инференс). Либо апгрейд до **4 GB**, либо backfill с ноутбука по `DATABASE_URL`, либо вынести worker на вторую маленькую VM.
+
+## Сборка упала на `frontend build … npm run build`
+
+На машине **2 GB** частая причина — **не ошибка кода**, а **OOM**: `update.sh` раньше собирал `frontend admin work xfashion` параллельно с backend. Сейчас образы собираются **по очереди**.
+
+На сервере посмотреть реальный лог (не только красную строку в Docker Desktop):
+
+```bash
+cd /opt/antrasha_tinder
+docker compose -f deploy/docker-compose.prod.yml build frontend 2>&1 | tee /tmp/frontend-build.log
+tail -80 /tmp/frontend-build.log
+echo "exit=$?"
+dmesg 2>/dev/null | tail -5 | rg -i 'kill|oom' || true
+```
+
+- **exit=137** или **Killed** в логе → не хватило RAM: включить **swap 2G** или апгрейд VM, собирать по одному сервису.
+- Текст ошибки **Vite / Rollup** → прислать последние 30 строк лога (это уже код/зависимости).
+
+После успешной сборки frontend не забудьте миграции (`046`–`048`) и образ Postgres **`pgvector/pgvector:pg16`** — без них backend может падать уже после build.
