@@ -521,13 +521,15 @@ def embed_catalog_status(
     _principal: AdminPrincipal = Depends(get_admin_principal),
 ) -> EmbedCatalogStatusOut:
     _ = _principal
+    needing = count_catalog_photos_needing_embedding(db)
     fastembed_ok = True
-    try:
-        from fastembed import ImageEmbedding  # noqa: F401
-    except ImportError:
-        fastembed_ok = False
+    if needing > 0:
+        try:
+            from fastembed import ImageEmbedding  # noqa: F401
+        except ImportError:
+            fastembed_ok = False
     return EmbedCatalogStatusOut(
-        needing_embedding=count_catalog_photos_needing_embedding(db),
+        needing_embedding=needing,
         fastembed_available=fastembed_ok,
     )
 
@@ -537,7 +539,7 @@ def embed_catalog_backfill(
     db: Session = Depends(get_db),
     _su: AdminPrincipal = Depends(require_superuser),
     gender: str | None = Query(None, max_length=10),
-    limit: int = Query(12, ge=1, le=30),
+    limit: int = Query(4, ge=1, le=12),
 ) -> EmbedCatalogBackfillOut:
     _ = _su
     g: str | None = None
@@ -549,6 +551,20 @@ def embed_catalog_backfill(
         result = embed_catalog_backfill_batch(db, gender=g, limit=limit)
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
+    except MemoryError as e:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Не хватило RAM для CLIP/fastembed в процессе API. "
+                "На VM 2 GB используйте photo-embedding-worker (deploy/README) или backfill с Mac."
+            ),
+        ) from e
+    except Exception as e:
+        log.exception("embed_catalog_backfill failed")
+        raise HTTPException(
+            status_code=503,
+            detail=f"Ошибка векторизации: {type(e).__name__}: {e}",
+        ) from e
     return EmbedCatalogBackfillOut(**result)
 
 

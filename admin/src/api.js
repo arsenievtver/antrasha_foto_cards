@@ -266,7 +266,7 @@ export async function fetchEmbedCatalogStatus() {
 }
 
 /** Порция backfill векторов для фото уже в ленте (без embedding). */
-export async function embedCatalogBackfill({ gender, limit = 12 } = {}) {
+export async function embedCatalogBackfill({ gender, limit = 4 } = {}) {
   const q = new URLSearchParams({ limit: String(limit) });
   if (gender) q.set("gender", gender);
   const res = await fetch(`${apiUrl("/admin/feed-settings/embed-catalog-backfill")}?${q}`, {

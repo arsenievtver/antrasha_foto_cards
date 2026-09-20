@@ -21,6 +21,7 @@ import {
 	postInteraction,
 } from "../api/client";
 import SwipeCheckpoint from "../components/SwipeCheckpoint.jsx";
+import SwipeFeedEmpty from "../components/SwipeFeedEmpty.jsx";
 import PushNotifyPrompt from "../components/PushNotifyPrompt";
 import { useAuth } from "../context/AuthContext";
 import "./Swipe.css";
@@ -275,6 +276,13 @@ function normalizeFeedPhotos(raw) {
 	return Array.from(byId.values());
 }
 
+/** Пустая выдача: исчерпан каталог vs реально нет фото в коллекции. */
+function classifyEmptyFeed(meta) {
+	if (Number(meta?.catalog_exhausted) > 0) return "exhausted";
+	if (Number(meta?.total_active_for_gender) === 0) return "no_catalog";
+	return null;
+}
+
 function CardImage({ url, fetchPriority, photoId, eager, onBroken }) {
 	const [ready, setReady] = useState(() => imageReadyUrls.has(url));
 	const [broken, setBroken] = useState(false);
@@ -405,6 +413,8 @@ export default function Swipe() {
 	const [loading, setLoading] = useState(true);
 
 	const [phase, setPhase] = useState("swipe");
+	const [feedEmptyKind, setFeedEmptyKind] = useState(null);
+	const [replayCatalog, setReplayCatalog] = useState(false);
 	const [chunkSize, setChunkSize] = useState(10);
 	const [feedMeta, setFeedMeta] = useState(null);
 	const [checkpoint, setCheckpoint] = useState(null);
@@ -445,8 +455,11 @@ export default function Swipe() {
 	);
 
 	const loadChunk = useCallback(
-		async (limit) => {
-			const data = await loadFeed(gender, { limit });
+		async (limit, { includeSeen = false } = {}) => {
+			const data = await loadFeed(gender, {
+				limit,
+				includeSeen: includeSeen || replayCatalog,
+			});
 			const list = normalizeFeedPhotos(data.photos ?? []);
 			setFeedMeta(data.meta ?? null);
 			setPhotos(list);
@@ -463,8 +476,15 @@ export default function Swipe() {
 			scheduleFeedPreload(urls, 0);
 			return { list, meta: data.meta ?? null };
 		},
-		[gender, dragX],
+		[gender, dragX, replayCatalog],
 	);
+
+	const openFeedEmpty = useCallback((kind, meta) => {
+		setFeedEmptyKind(kind);
+		setFeedMeta(meta ?? null);
+		setPhase("feed_empty");
+		setPhotos([]);
+	}, []);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -473,6 +493,8 @@ export default function Swipe() {
 		setLoadError(null);
 		setPhotos([]);
 		setPhase("swipe");
+		setFeedEmptyKind(null);
+		setReplayCatalog(false);
 		setCheckpoint(null);
 		setSessionLikes(0);
 		setSessionTotal(0);
@@ -488,10 +510,15 @@ export default function Swipe() {
 				const settings = await fetchFeedPublicSettings();
 				const limit = Math.max(1, Number(settings?.swipe_chunk_size) || 10);
 				if (!cancelled) setChunkSize(limit);
-				const { list } = await loadChunk(limit);
+				const { list, meta } = await loadChunk(limit);
 				if (cancelled) return;
 				if (!list.length) {
-					goThankYou(0, 0, []);
+					const emptyKind = classifyEmptyFeed(meta);
+					if (emptyKind) {
+						openFeedEmpty(emptyKind, meta);
+					} else {
+						goThankYou(0, 0, []);
+					}
 				}
 			} catch (e) {
 				if (!cancelled) setLoadError(e.message || String(e));
@@ -502,7 +529,7 @@ export default function Swipe() {
 		return () => {
 			cancelled = true;
 		};
-	}, [gender, dragX, goThankYou, loadChunk]);
+	}, [gender, dragX, goThankYou, loadChunk, openFeedEmpty]);
 
 	const currentPhoto = photos[index];
 
@@ -660,20 +687,44 @@ export default function Swipe() {
 		setCheckpoint(null);
 		setLoading(true);
 		try {
-			const { list } = await loadChunk(chunkSize);
+			const { list, meta } = await loadChunk(chunkSize);
 			if (!list.length) {
-				goThankYou(
-					checkpoint.session.likes,
-					checkpoint.session.total,
-					checkpoint.likedPhotoIds,
-				);
+				const emptyKind = classifyEmptyFeed(meta);
+				if (emptyKind) {
+					openFeedEmpty(emptyKind, meta);
+				} else {
+					goThankYou(
+						checkpoint.session.likes,
+						checkpoint.session.total,
+						checkpoint.likedPhotoIds,
+					);
+				}
 			}
 		} catch (e) {
 			setLoadError(e.message || String(e));
 		} finally {
 			setLoading(false);
 		}
-	}, [checkpoint, chunkSize, goThankYou, loadChunk]);
+	}, [checkpoint, chunkSize, goThankYou, loadChunk, openFeedEmpty]);
+
+	const onReplayCatalog = useCallback(async () => {
+		setReplayCatalog(true);
+		setFeedEmptyKind(null);
+		setPhase("swipe");
+		setLoading(true);
+		setLoadError(null);
+		try {
+			const { list, meta } = await loadChunk(chunkSize, { includeSeen: true });
+			if (!list.length) {
+				const emptyKind = classifyEmptyFeed(meta) || "no_catalog";
+				openFeedEmpty(emptyKind, meta);
+			}
+		} catch (e) {
+			setLoadError(e.message || String(e));
+		} finally {
+			setLoading(false);
+		}
+	}, [chunkSize, loadChunk, openFeedEmpty]);
 
 	const onCheckpointThankYou = useCallback(() => {
 		if (!checkpoint) return;
@@ -738,6 +789,22 @@ export default function Swipe() {
 		return <div className="swipe-no-images">Загрузка…</div>;
 	}
 
+	if (phase === "feed_empty" && feedEmptyKind) {
+		const totalInCatalog = Math.round(Number(feedMeta?.total_active_for_gender) || 0);
+		return (
+			<SwipeFeedEmpty
+				kind={feedEmptyKind}
+				gender={gender}
+				isAuthenticated={isAuthenticated}
+				displayName={profile?.display_name}
+				totalInCatalog={totalInCatalog || undefined}
+				onReplay={onReplayCatalog}
+				onHome={() => navigate("/")}
+				onGuestProgram={() => goThankYou(0, 0, [])}
+			/>
+		);
+	}
+
 	if (phase === "checkpoint" && checkpoint) {
 		return (
 			<SwipeCheckpoint
@@ -763,7 +830,23 @@ export default function Swipe() {
 		);
 	}
 
-	if (!photos.length) return <div className="swipe-no-images">Нет фото в базе</div>;
+	if (!photos.length) {
+		const fallbackKind = classifyEmptyFeed(feedMeta) || "no_catalog";
+		return (
+			<SwipeFeedEmpty
+				kind={fallbackKind}
+				gender={gender}
+				isAuthenticated={isAuthenticated}
+				displayName={profile?.display_name}
+				totalInCatalog={
+					Math.round(Number(feedMeta?.total_active_for_gender) || 0) || undefined
+				}
+				onReplay={onReplayCatalog}
+				onHome={() => navigate("/")}
+				onGuestProgram={() => goThankYou(0, 0, [])}
+			/>
+		);
+	}
 
 	const showCoach = !coachDismissed && photos.length > 0;
 	const showPushPrompt =

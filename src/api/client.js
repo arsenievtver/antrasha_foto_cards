@@ -245,9 +245,10 @@ export async function fetchFeedPublicSettings() {
 	return res.json();
 }
 
-export async function loadFeed(gender, { limit = 30 } = {}) {
+export async function loadFeed(gender, { limit = 30, includeSeen = false } = {}) {
 	const headers = await sessionAuthHeaders();
 	const q = new URLSearchParams({ gender, limit: String(limit) });
+	if (includeSeen) q.set("include_seen", "true");
 	const res = await fetch(`${apiUrl("/feed")}?${q}`, { headers });
 	if (!res.ok) {
 		const text = await res.text();

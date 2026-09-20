@@ -113,11 +113,13 @@ export default function Photos() {
       } finally {
         if (!c) setFeedSettingsLoading(false);
       }
-      try {
-        const st = await fetchEmbedCatalogStatus();
-        if (!c) setEmbedCatalogStatus(st);
-      } catch {
-        if (!c) setEmbedCatalogStatus(null);
+      if (getRole() === "superuser") {
+        try {
+          const st = await fetchEmbedCatalogStatus();
+          if (!c) setEmbedCatalogStatus(st);
+        } catch {
+          if (!c) setEmbedCatalogStatus(null);
+        }
       }
     })();
     return () => {
@@ -504,7 +506,7 @@ export default function Photos() {
       let totalOk = 0;
       let totalFail = 0;
       for (;;) {
-        const batch = await embedCatalogBackfill({ limit: 12 });
+        const batch = await embedCatalogBackfill({ limit: 4 });
         totalOk += batch.succeeded || 0;
         totalFail += (batch.failed || []).length;
         setEmbedBackfillProgress(
@@ -547,6 +549,10 @@ export default function Photos() {
     feedSettings?.card_badge_label != null && String(feedSettings.card_badge_label).trim()
       ? String(feedSettings.card_badge_label).trim()
       : "";
+
+  const showEmbedCatalogPanel =
+    getRole() === "superuser" &&
+    (embedBackfillBusy || (embedCatalogStatus?.needing_embedding ?? 0) > 0);
 
   return (
     <div>
@@ -619,50 +625,51 @@ export default function Photos() {
             </button>
           </form>
         </div>
-        <div className="feed-policy-row">
-          <div className="feed-policy-text">
-            <strong style={{ color: "var(--text)" }}>Вектора каталога (лента).</strong> После
-            миграции или для старых фото — один прогон backfill. Новые пакеты из ИИ-ingest
-            векторизуются при выпуске. Для hybrid/vectors в настройках ленты нужны embeddings.
-            {embedCatalogStatus && !embedCatalogStatus.fastembed_available ? (
-              <span style={{ display: "block", marginTop: "0.35rem", color: "var(--danger)" }}>
-                fastembed на сервере не установлен — backfill недоступен (requirements-embeddings).
-              </span>
-            ) : null}
-            {embedCatalogStatus?.needing_embedding > 0 ? (
+        {showEmbedCatalogPanel ? (
+          <div className="feed-policy-row">
+            <div className="feed-policy-text">
+              <strong style={{ color: "var(--text)" }}>Вектора каталога (лента).</strong>{" "}
+              Остались старые фото без embedding — один прогон backfill. Новые из ИИ-ingest считаются
+              при «Записать вектора и выпустить»; после деплоя fastembed в образе backend, отдельный
+              pip не нужен.
+              {embedCatalogStatus && !embedCatalogStatus.fastembed_available ? (
+                <span style={{ display: "block", marginTop: "0.35rem", color: "var(--danger)" }}>
+                  fastembed не найден в backend — пересоберите образ (update.sh) или один раз: pip
+                  install -r requirements-embeddings.txt в контейнере.
+                </span>
+              ) : (
+                <span style={{ display: "block", marginTop: "0.35rem", color: "var(--muted)" }}>
+                  На VM ~2 GB кнопка грузит API и может оборвать процесс (HTTP 500) — надёжнее
+                  воркер:{" "}
+                  <code style={{ fontSize: "0.85em" }}>
+                    docker compose … --profile embeddings up -d photo-embedding-worker
+                  </code>
+                </span>
+              )}
               <span style={{ display: "block", marginTop: "0.35rem", color: "var(--muted)" }}>
-                Без вектора: <strong>{embedCatalogStatus.needing_embedding}</strong> фото в ленте
+                Без вектора: <strong>{embedCatalogStatus?.needing_embedding ?? "…"}</strong> фото в
+                ленте
               </span>
-            ) : embedCatalogStatus ? (
-              <span style={{ display: "block", marginTop: "0.35rem", color: "var(--accent)" }}>
-                Все видимые в ленте фото уже с embedding
-              </span>
-            ) : null}
-            {embedBackfillProgress ? (
-              <span style={{ display: "block", marginTop: "0.25rem", color: "var(--muted)" }}>
-                {embedBackfillProgress}
-              </span>
-            ) : null}
-            {getRole() !== "superuser" && (
-              <span style={{ display: "block", marginTop: "0.25rem" }}>
-                Запускает только суперпользователь.
-              </span>
-            )}
+              {embedBackfillProgress ? (
+                <span style={{ display: "block", marginTop: "0.25rem", color: "var(--muted)" }}>
+                  {embedBackfillProgress}
+                </span>
+              ) : null}
+            </div>
+            <button
+              type="button"
+              disabled={
+                embedBackfillBusy ||
+                feedSettingsLoading ||
+                !embedCatalogStatus?.fastembed_available ||
+                !(embedCatalogStatus?.needing_embedding > 0)
+              }
+              onClick={onEmbedCatalogBackfill}
+            >
+              {embedBackfillBusy ? "Считаем вектора…" : "Пересчитать (малыми порциями)"}
+            </button>
           </div>
-          <button
-            type="button"
-            disabled={
-              embedBackfillBusy ||
-              feedSettingsLoading ||
-              getRole() !== "superuser" ||
-              !embedCatalogStatus?.fastembed_available ||
-              !(embedCatalogStatus?.needing_embedding > 0)
-            }
-            onClick={onEmbedCatalogBackfill}
-          >
-            {embedBackfillBusy ? "Считаем вектора…" : "Пересчитать вектора каталога"}
-          </button>
-        </div>
+        ) : null}
       </div>
       <div className="toolbar">
         <div>

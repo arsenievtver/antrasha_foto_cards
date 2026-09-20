@@ -148,6 +148,7 @@ def fetch_feed_photos(
     limit: int,
     user_id: uuid.UUID | None,
     session_id: uuid.UUID,
+    include_seen: bool = False,
 ) -> tuple[list[Photo], dict[str, float]]:
     g_norm = gender.strip().lower()
     weights = load_weights_map(db, user_id=user_id, session_id=session_id)
@@ -174,7 +175,10 @@ def fetch_feed_photos(
     )
     all_for_gender = list(db.execute(q).scalars().unique().all())
     total_active = len(all_for_gender)
-    candidates = [p for p in all_for_gender if p.id not in seen]
+    if include_seen:
+        candidates = list(all_for_gender)
+    else:
+        candidates = [p for p in all_for_gender if p.id not in seen]
     loop_rewind = False
 
     if not candidates:
@@ -269,6 +273,7 @@ def fetch_feed_photos(
     meta = {
         "candidates": float(len(candidates)),
         "has_more_unseen": float(1 if has_more_unseen else 0),
+        "include_seen": float(1 if include_seen else 0),
         "swipe_chunk_size": float(feed_swipe_chunk_size(db)),
         "nonzero_scores": float(sum(1 for _, s in scored if s != 0)),
         "weight_keys": float(len(weights)),

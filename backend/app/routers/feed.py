@@ -25,6 +25,10 @@ def get_feed(
     db: Session = Depends(get_db),
     gender: str = Query(..., min_length=1, max_length=10),
     limit: int = Query(20, ge=1, le=50),
+    include_seen: bool = Query(
+        False,
+        description="Показать уже просмотренные (пересмотр каталога без новых релизов)",
+    ),
     session_id: uuid.UUID = Depends(parse_session_id),
     user=Depends(get_optional_user),
 ) -> FeedResponse:
@@ -46,6 +50,7 @@ def get_feed(
         limit=limit,
         user_id=uid,
         session_id=session_id,
+        include_seen=include_seen,
     )
     badge_text = feed_card_badge_label(db)
     out: list[FeedPhoto] = []
