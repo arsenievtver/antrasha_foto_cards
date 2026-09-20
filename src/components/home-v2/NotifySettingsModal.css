@@ -14,8 +14,6 @@
 	position: relative;
 	width: 100%;
 	max-width: 360px;
-	max-height: min(88dvh, 720px);
-	overflow: auto;
 	padding: 20px;
 	border-radius: 12px;
 	background: #171614;
@@ -109,30 +107,4 @@
 .hv2-notify-text--status strong {
 	color: var(--hv2-gold);
 	font-weight: 500;
-}
-
-.hv2-notify-text--hint {
-	font-size: 0.78rem;
-	opacity: 0.65;
-}
-
-.hv2-notify-btn--diag {
-	margin-top: 0.5rem;
-}
-
-.hv2-notify-diag {
-	margin: 0.65rem 0 0;
-	padding: 10px;
-	max-height: 180px;
-	overflow: auto;
-	border-radius: 8px;
-	border: 1px solid rgba(245, 240, 232, 0.12);
-	background: rgba(0, 0, 0, 0.35);
-	font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-	font-size: 0.62rem;
-	line-height: 1.35;
-	white-space: pre-wrap;
-	word-break: break-word;
-	color: rgba(245, 240, 232, 0.82);
-	user-select: all;
 }
