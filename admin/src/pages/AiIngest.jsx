@@ -4,9 +4,11 @@ import {
   deleteAiIngestJob,
   fetchAiIngestJobs,
   fetchAiIngestLimits,
+  fetchAiIngestReleaseDraft,
   fetchAiIngestStats,
   fetchBrands,
   fetchFeedSettings,
+  publishAiIngestRelease,
   retryAiIngestJob,
   uploadAiIngestBatch,
 } from "../api.js";
@@ -54,6 +56,8 @@ export default function AiIngest() {
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [releaseDraft, setReleaseDraft] = useState(null);
+  const [publishBusy, setPublishBusy] = useState(false);
   const fileInputRef = useRef(null);
 
   const loadJobs = useCallback(async () => {
@@ -64,21 +68,32 @@ export default function AiIngest() {
   }, [skip, limit]);
 
   /** Тихое обновление списка и счётчиков без сброса ошибки (для опроса в фоне). */
+  const loadReleaseDraft = useCallback(async () => {
+    try {
+      const d = await fetchAiIngestReleaseDraft(gender);
+      setReleaseDraft(d);
+    } catch {
+      setReleaseDraft(null);
+    }
+  }, [gender]);
+
   const pollQueue = useCallback(async () => {
     try {
-      const [st, data, lim] = await Promise.all([
+      const [st, data, lim, draft] = await Promise.all([
         fetchAiIngestStats(),
         fetchAiIngestJobs({ skip, limit }),
         fetchAiIngestLimits(),
+        fetchAiIngestReleaseDraft(gender),
       ]);
       setStats(st);
       setItems(data.items || []);
       setTotal(data.total ?? 0);
       setLimits(lim);
+      setReleaseDraft(draft);
     } catch {
       /* сеть / сессия — не показываем при каждом тике */
     }
-  }, [skip, limit]);
+  }, [skip, limit, gender]);
 
   const loadBrands = useCallback(async () => {
     const data = await fetchBrands();
@@ -212,6 +227,30 @@ export default function AiIngest() {
     }
   }
 
+  async function onPublishRelease() {
+    if (!releaseDraft?.can_publish) return;
+    if (
+      !confirm(
+        `Записать вектора и выпустить ${releaseDraft.photo_count} фото в ленту? После успеха черновик закроется.`,
+      )
+    ) {
+      return;
+    }
+    setPublishBusy(true);
+    setErr("");
+    try {
+      const result = await publishAiIngestRelease(gender);
+      if (!result.ok) {
+        setErr(result.message || "Ошибка векторизации — см. детали ниже");
+      }
+      await Promise.all([refreshMeta(), loadJobs(), loadReleaseDraft()]);
+    } catch (ex) {
+      setErr(ex.message || String(ex));
+    } finally {
+      setPublishBusy(false);
+    }
+  }
+
   async function onDelete(id) {
     if (!confirm("Удалить задачу и локальный исходник (если есть)?")) return;
     setErr("");
@@ -286,6 +325,61 @@ export default function AiIngest() {
       )}
 
       {err ? <p className="error">{err}</p> : null}
+
+      {releaseDraft ? (
+        <div
+          style={{
+            marginBottom: "1.25rem",
+            padding: "0.85rem 1rem",
+            borderRadius: 8,
+            border: "1px solid var(--border)",
+            background: "var(--surface)",
+          }}
+        >
+          <div style={{ fontWeight: 600, marginBottom: "0.35rem" }}>
+            Пакет в ленту ({gender === "male" ? "мужской" : "женский"})
+          </div>
+          <p style={{ margin: "0 0 0.5rem", color: "var(--muted)", fontSize: "0.9rem" }}>
+            После Fashn задачи остаются в таблице со статусом «Готово», пока не нажмёте выпуск с
+            векторами. В ленте фото не видны до успешной векторизации; после выпуска записи
+            очереди для этого пакета удаляются.
+          </p>
+          <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap", alignItems: "center" }}>
+            <span>
+              В черновике: <strong>{releaseDraft.photo_count}</strong>
+            </span>
+            {releaseDraft.fashn_pending > 0 ? (
+              <span style={{ color: "var(--muted)" }}>
+                Fashn в работе: <strong>{releaseDraft.fashn_pending}</strong>
+              </span>
+            ) : null}
+            {releaseDraft.fashn_failed > 0 ? (
+              <span style={{ color: "var(--danger)" }}>
+                Ошибки Fashn в пакете: <strong>{releaseDraft.fashn_failed}</strong> — выпуск
+                заблокирован
+              </span>
+            ) : null}
+            {releaseDraft.embed_error_count > 0 ? (
+              <span style={{ color: "var(--danger)" }}>
+                Ошибки векторов: <strong>{releaseDraft.embed_error_count}</strong>
+              </span>
+            ) : null}
+          </div>
+          {releaseDraft.last_embed_error ? (
+            <p style={{ margin: "0.5rem 0 0", color: "var(--danger)", fontSize: "0.88rem" }}>
+              {releaseDraft.last_embed_error}
+            </p>
+          ) : null}
+          <button
+            type="button"
+            style={{ marginTop: "0.65rem" }}
+            disabled={!releaseDraft.can_publish || publishBusy}
+            onClick={onPublishRelease}
+          >
+            {publishBusy ? "Векторизация…" : "Записать вектора и выпустить в ленту"}
+          </button>
+        </div>
+      ) : null}
 
       <form onSubmit={onUpload} style={{ marginBottom: "2rem" }}>
         <div
@@ -411,7 +505,11 @@ export default function AiIngest() {
         </button>
       </form>
 
-      <h3 style={{ fontSize: "1rem" }}>Задачи</h3>
+      <h3 style={{ fontSize: "1rem" }}>Очередь Fashn (ошибки и в работе)</h3>
+      <p style={{ margin: "0 0 0.75rem", color: "var(--muted)", fontSize: "0.85rem" }}>
+        «Готово» — Fashn прошёл, фото в черновике; строки исчезнут после «Записать вектора и
+        выпустить».
+      </p>
       <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.9rem" }}>
           <thead>

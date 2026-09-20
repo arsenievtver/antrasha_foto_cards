@@ -199,3 +199,15 @@ Add auto-renew via cron (daily at 03:17):
 ```bash
 (crontab -l 2>/dev/null; echo '17 3 * * * cd /opt/antrasha_tinder && bash deploy/scripts/tls-renew.sh >> /var/log/antrasha-tls-renew.log 2>&1') | crontab -
 ```
+
+## Vector taste (pgvector + embedding worker)
+
+Postgres image: `pgvector/pgvector:pg16` (extension `vector` создаётся миграцией `046_vector_taste`).
+
+1. Deploy backend as usual (`alembic upgrade head`).
+2. Backfill embeddings (один из вариантов):
+   - **Отдельная машина / Mac:** `pip install -r backend/requirements-embeddings.txt`, `DATABASE_URL=... python -m jobs.photo_embedding_worker` (остановить когда очередь пуста).
+   - **На VM с профилем:** `docker compose -f deploy/docker-compose.prod.yml --profile embeddings up -d photo-embedding-worker`
+3. В админке **Feed settings** переключить `feed_ranking_mode`: `tags` → `hybrid` → `vectors` после того как большинство активных фото имеют embedding.
+
+**RAM на VM 2 GB:** API + Postgres + nginx умещаются; **воркер CLIP/fastembed на том же 2 GB не рекомендуется** (пик ~1–1.5 GB на инференс). Либо апгрейд до **4 GB**, либо backfill с ноутбука по `DATABASE_URL`, либо вынести worker на вторую маленькую VM.

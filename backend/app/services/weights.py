@@ -16,6 +16,7 @@ from app.recommendation_model import (
     tier_mult,
 )
 from app.models import Interaction, Photo, User, UserSession, UserTagPairWeight, UserTagWeight
+from app.services.taste_vector import merge_session_taste_into_user
 
 
 def _maybe_clamp(weight: float, clamp: tuple[float, float] | None) -> float:
@@ -244,6 +245,8 @@ def merge_session_into_user(
                 )
             )
         db.delete(sp)
+
+    merge_session_taste_into_user(db, session_id=session_id, user=user)
 
     from app.services.web_push import merge_session_push_subscriptions
 

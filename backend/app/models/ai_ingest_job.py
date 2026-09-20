@@ -51,5 +51,18 @@ class AiIngestJob(Base):
     )
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    release_batch_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("feed_release_batches.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    photo_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("photos.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
 
     brand = relationship("Brand", lazy="joined", back_populates="ingest_jobs")
+    release_batch = relationship("FeedReleaseBatch", back_populates="ingest_jobs")

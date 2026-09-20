@@ -47,3 +47,9 @@ class User(Base):
     signup_campaign = relationship("MarketingCampaign", foreign_keys=[signup_campaign_id])
     tag_weights = relationship("UserTagWeight", back_populates="user")
     tag_pair_weights = relationship("UserTagPairWeight", back_populates="user")
+    taste_vector = relationship(
+        "UserTasteVector",
+        back_populates="user",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )

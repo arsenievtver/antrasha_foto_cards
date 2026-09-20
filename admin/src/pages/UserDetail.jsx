@@ -121,6 +121,58 @@ export default function UserDetail() {
         </div>
       </div>
 
+      <h3 style={{ marginTop: "1.25rem" }}>Вектор вкуса (превью)</h3>
+      <p style={{ color: "var(--muted)", fontSize: "0.9rem", marginTop: 0 }}>
+        До 4 образов из ленты с наибольшим cosine к профилю пользователя (k-NN по embedding).
+      </p>
+      <div className="card" style={{ marginBottom: "1.25rem" }}>
+        {!data.taste_vector_ready ? (
+          <p style={{ margin: 0, color: "var(--muted)" }}>
+            Профиль по вектору ещё не собран — нужны лайки/дизлайки по фото с embedding.
+          </p>
+        ) : (data.taste_nearest_photos || []).length === 0 ? (
+          <p style={{ margin: 0, color: "var(--muted)" }}>
+            Вектор есть (обновлений: {data.taste_swipe_updates ?? 0}), но в каталоге нет фото с
+            embedding для сравнения.
+          </p>
+        ) : (
+          <>
+            <p style={{ margin: "0 0 0.75rem", fontSize: "0.85rem", color: "var(--muted)" }}>
+              Обновлений профиля по свайпам: <strong>{data.taste_swipe_updates ?? 0}</strong>
+            </p>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
+                gap: "0.75rem",
+              }}
+            >
+              {(data.taste_nearest_photos || []).map((p) => (
+                <figure key={p.photo_id} style={{ margin: 0 }}>
+                  <a href={p.url} target="_blank" rel="noreferrer">
+                    <img
+                      src={p.url}
+                      alt=""
+                      style={{
+                        width: "100%",
+                        aspectRatio: "3/4",
+                        objectFit: "cover",
+                        borderRadius: 8,
+                        border: "1px solid var(--border)",
+                      }}
+                    />
+                  </a>
+                  <figcaption style={{ fontSize: "0.78rem", color: "var(--muted)", marginTop: 4 }}>
+                    cosine {(Number(p.cosine) * 100).toFixed(0)}% · {p.gender}
+                    {p.brand ? ` · ${p.brand}` : ""}
+                  </figcaption>
+                </figure>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+
       <h3>Веса тегов (профиль)</h3>
       <p style={{ color: "var(--muted)", fontSize: "0.9rem", marginTop: 0 }}>
         Накопленные веса после лайков/дизлайков по каталогу тегов.

@@ -20,11 +20,20 @@ from app.schemas.ai_ingest import (
     AiIngestJobListResponse,
     AiIngestJobOut,
     AiIngestLimitsOut,
+    AiIngestPublishOut,
     AiIngestQueueStatsOut,
+    AiIngestReleaseDraftOut,
     AiIngestUploadResponse,
 )
 from app.externals.http.fashn import VALID_INGEST_SOURCE_MODES, normalize_source_mode
 from app.services.ai_ingest_worker import count_pending_jobs
+from app.services.feed_release_batch import (
+    count_failed_fashn_for_draft,
+    count_pending_fashn_for_draft,
+    draft_batch_summary,
+    get_or_create_draft_batch,
+    publish_draft_batch,
+)
 from app.services.yc_storage import public_object_url
 
 log = logging.getLogger("app.api.admin_ai_ingest")
@@ -138,6 +147,75 @@ def queue_stats(
         pending=_count_status(db, "pending"),
         processing=_count_status(db, "processing"),
         failed=_count_status(db, "failed"),
+    )
+
+
+@router.get("/release-draft", response_model=AiIngestReleaseDraftOut)
+def get_release_draft(
+    gender: str = Query(..., min_length=1, max_length=10),
+    db: Session = Depends(get_db),
+    _p: AdminPrincipal = Depends(get_admin_principal),
+) -> AiIngestReleaseDraftOut:
+    _ = _p
+    g = gender.strip().lower()
+    if g not in ("male", "female"):
+        raise HTTPException(status_code=400, detail="gender: male или female")
+    summary = draft_batch_summary(db, gender=g)
+    batch_id = summary.get("batch_id")
+    fashn_pending = 0
+    fashn_failed = 0
+    if batch_id:
+        fashn_pending = count_pending_fashn_for_draft(db, batch_id)
+        fashn_failed = count_failed_fashn_for_draft(db, batch_id)
+    photo_count = int(summary["photo_count"])
+    can_publish = photo_count > 0 and fashn_pending == 0 and fashn_failed == 0
+    return AiIngestReleaseDraftOut(
+        gender=g,
+        batch_id=batch_id,
+        photo_count=photo_count,
+        embed_error_count=int(summary["embed_error_count"]),
+        last_embed_error=summary.get("last_embed_error"),
+        fashn_pending=fashn_pending,
+        fashn_failed=fashn_failed,
+        can_publish=can_publish,
+    )
+
+
+@router.post("/release/publish", response_model=AiIngestPublishOut)
+def publish_release_draft(
+    gender: str = Query(..., min_length=1, max_length=10),
+    db: Session = Depends(get_db),
+    _p: AdminPrincipal = Depends(get_admin_principal),
+) -> AiIngestPublishOut:
+    _ = _p
+    g = gender.strip().lower()
+    if g not in ("male", "female"):
+        raise HTTPException(status_code=400, detail="gender: male или female")
+    draft = draft_batch_summary(db, gender=g)
+    batch_id = draft.get("batch_id")
+    if batch_id and count_pending_fashn_for_draft(db, batch_id) > 0:
+        raise HTTPException(
+            status_code=409,
+            detail="Fashn ещё обрабатывает файлы — дождитесь окончания очереди",
+        )
+    if batch_id and count_failed_fashn_for_draft(db, batch_id) > 0:
+        raise HTTPException(
+            status_code=409,
+            detail="В пакете есть ошибки Fashn — повторите или удалите их в таблице ниже",
+        )
+    try:
+        result = publish_draft_batch(db, gender=g)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+    return AiIngestPublishOut(
+        ok=bool(result.get("ok")),
+        published=bool(result.get("published")),
+        batch_id=result.get("batch_id"),
+        photo_count=int(result.get("photo_count") or 0),
+        message=str(result.get("message") or ""),
+        failed=list(result.get("failed") or []),
     )
 
 
@@ -314,6 +392,7 @@ async def upload_batch(
     created_rows: list[AiIngestJob] = []
     db_ins = SessionLocal()
     try:
+        draft = get_or_create_draft_batch(db_ins, gender=g)
         for jid, dest_resolved, raw_name in planned:
             job = AiIngestJob(
                 id=jid,
@@ -324,6 +403,7 @@ async def upload_batch(
                 original_filename=raw_name,
                 temp_path=str(dest_resolved),
                 status="pending",
+                release_batch_id=draft.id,
             )
             db_ins.add(job)
             created_rows.append(job)

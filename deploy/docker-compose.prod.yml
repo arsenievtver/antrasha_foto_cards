@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     restart: unless-stopped
     env_file:
       - ./env/.env.postgres.prod
@@ -43,6 +43,28 @@ services:
       timeout: 10s
       retries: 8
       start_period: 90s
+    networks:
+      - antrasha_net
+
+  photo-embedding-worker:
+    profiles: ["embeddings"]
+    build:
+      context: ../backend
+      dockerfile: Dockerfile.embeddings
+    restart: unless-stopped
+    command: ["python", "-m", "jobs.photo_embedding_worker"]
+    env_file:
+      - ./env/.env.backend.prod
+      - ./env/.env.postgres.prod
+    environment:
+      - HF_HOME=/app/var/hf_cache
+    volumes:
+      - antrasha_embed_hf_cache:/app/var/hf_cache
+    depends_on:
+      postgres:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
     networks:
       - antrasha_net
 
@@ -184,6 +206,7 @@ volumes:
   antrasha_vton_weights:
   antrasha_vton_hf_cache:
   antrasha_try_on_tmp:
+  antrasha_embed_hf_cache:
 
 networks:
   antrasha_net:

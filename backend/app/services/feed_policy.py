@@ -15,6 +15,31 @@ def feed_require_tagging_review_for_feed(db: Session) -> bool:
     return bool(row.require_tagging_review_for_feed)
 
 
+def feed_ranking_mode(db: Session) -> str:
+    row = db.get(FeedSettings, 1)
+    if row is None:
+        return "tags"
+    mode = (row.feed_ranking_mode or "tags").strip().lower()
+    if mode not in ("tags", "vectors", "hybrid"):
+        return "tags"
+    return mode
+
+
+def feed_swipe_chunk_size(db: Session) -> int:
+    row = db.get(FeedSettings, 1)
+    if row is None:
+        return 10
+    return max(1, min(50, int(row.swipe_chunk_size or 10)))
+
+
+def feed_vector_weight(db: Session) -> float:
+    row = db.get(FeedSettings, 1)
+    if row is None:
+        return 0.65
+    w = float(row.feed_vector_weight)
+    return max(0.0, min(1.0, w))
+
+
 def feed_card_badge_label(db: Session) -> str | None:
     """Единый текст бейджа для карточек с show_badge; None если не задан."""
     row = db.get(FeedSettings, 1)

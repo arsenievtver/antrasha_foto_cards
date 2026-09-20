@@ -15,8 +15,14 @@ import {
 	useTransform,
 	animate,
 } from "framer-motion";
-import { loadFeed, postInteraction } from "../api/client";
+import {
+	fetchFeedPublicSettings,
+	loadFeed,
+	postInteraction,
+} from "../api/client";
+import SwipeCheckpoint from "../components/SwipeCheckpoint.jsx";
 import PushNotifyPrompt from "../components/PushNotifyPrompt";
+import { useAuth } from "../context/AuthContext";
 import "./Swipe.css";
 
 const SWIPE_COACH_KEY = "swipe_coach_v2_dismissed";
@@ -387,6 +393,7 @@ export default function Swipe() {
 	const { gender } = useParams();
 	const navigate = useNavigate();
 	const reduceMotion = useReducedMotion();
+	const { isAuthenticated, profile } = useAuth();
 
 	const [coachDismissed, setCoachDismissed] = useState(
 		readCoachPermanentlyDismissed,
@@ -397,9 +404,16 @@ export default function Swipe() {
 	const [loadError, setLoadError] = useState(null);
 	const [loading, setLoading] = useState(true);
 
+	const [phase, setPhase] = useState("swipe");
+	const [chunkSize, setChunkSize] = useState(10);
+	const [feedMeta, setFeedMeta] = useState(null);
+	const [checkpoint, setCheckpoint] = useState(null);
+	const [sessionLikes, setSessionLikes] = useState(0);
+	const [sessionTotal, setSessionTotal] = useState(0);
+	const [chunkLikes, setChunkLikes] = useState(0);
+	const [chunkTotal, setChunkTotal] = useState(0);
 	const [index, setIndex] = useState(0);
 	const [isExiting, setIsExiting] = useState(false);
-	const [likes, setLikes] = useState(0);
 	const [likedPhotoIds, setLikedPhotoIds] = useState([]);
 	const [overlay, setOverlay] = useState(null);
 	const [showInfo, setShowInfo] = useState(false);
@@ -417,14 +431,51 @@ export default function Swipe() {
 		[1, 0.5, 0],
 	);
 
+	const goThankYou = useCallback(
+		(likes, total, photoIds) => {
+			navigate("/thank-you", {
+				state: {
+					likes,
+					total,
+					likedPhotoIds: photoIds,
+				},
+			});
+		},
+		[navigate],
+	);
+
+	const loadChunk = useCallback(
+		async (limit) => {
+			const data = await loadFeed(gender, { limit });
+			const list = normalizeFeedPhotos(data.photos ?? []);
+			setFeedMeta(data.meta ?? null);
+			setPhotos(list);
+			setIndex(0);
+			setChunkLikes(0);
+			setChunkTotal(0);
+			setOverlay(null);
+			setShowInfo(false);
+			setIsExiting(false);
+			swipeHandledRef.current = false;
+			dragX.set(0);
+			const urls = list.map((p) => p.url);
+			await preloadManyOrdered(urls.slice(0, 4), 3);
+			scheduleFeedPreload(urls, 0);
+			return { list, meta: data.meta ?? null };
+		},
+		[gender, dragX],
+	);
+
 	useEffect(() => {
 		let cancelled = false;
 		backgroundPreloadGen += 1;
 		setLoading(true);
 		setLoadError(null);
 		setPhotos([]);
-		setIndex(0);
-		setLikes(0);
+		setPhase("swipe");
+		setCheckpoint(null);
+		setSessionLikes(0);
+		setSessionTotal(0);
 		setLikedPhotoIds([]);
 		setOverlay(null);
 		setShowInfo(false);
@@ -432,26 +483,26 @@ export default function Swipe() {
 		swipeHandledRef.current = false;
 		dragX.set(0);
 
-		loadFeed(gender, { limit: 40 })
-			.then(async (data) => {
+		(async () => {
+			try {
+				const settings = await fetchFeedPublicSettings();
+				const limit = Math.max(1, Number(settings?.swipe_chunk_size) || 10);
+				if (!cancelled) setChunkSize(limit);
+				const { list } = await loadChunk(limit);
 				if (cancelled) return;
-				const list = normalizeFeedPhotos(data.photos ?? []);
-				const urls = list.map((p) => p.url);
-				setPhotos(list);
-				/* Первые карточки — до «Загрузка…», остальное — фоном от текущего окна */
-				await preloadManyOrdered(urls.slice(0, 4), 3);
-				if (!cancelled) scheduleFeedPreload(urls, 0);
-			})
-			.catch((e) => {
+				if (!list.length) {
+					goThankYou(0, 0, []);
+				}
+			} catch (e) {
 				if (!cancelled) setLoadError(e.message || String(e));
-			})
-			.finally(() => {
+			} finally {
 				if (!cancelled) setLoading(false);
-			});
+			}
+		})();
 		return () => {
 			cancelled = true;
 		};
-	}, [gender, dragX]);
+	}, [gender, dragX, goThankYou, loadChunk]);
 
 	const currentPhoto = photos[index];
 
@@ -520,6 +571,22 @@ export default function Swipe() {
 		[currentPhoto],
 	);
 
+	const finishChunk = useCallback(
+		(nextChunkLikes, nextChunkTotal, nextSessionLikes, nextSessionTotal, nextLikedIds) => {
+			const hasMore = Number(feedMeta?.has_more_unseen) > 0;
+			setCheckpoint({
+				chunk: { likes: nextChunkLikes, total: nextChunkTotal },
+				session: { likes: nextSessionLikes, total: nextSessionTotal },
+				hasMore,
+				tasteVectorReady: Number(feedMeta?.taste_vector_ready) > 0,
+				likedPhotoIds: nextLikedIds,
+			});
+			setPhase("checkpoint");
+			swipeHandledRef.current = false;
+		},
+		[feedMeta],
+	);
+
 	const handleAction = useCallback(
 		(action) => {
 			if (swipeHandledRef.current) return;
@@ -527,23 +594,30 @@ export default function Swipe() {
 
 			void sendAction(action);
 
-			const newLikes = action === "like" ? likes + 1 : likes;
-			if (action === "like") setLikes(newLikes);
+			const nextChunkTotal = chunkTotal + 1;
+			const nextSessionTotal = sessionTotal + 1;
+			const nextChunkLikes = action === "like" ? chunkLikes + 1 : chunkLikes;
+			const nextSessionLikes = action === "like" ? sessionLikes + 1 : sessionLikes;
 			const nextLikedPhotoIds =
 				action === "like"
 					? [...likedPhotoIds, currentPhoto.id]
 					: likedPhotoIds;
-			if (action === "like") setLikedPhotoIds(nextLikedPhotoIds);
+
+			setChunkTotal(nextChunkTotal);
+			setSessionTotal(nextSessionTotal);
+			setChunkLikes(nextChunkLikes);
+			setSessionLikes(nextSessionLikes);
+			setLikedPhotoIds(nextLikedPhotoIds);
 
 			const nextIndex = index + 1;
 			if (nextIndex >= photos.length) {
-				navigate("/thank-you", {
-					state: {
-						likes: newLikes,
-						total: photos.length,
-						likedPhotoIds: nextLikedPhotoIds,
-					},
-				});
+				finishChunk(
+					nextChunkLikes,
+					nextChunkTotal,
+					nextSessionLikes,
+					nextSessionTotal,
+					nextLikedPhotoIds,
+				);
 				return;
 			}
 
@@ -559,15 +633,56 @@ export default function Swipe() {
 		},
 		[
 			sendAction,
-			likes,
+			chunkLikes,
+			chunkTotal,
+			sessionLikes,
+			sessionTotal,
 			likedPhotoIds,
 			currentPhoto,
 			index,
 			photos.length,
-			navigate,
+			finishChunk,
 			dragX,
 		],
 	);
+
+	const onCheckpointContinue = useCallback(async () => {
+		if (!checkpoint) return;
+		if (!checkpoint.hasMore) {
+			goThankYou(
+				checkpoint.session.likes,
+				checkpoint.session.total,
+				checkpoint.likedPhotoIds,
+			);
+			return;
+		}
+		setPhase("swipe");
+		setCheckpoint(null);
+		setLoading(true);
+		try {
+			const { list } = await loadChunk(chunkSize);
+			if (!list.length) {
+				goThankYou(
+					checkpoint.session.likes,
+					checkpoint.session.total,
+					checkpoint.likedPhotoIds,
+				);
+			}
+		} catch (e) {
+			setLoadError(e.message || String(e));
+		} finally {
+			setLoading(false);
+		}
+	}, [checkpoint, chunkSize, goThankYou, loadChunk]);
+
+	const onCheckpointThankYou = useCallback(() => {
+		if (!checkpoint) return;
+		goThankYou(
+			checkpoint.session.likes,
+			checkpoint.session.total,
+			checkpoint.likedPhotoIds,
+		);
+	}, [checkpoint, goThankYou]);
 
 	const commitExit = useCallback(
 		(action, overlayKind, exitX) => {
@@ -621,6 +736,22 @@ export default function Swipe() {
 
 	if (loading) {
 		return <div className="swipe-no-images">Загрузка…</div>;
+	}
+
+	if (phase === "checkpoint" && checkpoint) {
+		return (
+			<SwipeCheckpoint
+				isAuthenticated={isAuthenticated}
+				displayName={profile?.display_name}
+				chunk={checkpoint.chunk}
+				session={checkpoint.session}
+				hasMore={checkpoint.hasMore}
+				tasteVectorReady={checkpoint.tasteVectorReady}
+				onContinue={onCheckpointContinue}
+				onGoThankYou={onCheckpointThankYou}
+				onHome={() => navigate("/")}
+			/>
+		);
 	}
 
 	if (loadError) {

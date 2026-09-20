@@ -142,7 +142,9 @@ def ensure_photo_row_for_yc_key(
     key: str,
     brand_id: uuid.UUID | None = None,
     show_badge: bool | None = None,
-) -> None:
+    feed_visible: bool = True,
+    release_batch_id: uuid.UUID | None = None,
+) -> Photo:
     """
     Одна запись `photos` для загруженного в бакет ключа (без полного list бакета).
     Логика согласована с sync_bucket_to_db.
@@ -169,19 +171,26 @@ def ensure_photo_row_for_yc_key(
             row.brand = brand_name
         if show_badge is not None:
             row.show_badge = bool(show_badge)
-        return
-    db.add(
-        Photo(
-            id=uuid.uuid4(),
-            url=url,
-            gender=gender,
-            source_type=PHOTO_SOURCE_YC_OBJECT_STORAGE,
-            is_active=True,
-            brand_id=brand_id,
-            brand=brand_name,
-            show_badge=bool(show_badge) if show_badge is not None else False,
-        )
+        if release_batch_id is not None:
+            row.release_batch_id = release_batch_id
+            row.feed_visible = feed_visible
+        elif not feed_visible:
+            row.feed_visible = False
+        return row
+    photo = Photo(
+        id=uuid.uuid4(),
+        url=url,
+        gender=gender,
+        source_type=PHOTO_SOURCE_YC_OBJECT_STORAGE,
+        is_active=True,
+        feed_visible=feed_visible,
+        release_batch_id=release_batch_id,
+        brand_id=brand_id,
+        brand=brand_name,
+        show_badge=bool(show_badge) if show_badge is not None else False,
     )
+    db.add(photo)
+    return photo
 
 
 def sync_all_buckets_from_yc(

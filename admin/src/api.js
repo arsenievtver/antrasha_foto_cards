@@ -256,6 +256,28 @@ export async function fetchFeedSettings() {
   return data;
 }
 
+export async function fetchEmbedCatalogStatus() {
+  const res = await fetch(apiUrl("/admin/feed-settings/embed-catalog-status"), {
+    headers: headersJson(),
+  });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
+/** Порция backfill векторов для фото уже в ленте (без embedding). */
+export async function embedCatalogBackfill({ gender, limit = 12 } = {}) {
+  const q = new URLSearchParams({ limit: String(limit) });
+  if (gender) q.set("gender", gender);
+  const res = await fetch(`${apiUrl("/admin/feed-settings/embed-catalog-backfill")}?${q}`, {
+    method: "POST",
+    headers: headersJson(),
+  });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
 export async function patchFeedSettings(body) {
   const res = await fetch(apiUrl("/admin/feed-settings"), {
     method: "PATCH",
@@ -696,6 +718,27 @@ export async function fetchAiIngestLimits() {
 
 export async function fetchAiIngestStats() {
   const res = await fetch(apiUrl("/admin/ai-ingest/stats"), { headers: headersJson() });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
+export async function fetchAiIngestReleaseDraft(gender) {
+  const q = new URLSearchParams({ gender });
+  const res = await fetch(`${apiUrl("/admin/ai-ingest/release-draft")}?${q}`, {
+    headers: headersJson(),
+  });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
+export async function publishAiIngestRelease(gender) {
+  const q = new URLSearchParams({ gender });
+  const res = await fetch(`${apiUrl("/admin/ai-ingest/release/publish")}?${q}`, {
+    method: "POST",
+    headers: headersJson(),
+  });
   const data = await parseResponseJson(res);
   if (!res.ok) throw new Error(detail(data, res.statusText));
   return data;

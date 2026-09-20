@@ -76,7 +76,7 @@ export default function PushNotifyPrompt({ visible, gender }) {
 		<div className="push-prompt" role="region" aria-label="Уведомления о новинках">
 			<div className="push-prompt-inner">
 				<p className="push-prompt-text">
-					Сообщим о новых образах — не чаще одного раза в день. Что интересует?
+					Сообщим о новых образах — около одного раза в неделю. Что интересует?
 				</p>
 				<div
 					className="push-prompt-genders"

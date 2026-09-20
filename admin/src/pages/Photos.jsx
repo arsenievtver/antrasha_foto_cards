@@ -4,6 +4,8 @@ import {
   createBrand,
   fetchAdminPhoto,
   fetchBrands,
+  embedCatalogBackfill,
+  fetchEmbedCatalogStatus,
   fetchFeedSettings,
   fetchPhotos,
   getRole,
@@ -48,6 +50,9 @@ export default function Photos() {
   const [syncSummary, setSyncSummary] = useState(null);
   const [feedSettings, setFeedSettings] = useState(null);
   const [feedSettingsLoading, setFeedSettingsLoading] = useState(true);
+  const [embedCatalogStatus, setEmbedCatalogStatus] = useState(null);
+  const [embedBackfillBusy, setEmbedBackfillBusy] = useState(false);
+  const [embedBackfillProgress, setEmbedBackfillProgress] = useState("");
   const [badgeLabelDraft, setBadgeLabelDraft] = useState("");
   const [badgeLabelSaving, setBadgeLabelSaving] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
@@ -107,6 +112,12 @@ export default function Photos() {
         }
       } finally {
         if (!c) setFeedSettingsLoading(false);
+      }
+      try {
+        const st = await fetchEmbedCatalogStatus();
+        if (!c) setEmbedCatalogStatus(st);
+      } catch {
+        if (!c) setEmbedCatalogStatus(null);
       }
     })();
     return () => {
@@ -468,6 +479,47 @@ export default function Photos() {
     }
   }
 
+  async function refreshEmbedCatalogStatus() {
+    try {
+      const st = await fetchEmbedCatalogStatus();
+      setEmbedCatalogStatus(st);
+    } catch {
+      setEmbedCatalogStatus(null);
+    }
+  }
+
+  async function onEmbedCatalogBackfill() {
+    if (getRole() !== "superuser" || embedBackfillBusy) return;
+    if (
+      !confirm(
+        "Пересчитать вектора для всех фото, уже видимых в ленте, но без embedding? Это может занять несколько минут.",
+      )
+    ) {
+      return;
+    }
+    setEmbedBackfillBusy(true);
+    setErr("");
+    setEmbedBackfillProgress("");
+    try {
+      let totalOk = 0;
+      let totalFail = 0;
+      for (;;) {
+        const batch = await embedCatalogBackfill({ limit: 12 });
+        totalOk += batch.succeeded || 0;
+        totalFail += (batch.failed || []).length;
+        setEmbedBackfillProgress(
+          `Готово ${totalOk}, ошибок ${totalFail}, осталось ${batch.remaining ?? "?"}`,
+        );
+        if (batch.done || !batch.processed) break;
+      }
+      await refreshEmbedCatalogStatus();
+    } catch (ex) {
+      setErr(ex.message || String(ex));
+    } finally {
+      setEmbedBackfillBusy(false);
+    }
+  }
+
   async function onSaveBadgeLabel(e) {
     e?.preventDefault?.();
     if (getRole() !== "superuser" || badgeLabelSaving) return;
@@ -566,6 +618,50 @@ export default function Photos() {
               {badgeLabelSaving ? "…" : "Сохранить"}
             </button>
           </form>
+        </div>
+        <div className="feed-policy-row">
+          <div className="feed-policy-text">
+            <strong style={{ color: "var(--text)" }}>Вектора каталога (лента).</strong> После
+            миграции или для старых фото — один прогон backfill. Новые пакеты из ИИ-ingest
+            векторизуются при выпуске. Для hybrid/vectors в настройках ленты нужны embeddings.
+            {embedCatalogStatus && !embedCatalogStatus.fastembed_available ? (
+              <span style={{ display: "block", marginTop: "0.35rem", color: "var(--danger)" }}>
+                fastembed на сервере не установлен — backfill недоступен (requirements-embeddings).
+              </span>
+            ) : null}
+            {embedCatalogStatus?.needing_embedding > 0 ? (
+              <span style={{ display: "block", marginTop: "0.35rem", color: "var(--muted)" }}>
+                Без вектора: <strong>{embedCatalogStatus.needing_embedding}</strong> фото в ленте
+              </span>
+            ) : embedCatalogStatus ? (
+              <span style={{ display: "block", marginTop: "0.35rem", color: "var(--accent)" }}>
+                Все видимые в ленте фото уже с embedding
+              </span>
+            ) : null}
+            {embedBackfillProgress ? (
+              <span style={{ display: "block", marginTop: "0.25rem", color: "var(--muted)" }}>
+                {embedBackfillProgress}
+              </span>
+            ) : null}
+            {getRole() !== "superuser" && (
+              <span style={{ display: "block", marginTop: "0.25rem" }}>
+                Запускает только суперпользователь.
+              </span>
+            )}
+          </div>
+          <button
+            type="button"
+            disabled={
+              embedBackfillBusy ||
+              feedSettingsLoading ||
+              getRole() !== "superuser" ||
+              !embedCatalogStatus?.fastembed_available ||
+              !(embedCatalogStatus?.needing_embedding > 0)
+            }
+            onClick={onEmbedCatalogBackfill}
+          >
+            {embedBackfillBusy ? "Считаем вектора…" : "Пересчитать вектора каталога"}
+          </button>
         </div>
       </div>
       <div className="toolbar">

@@ -58,6 +58,26 @@ class AiIngestQueueStatsOut(BaseModel):
     failed: int
 
 
+class AiIngestReleaseDraftOut(BaseModel):
+    gender: str
+    batch_id: uuid.UUID | None = None
+    photo_count: int = 0
+    embed_error_count: int = 0
+    last_embed_error: str | None = None
+    fashn_pending: int = 0
+    fashn_failed: int = 0
+    can_publish: bool = False
+
+
+class AiIngestPublishOut(BaseModel):
+    ok: bool
+    published: bool
+    batch_id: str | None = None
+    photo_count: int = 0
+    message: str
+    failed: list[dict] = []
+
+
 class AiIngestDiagnosticsOut(BaseModel):
     """Проверка с сервера (не из браузера): доступность хоста Fashn по TCP."""
 

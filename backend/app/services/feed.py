@@ -17,6 +17,7 @@ from app.recommendation_model import (
 )
 from app.models import (
     PHOTO_SOURCE_YC_OBJECT_STORAGE,
+    FeedReleaseBatch,
     Interaction,
     Photo,
     PhotoTag,
@@ -24,7 +25,15 @@ from app.models import (
     UserTagPairWeight,
     UserTagWeight,
 )
-from app.services.feed_policy import feed_require_tagging_review_for_feed
+from app.services.feed_policy import (
+    feed_ranking_mode,
+    feed_require_tagging_review_for_feed,
+    feed_swipe_chunk_size,
+    feed_vector_weight,
+)
+from app.services.photo_embedding import load_embeddings_for_photo_ids
+from app.services.taste_vector import load_taste_embedding
+from app.services.taste_vector_math import cosine_similarity, min_max_normalize
 
 log = logging.getLogger("app.feed")
 
@@ -152,6 +161,7 @@ def fetch_feed_photos(
 
     cond = [
         Photo.is_active.is_(True),
+        Photo.feed_visible.is_(True),
         func.lower(Photo.gender) == g_norm,
         Photo.source_type == PHOTO_SOURCE_YC_OBJECT_STORAGE,
     ]
@@ -160,6 +170,7 @@ def fetch_feed_photos(
 
     q = select(Photo).where(*cond).options(
         selectinload(Photo.photo_tags).selectinload(PhotoTag.tag).selectinload(Tag.group),
+        selectinload(Photo.release_batch),
     )
     all_for_gender = list(db.execute(q).scalars().unique().all())
     total_active = len(all_for_gender)
@@ -183,36 +194,91 @@ def fetch_feed_photos(
             )
             return [], meta
 
-        # Все карты уже просмотрены — снова показываем полный набор (новый круг)
-        candidates = list(all_for_gender)
-        loop_rewind = True
+        # Каталог исчерпан — без автоповтора всей ленты (см. чанки / новый пакет).
+        loop_rewind = False
+        meta = {
+            "candidates": float(0),
+            "nonzero_scores": float(0),
+            "weight_keys": float(len(weights)),
+            "pair_weight_keys": float(len(pair_w)),
+            "total_active_for_gender": float(total_active),
+            "seen_in_this_collection": float(len(seen)),
+            "loop_rewind": float(0),
+            "catalog_exhausted": float(1),
+            "has_more_unseen": float(0),
+        }
         log.info(
-            "feed.loop_rewind gender=%s session_id=%s total_active=%s — начинаем показ заново",
+            "feed.exhausted gender=%s session_id=%s total_active=%s seen=%s",
             gender,
             session_id,
             total_active,
+            len(seen),
         )
+        return [], meta
+
+    ranking_mode = feed_ranking_mode(db)
+    vector_w = feed_vector_weight(db)
+    taste_emb = load_taste_embedding(db, user_id=user_id, session_id=session_id)
+    emb_by_id = load_embeddings_for_photo_ids(db, [p.id for p in candidates])
+
+    tag_scores = [score_for_photo(p, weights, pair_w) for p in candidates]
+    vec_raw: list[float] = []
+    for p in candidates:
+        pe = emb_by_id.get(p.id)
+        if taste_emb and pe:
+            vec_raw.append(max(0.0, cosine_similarity(taste_emb, pe)))
+        else:
+            vec_raw.append(0.0)
+    tag_norm = min_max_normalize(tag_scores)
+    vec_norm = min_max_normalize(vec_raw)
+
+    combined: list[float] = []
+    for i, _p in enumerate(candidates):
+        ts = tag_norm[i]
+        vs = vec_norm[i]
+        if ranking_mode == "tags":
+            combined.append(ts)
+        elif ranking_mode == "vectors":
+            combined.append(vs if taste_emb else ts)
+        else:
+            if taste_emb and emb_by_id.get(candidates[i].id):
+                combined.append((1.0 - vector_w) * ts + vector_w * vs)
+            else:
+                combined.append(ts)
 
     scored: list[tuple[Photo, float]] = [
-        (p, score_for_photo(p, weights, pair_w)) for p in candidates
+        (p, combined[i]) for i, p in enumerate(candidates)
     ]
     # В ленте сначала показываем самые новые фото из бакета; score остаётся вторым приоритетом.
+    def _batch_ts(photo: Photo) -> float:
+        batch: FeedReleaseBatch | None = getattr(photo, "release_batch", None)
+        if batch and batch.published_at:
+            return batch.published_at.timestamp()
+        return photo.created_at.timestamp() if photo.created_at else 0.0
+
     scored.sort(
         key=lambda x: (
+            -_batch_ts(x[0]),
             -(x[0].created_at.timestamp() if x[0].created_at else 0.0),
             -x[1],
             random.random(),
         )
     )
     top = [p for p, _ in scored[:limit]]
+    has_more_unseen = len(candidates) > len(top)
     meta = {
         "candidates": float(len(candidates)),
+        "has_more_unseen": float(1 if has_more_unseen else 0),
+        "swipe_chunk_size": float(feed_swipe_chunk_size(db)),
         "nonzero_scores": float(sum(1 for _, s in scored if s != 0)),
         "weight_keys": float(len(weights)),
         "pair_weight_keys": float(len(pair_w)),
         "total_active_for_gender": float(total_active),
         "seen_in_this_collection": float(len(seen)),
         "loop_rewind": float(loop_rewind),
+        "ranking_mode": float({"tags": 0, "vectors": 1, "hybrid": 2}.get(ranking_mode, 0)),
+        "taste_vector_ready": float(1 if taste_emb else 0),
+        "photos_with_embedding": float(len(emb_by_id)),
     }
     log.info(
         "feed.ok gender=%s session_id=%s returned=%s candidates_pool=%s total_active=%s "

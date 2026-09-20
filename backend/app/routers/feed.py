@@ -6,13 +6,18 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.deps import get_optional_user, get_session_or_404, parse_session_id
-from app.schemas.feed import FeedPhoto, FeedResponse, TagOut
+from app.schemas.feed import FeedPhoto, FeedPublicSettingsOut, FeedResponse, TagOut
 from app.services.feed import fetch_feed_photos
-from app.services.feed_policy import feed_card_badge_label
+from app.services.feed_policy import feed_card_badge_label, feed_swipe_chunk_size
 from app.services.weights import touch_session
 
 log = logging.getLogger("app.api.feed")
 router = APIRouter(prefix="/feed", tags=["feed"])
+
+
+@router.get("/public-settings", response_model=FeedPublicSettingsOut)
+def get_feed_public_settings(db: Session = Depends(get_db)) -> FeedPublicSettingsOut:
+    return FeedPublicSettingsOut(swipe_chunk_size=feed_swipe_chunk_size(db))
 
 
 @router.get("", response_model=FeedResponse)

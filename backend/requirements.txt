@@ -17,3 +17,5 @@ ujson>=5.9.0
 pyfailsafe>=0.6.0
 prometheus-fastapi-instrumentator>=7.0.0
 pywebpush>=2.0.0
+pgvector>=0.3.6
+numpy>=1.26.0

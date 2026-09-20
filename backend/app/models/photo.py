@@ -50,6 +50,15 @@ class Photo(Base):
         DateTime(timezone=True), server_default=func.now()
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    # False — фото в бакете/БД, но не в /feed (ожидает выпуска пакета после ingest).
+    feed_visible: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
+    release_batch_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("feed_release_batches.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    vector_embed_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     tagging_claimed_by_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="SET NULL"),
@@ -88,7 +97,14 @@ class Photo(Base):
     dislikes_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     brand_row = relationship("Brand", back_populates="photos")
+    release_batch = relationship("FeedReleaseBatch", back_populates="photos")
     photo_tags = relationship("PhotoTag", back_populates="photo", cascade="all, delete-orphan")
+    photo_embedding = relationship(
+        "PhotoEmbedding",
+        back_populates="photo",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
     interactions = relationship("Interaction", back_populates="photo")
 
 

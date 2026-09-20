@@ -8,6 +8,7 @@ from app.models.brand_order import (
     BrandOrderCategoryLine,
 )
 from app.models.category import CATEGORY_GENDERS, Category
+from app.models.feed_release_batch import FeedReleaseBatch
 from app.models.feed_settings import FeedSettings
 from app.models.fitting_request import FittingRequest, FittingRequestLikedPhoto
 from app.models.fx_rate import FxRate
@@ -21,6 +22,8 @@ from app.models.home_v2_settings import HomeV2Settings
 from app.models.promo_banner import PromoBanner, PromoBannerDisplayMode, PromoBannerImpression
 from app.models.push_subscription import PushSubscription
 from app.models.photo import PHOTO_SOURCE_YC_OBJECT_STORAGE, Photo, PhotoTag, Tag, TagGroup
+from app.models.photo_embedding import PhotoEmbedding
+from app.models.user_taste_vector import UserTasteVector
 from app.models.season import Season
 from app.models.session import UserSession
 from app.models.shipment import Shipment
@@ -43,6 +46,7 @@ __all__ = [
     "AiIngestJob",
     "OutletPhotoUpload",
     "TryOnJob",
+    "FeedReleaseBatch",
     "FeedSettings",
     "FittingRequest",
     "FittingRequestLikedPhoto",
@@ -63,6 +67,8 @@ __all__ = [
     "Tag",
     "TagGroup",
     "PhotoTag",
+    "PhotoEmbedding",
+    "UserTasteVector",
     "Interaction",
     "UserTagWeight",
     "UserTagPairWeight",

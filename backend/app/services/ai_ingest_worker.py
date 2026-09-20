@@ -16,6 +16,7 @@ from app.config import Settings, settings
 from app.database import SessionLocal
 from app.externals.http.fashn import FashnClient
 from app.models import AiIngestJob
+from app.services.feed_release_batch import get_or_create_draft_batch
 from app.services.image_prepare import (
     build_fashn_product_image_data_url,
     png_bytes_to_webp,
@@ -49,24 +50,28 @@ def reset_stale_processing_jobs(db: Session, *, older_than_minutes: int = 90) ->
     return n
 
 
-def _fail_job(db: Session, job: AiIngestJob, message: str) -> None:
-    job.status = "failed"
-    job.error_message = (message or "")[:4000]
-    job.finished_at = datetime.now(timezone.utc)
-    db.commit()
-
-
-def _success_job(
+def _complete_job(
     db: Session,
     job: AiIngestJob,
     *,
     bucket: str,
     key: str,
+    photo_id: uuid.UUID,
+    release_batch_id: uuid.UUID,
 ) -> None:
     job.status = "completed"
     job.error_message = None
     job.result_bucket = bucket
     job.result_key = key
+    job.photo_id = photo_id
+    job.release_batch_id = release_batch_id
+    job.finished_at = datetime.now(timezone.utc)
+    db.commit()
+
+
+def _fail_job(db: Session, job: AiIngestJob, message: str) -> None:
+    job.status = "failed"
+    job.error_message = (message or "")[:4000]
     job.finished_at = datetime.now(timezone.utc)
     db.commit()
 
@@ -198,7 +203,11 @@ def run_single_ingest_job(cfg: Settings, job_id: uuid.UUID) -> None:
                 len(webp_bytes),
             )
             put_image_object(bucket, key, webp_bytes, content_type="image/webp")
-            ensure_photo_row_for_yc_key(
+            batch_id = job.release_batch_id
+            if batch_id is None:
+                batch = get_or_create_draft_batch(db, gender=job.gender)
+                batch_id = batch.id
+            photo = ensure_photo_row_for_yc_key(
                 db,
                 settings=cfg,
                 gender=job.gender,
@@ -206,9 +215,23 @@ def run_single_ingest_job(cfg: Settings, job_id: uuid.UUID) -> None:
                 key=key,
                 brand_id=job.brand_id,
                 show_badge=bool(job.show_badge),
+                feed_visible=False,
+                release_batch_id=batch_id,
             )
-            _success_job(db, job, bucket=bucket, key=key)
-            log.info("ai_ingest job_id=%s завершён (completed)", job_id)
+            _complete_job(
+                db,
+                job,
+                bucket=bucket,
+                key=key,
+                photo_id=photo.id,
+                release_batch_id=batch_id,
+            )
+            log.info(
+                "ai_ingest job_id=%s OK → photo_id=%s draft batch %s (job до выпуска пакета)",
+                job_id,
+                photo.id,
+                batch_id,
+            )
         except Exception as e:
             log.exception("s3 or db job_id=%s", job_id)
             db.rollback()

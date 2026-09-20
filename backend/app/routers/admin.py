@@ -47,6 +47,8 @@ from app.schemas.admin import (
     AdminPhotoTagsPutBody,
     AdminBrandCreateRequest,
     AdminBrandUpdateRequest,
+    EmbedCatalogBackfillOut,
+    EmbedCatalogStatusOut,
     FeedSettingsOut,
     FeedSettingsPatch,
     AdminFittingRequestListResponse,
@@ -73,6 +75,7 @@ from app.schemas.admin import (
     AdminTagUpdateRequest,
     AdminUserCreateRequest,
     AdminUserDetailOut,
+    AdminUserTastePhotoOut,
     AdminUserListResponse,
     AdminUserOut,
     AdminUserTagPairWeightStat,
@@ -89,6 +92,11 @@ from app.services.campaign_stats import (
     fetch_campaign_dashboard_rows,
 )
 from app.services.tagging_validation import validate_catalog_tag_selection
+from app.services.taste_nearest_photos import nearest_feed_photos_to_taste, user_taste_meta
+from app.services.photo_embedding import (
+    count_catalog_photos_needing_embedding,
+    embed_catalog_backfill_batch,
+)
 from app.services.yc_photo_sync import run_sync_job_commit
 from app.services.yc_storage import bulk_delete_photo_files_from_object_storage
 from app.permissions import (
@@ -440,10 +448,19 @@ def get_feed_settings(
 ) -> FeedSettingsOut:
     row = db.get(FeedSettings, 1)
     if row is None:
-        return FeedSettingsOut(require_tagging_review_for_feed=False, card_badge_label=None)
+        return FeedSettingsOut(
+            require_tagging_review_for_feed=False,
+            card_badge_label=None,
+            feed_ranking_mode="tags",
+            feed_vector_weight=0.65,
+            swipe_chunk_size=10,
+        )
     return FeedSettingsOut(
         require_tagging_review_for_feed=row.require_tagging_review_for_feed,
         card_badge_label=row.card_badge_label,
+        feed_ranking_mode=row.feed_ranking_mode or "tags",
+        feed_vector_weight=float(row.feed_vector_weight),
+        swipe_chunk_size=int(row.swipe_chunk_size or 10),
     )
 
 
@@ -462,11 +479,24 @@ def patch_feed_settings(
         )
     row = db.get(FeedSettings, 1)
     if row is None:
-        row = FeedSettings(id=1, require_tagging_review_for_feed=False, card_badge_label=None)
+        row = FeedSettings(
+            id=1,
+            require_tagging_review_for_feed=False,
+            card_badge_label=None,
+            feed_ranking_mode="tags",
+            feed_vector_weight=0.65,
+            swipe_chunk_size=10,
+        )
         db.add(row)
         db.flush()
     if "require_tagging_review_for_feed" in patch:
         row.require_tagging_review_for_feed = bool(patch["require_tagging_review_for_feed"])
+    if "feed_ranking_mode" in patch and patch["feed_ranking_mode"] is not None:
+        row.feed_ranking_mode = str(patch["feed_ranking_mode"]).strip().lower()
+    if "feed_vector_weight" in patch and patch["feed_vector_weight"] is not None:
+        row.feed_vector_weight = float(patch["feed_vector_weight"])
+    if "swipe_chunk_size" in patch and patch["swipe_chunk_size"] is not None:
+        row.swipe_chunk_size = int(patch["swipe_chunk_size"])
     if "card_badge_label" in patch:
         raw = patch.get("card_badge_label")
         if raw is None or (isinstance(raw, str) and not raw.strip()):
@@ -479,7 +509,47 @@ def patch_feed_settings(
     return FeedSettingsOut(
         require_tagging_review_for_feed=row.require_tagging_review_for_feed,
         card_badge_label=row.card_badge_label,
+        feed_ranking_mode=row.feed_ranking_mode or "tags",
+        feed_vector_weight=float(row.feed_vector_weight),
+        swipe_chunk_size=int(row.swipe_chunk_size or 10),
     )
+
+
+@router.get("/feed-settings/embed-catalog-status", response_model=EmbedCatalogStatusOut)
+def embed_catalog_status(
+    db: Session = Depends(get_db),
+    _principal: AdminPrincipal = Depends(get_admin_principal),
+) -> EmbedCatalogStatusOut:
+    _ = _principal
+    fastembed_ok = True
+    try:
+        from fastembed import ImageEmbedding  # noqa: F401
+    except ImportError:
+        fastembed_ok = False
+    return EmbedCatalogStatusOut(
+        needing_embedding=count_catalog_photos_needing_embedding(db),
+        fastembed_available=fastembed_ok,
+    )
+
+
+@router.post("/feed-settings/embed-catalog-backfill", response_model=EmbedCatalogBackfillOut)
+def embed_catalog_backfill(
+    db: Session = Depends(get_db),
+    _su: AdminPrincipal = Depends(require_superuser),
+    gender: str | None = Query(None, max_length=10),
+    limit: int = Query(12, ge=1, le=30),
+) -> EmbedCatalogBackfillOut:
+    _ = _su
+    g: str | None = None
+    if gender is not None and gender.strip():
+        g = gender.strip().lower()
+        if g not in ("male", "female"):
+            raise HTTPException(status_code=400, detail="gender: male, female или пусто")
+    try:
+        result = embed_catalog_backfill_batch(db, gender=g, limit=limit)
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+    return EmbedCatalogBackfillOut(**result)
 
 
 # Поддерживаемые сортировки в /admin/photos. Значения сохраняйте синхронно с фронтом (admin/src/pages/Photos.jsx).
@@ -1488,6 +1558,20 @@ def get_user_detail(
         for row in tp_sorted
     ]
 
+    taste_emb, taste_updates = user_taste_meta(db, uid)
+    taste_nearest: list[AdminUserTastePhotoOut] = []
+    if taste_emb:
+        for photo, cos in nearest_feed_photos_to_taste(db, taste_emb, k=4):
+            taste_nearest.append(
+                AdminUserTastePhotoOut(
+                    photo_id=photo.id,
+                    url=photo.url,
+                    gender=photo.gender,
+                    brand=photo.brand,
+                    cosine=float(cos),
+                )
+            )
+
     return AdminUserDetailOut(
         user=_admin_user_out(u),
         interactions_total=interactions_total,
@@ -1500,6 +1584,9 @@ def get_user_detail(
         avg_view_time_ms=avg_view_time_ms,
         tag_weights=tag_weights,
         tag_pair_weights=tag_pair_weights,
+        taste_vector_ready=taste_emb is not None,
+        taste_swipe_updates=taste_updates,
+        taste_nearest_photos=taste_nearest,
     )
 
 

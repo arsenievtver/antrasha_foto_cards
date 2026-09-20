@@ -236,6 +236,15 @@ export async function markPromoBannerSeen(bannerId) {
 	}
 }
 
+export async function fetchFeedPublicSettings() {
+	const res = await fetch(apiUrl("/feed/public-settings"));
+	if (!res.ok) {
+		const text = await res.text();
+		throw new Error(text || `Feed settings ${res.status}`);
+	}
+	return res.json();
+}
+
 export async function loadFeed(gender, { limit = 30 } = {}) {
 	const headers = await sessionAuthHeaders();
 	const q = new URLSearchParams({ gender, limit: String(limit) });

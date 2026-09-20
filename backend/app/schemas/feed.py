@@ -27,3 +27,7 @@ class FeedPhoto(BaseModel):
 class FeedResponse(BaseModel):
     photos: list[FeedPhoto]
     meta: dict[str, Any] = Field(default_factory=dict)
+
+
+class FeedPublicSettingsOut(BaseModel):
+    swipe_chunk_size: int = 10

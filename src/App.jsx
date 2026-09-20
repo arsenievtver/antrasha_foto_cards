@@ -30,6 +30,7 @@ stripRefFromUrl();
 function AppShell() {
 	const { pathname } = useLocation();
 	const scrollMain =
+		pathname.startsWith("/swipe/") ||
 		pathname === "/thank-you" ||
 		pathname === "/about" ||
 		pathname === "/privacy" ||

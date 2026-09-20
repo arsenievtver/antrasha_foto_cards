@@ -9,6 +9,7 @@ from app.deps import get_optional_user, get_session_or_404, parse_session_id
 from app.models import PHOTO_SOURCE_YC_OBJECT_STORAGE, Interaction, Photo, PhotoTag, Tag
 from app.schemas.interaction import InteractionCreate, InteractionResponse
 from app.services.k_factor import k_factor
+from app.services.taste_vector import apply_swipe_to_taste_vector
 from app.services.weights import apply_swipe_to_weights, touch_session
 
 router = APIRouter(prefix="/interactions", tags=["interactions"])
@@ -116,11 +117,19 @@ def create_interaction(
     )
     db.add(inter)
 
-    # skip — только «видел» (лента, seen); в публичный рейтинг и веса не идёт.
+    # skip («Дальше») — только «видел» (лента, seen); в теги, taste-vector и рейтинг не идёт.
     if body.action in ("like", "dislike"):
         apply_swipe_to_weights(
             db,
             photo,
+            action=body.action,
+            k=k,
+            user_id=uid,
+            session_id=session_id if uid is None else None,
+        )
+        apply_swipe_to_taste_vector(
+            db,
+            photo.id,
             action=body.action,
             k=k,
             user_id=uid,

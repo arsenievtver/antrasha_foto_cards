@@ -84,7 +84,7 @@ export default function NotifySettingsModal({ open, onClose }) {
 				) : (
 					<>
 						<p className="hv2-notify-text">
-							Сообщим о новых образах — не чаще одного раза в день.
+							Сообщим о новых образах — около одного раза в неделю.
 						</p>
 						<div
 							className="hv2-notify-genders"
