@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext.jsx";
 import {
+	buildPushDiagnosticReport,
 	fetchPushAccountStatus,
 	getPushUnsupportedHint,
 	isPushActiveOnDevice,
 	isPushAvailableOnServer,
 	isPushReadyFromProbe,
-	preparePushServiceWorker,
 	pushGenderScopeLabel,
 	subscribeToNewPhotosPush,
 	unsubscribeFromNewPhotosPush,
@@ -30,18 +30,34 @@ export default function NotifySettingsModal({ open, onClose, onPushStateChange }
 	const [accountScope, setAccountScope] = useState(null);
 	const [pushProbe, setPushProbe] = useState(null);
 	const [probeBusy, setProbeBusy] = useState(false);
+	const [diagText, setDiagText] = useState("");
+	const [probeStatus, setProbeStatus] = useState("");
+	const [copyHint, setCopyHint] = useState("");
 	const pushReady = pushProbe ? isPushReadyFromProbe(pushProbe) : null;
 
 	async function runPushProbe({ forceRetry = false } = {}) {
 		setProbeBusy(true);
 		setError("");
+		setCopyHint("");
+		setProbeStatus(
+			forceRetry
+				? "Сбрасываем service worker… подождите до 30 сек."
+				: "Проверяем окружение…",
+		);
 		try {
-			const probe = await preparePushServiceWorker({ forceRetry });
+			const { probe, text } = await buildPushDiagnosticReport({ forceRetry });
 			setPushProbe(probe);
+			setDiagText(text);
 			if (!isPushReadyFromProbe(probe)) {
 				setServerOk(false);
+				setProbeStatus(
+					forceRetry
+						? `Готово. Push: ${probe.registrationReady ? "SW ok" : "SW нет"}.`
+						: "Push пока недоступен — см. текст и диагностику ниже.",
+				);
 				return;
 			}
+			setProbeStatus("Окружение готово, проверяем сервер…");
 			const ok = await isPushAvailableOnServer();
 			setServerOk(ok);
 			const onDevice = await isPushActiveOnDevice();
@@ -52,10 +68,22 @@ export default function NotifySettingsModal({ open, onClose, onPushStateChange }
 				setAccountScope(acc?.gender_scope ?? null);
 				if (acc?.gender_scope) setGenderScope(acc.gender_scope);
 			}
+			setProbeStatus(ok ? "Можно включать уведомления." : "Сервер push временно недоступен.");
 		} catch (e) {
 			setError(e.message || String(e));
+			setProbeStatus("Ошибка проверки — см. сообщение выше.");
 		} finally {
 			setProbeBusy(false);
+		}
+	}
+
+	async function copyDiagnostics() {
+		if (!diagText) return;
+		try {
+			await navigator.clipboard.writeText(diagText);
+			setCopyHint("Скопировано — вставьте в Telegram или Notes.");
+		} catch {
+			setCopyHint("Не удалось скопировать — выделите текст в блоке ниже вручную.");
 		}
 	}
 
@@ -66,6 +94,9 @@ export default function NotifySettingsModal({ open, onClose, onPushStateChange }
 		setAccountActive(false);
 		setAccountScope(null);
 		setPushProbe(null);
+		setDiagText("");
+		setProbeStatus("");
+		setCopyHint("");
 		void runPushProbe();
 		// eslint-disable-next-line react-hooks/exhaustive-deps -- только открытие модалки
 	}, [open, isAuthenticated]);
@@ -123,20 +154,44 @@ export default function NotifySettingsModal({ open, onClose, onPushStateChange }
 				<h2 id="hv2-notify-title" className="hv2-notify-title">
 					Уведомления
 				</h2>
-				{pushReady === null && probeBusy ? (
-					<p className="hv2-notify-text">Проверяем push и service worker…</p>
+				{probeBusy && !pushProbe ? (
+					<p className="hv2-notify-text">{probeStatus || "Проверяем push и service worker…"}</p>
 				) : pushReady === false ? (
 					<>
 						<p className="hv2-notify-text">{getPushUnsupportedHint(pushProbe)}</p>
+						{probeStatus ? (
+							<p className="hv2-notify-text hv2-notify-text--status">{probeStatus}</p>
+						) : null}
 						{error ? <p className="hv2-notify-error">{error}</p> : null}
+						<p className="hv2-notify-text hv2-notify-text--hint">
+							Кнопка «Сбросить SW» работает только в приложении с иконки (не Safari). Ждите
+							до 30 сек — статус обновится здесь.
+						</p>
 						<button
 							type="button"
 							className="hv2-notify-btn"
 							disabled={probeBusy}
 							onClick={() => runPushProbe({ forceRetry: true })}
 						>
-							{probeBusy ? "Повтор…" : "Повторить (сбросить service worker)"}
+							{probeBusy ? "Сброс SW…" : "Сбросить service worker и проверить снова"}
 						</button>
+						{diagText ? (
+							<>
+								<button
+									type="button"
+									className="hv2-notify-btn hv2-notify-btn--secondary hv2-notify-btn--diag"
+									onClick={copyDiagnostics}
+								>
+									Скопировать диагностику
+								</button>
+								{copyHint ? (
+									<p className="hv2-notify-text hv2-notify-text--status">{copyHint}</p>
+								) : null}
+								<pre className="hv2-notify-diag" aria-label="Диагностика push">
+									{diagText}
+								</pre>
+							</>
+						) : null}
 					</>
 				) : serverOk === false ? (
 					<p className="hv2-notify-text">Уведомления временно недоступны.</p>

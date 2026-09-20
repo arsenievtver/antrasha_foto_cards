@@ -71,7 +71,19 @@ function probeHasPushManager(probe, reg) {
  * @property {boolean} standalone
  * @property {boolean} registrationReady
  * @property {string} [registerError]
+ * @property {boolean} [forceRetryUsed]
+ * @property {number} [unregisteredCount]
+ * @property {string} [workerState]
+ * @property {boolean} [hasController]
  */
+
+function workerStateLabel(reg) {
+	if (!reg) return "нет регистрации";
+	if (reg.active) return `active (${reg.active.state})`;
+	if (reg.installing) return `installing (${reg.installing.state})`;
+	if (reg.waiting) return `waiting (${reg.waiting.state})`;
+	return "unknown";
+}
 
 /** Регистрация SW + ожидание active (iOS PWA). */
 export async function preparePushServiceWorker({ forceRetry = false } = {}) {
@@ -87,10 +99,13 @@ export async function preparePushServiceWorker({ forceRetry = false } = {}) {
 				pushManagerApi: typeof window !== "undefined" && "PushManager" in window,
 				standalone: isStandaloneDisplayMode(),
 				registrationReady: false,
+				forceRetryUsed: forceRetry,
+				unregisteredCount: 0,
+				hasController: Boolean(navigator.serviceWorker?.controller),
 			};
 
 			if (!probe.secure || !probe.serviceWorkerApi) {
-				return probe;
+				return enrichProbeWithRegistration(probe, null);
 			}
 
 			try {
@@ -98,6 +113,7 @@ export async function preparePushServiceWorker({ forceRetry = false } = {}) {
 				if (!reg || forceRetry) {
 					if (forceRetry) {
 						const all = await navigator.serviceWorker.getRegistrations();
+						probe.unregisteredCount = all.length;
 						await Promise.all(all.map((r) => r.unregister()));
 					}
 					reg = await navigator.serviceWorker.register(SW_URL, {
@@ -121,17 +137,69 @@ export async function preparePushServiceWorker({ forceRetry = false } = {}) {
 				reg = (await waitForActiveRegistration(reg)) || reg;
 				probe.pushManagerApi = probeHasPushManager(probe, reg);
 				probe.registrationReady = Boolean(reg?.active);
+				probe.hasController = Boolean(navigator.serviceWorker?.controller);
+				return enrichProbeWithRegistration(probe, reg);
 			} catch (e) {
 				probe.registerError = e?.message || String(e);
+				try {
+					const reg = await navigator.serviceWorker.getRegistration(SW_SCOPE);
+					return enrichProbeWithRegistration(probe, reg);
+				} catch {
+					return enrichProbeWithRegistration(probe, null);
+				}
 			}
-
-			return probe;
 		})().finally(() => {
 			swPreparePromise = null;
 		});
 	}
 
 	return swPreparePromise;
+}
+
+function enrichProbeWithRegistration(probe, reg) {
+	probe.workerState = workerStateLabel(reg);
+	return probe;
+}
+
+/** Текст для поддержки / Telegram — без кабеля и Mac. */
+export async function buildPushDiagnosticReport({ forceRetry = false } = {}) {
+	const probe = await preparePushServiceWorker({ forceRetry });
+	let vapidOk = null;
+	try {
+		vapidOk = Boolean(await fetchVapidPublicKey());
+	} catch {
+		vapidOk = false;
+	}
+
+	const dmStandalone = window.matchMedia("(display-mode: standalone)").matches;
+	const dmFullscreen = window.matchMedia("(display-mode: fullscreen)").matches;
+	const dmMinimal = window.matchMedia("(display-mode: minimal-ui)").matches;
+	const notif = typeof Notification !== "undefined" ? Notification.permission : "n/a";
+
+	const lines = [
+		"=== ANTRASHA push diagnostic ===",
+		`time: ${new Date().toISOString()}`,
+		`url: ${location.href}`,
+		`https: ${probe.secure ? "yes" : "no"}`,
+		`ios: ${isIosSafari() ? "yes" : "no"}`,
+		`pwa_icon_mode: ${probe.standalone ? "YES" : "NO"}`,
+		`navigator.standalone: ${String(navigator.standalone)}`,
+		`display-mode standalone/full/min: ${dmStandalone}/${dmFullscreen}/${dmMinimal}`,
+		`serviceWorker API: ${probe.serviceWorkerApi ? "yes" : "no"}`,
+		`PushManager API: ${probe.pushManagerApi ? "yes" : "no"}`,
+		`Notification.permission: ${notif}`,
+		`sw registration active: ${probe.registrationReady ? "yes" : "no"}`,
+		`sw controller on page: ${probe.hasController ? "yes" : "no"}`,
+		`sw worker state: ${probe.workerState ?? "—"}`,
+		`sw reset tried: ${probe.forceRetryUsed ? "yes" : "no"}`,
+		`sw unregistered count: ${probe.unregisteredCount ?? 0}`,
+		probe.registerError ? `sw error: ${probe.registerError}` : null,
+		`push ready: ${isPushReadyFromProbe(probe) ? "YES" : "NO"}`,
+		`server vapid: ${vapidOk ? "ok" : "fail"}`,
+		"=== end ===",
+	].filter(Boolean);
+
+	return { probe, text: lines.join("\n") };
 }
 
 /** Почему push недоступен — для текста в UI. */
