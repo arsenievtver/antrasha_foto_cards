@@ -56,6 +56,7 @@ set -a
 # shellcheck disable=SC1091
 source "$DEPLOY_DIR/env/.env.prod"
 set +a
+assert_distinct_edge_domains
 materialize_nginx_template_from_certs
 
 echo "[step] restarting services"
@@ -83,10 +84,16 @@ _header_from_container() {
 for _ in 1 2 3 4 5 6 7 8 9 10; do
   if curl -fsS "http://127.0.0.1/health" >/dev/null 2>&1; then
     app_hdr="$(_header_from_container frontend || true)"
+    admin_hdr="$(_header_from_container admin || true)"
     work_hdr="$(_header_from_container work || true)"
     if [[ "$app_hdr" != "client" ]]; then
       echo "[error] container frontend отдал X-Antrasha-App='${app_hdr:-<empty>}' (ожидали client)"
       compose logs --tail=80 frontend work nginx
+      exit 1
+    fi
+    if [[ "$admin_hdr" != "admin" ]]; then
+      echo "[error] container admin отдал X-Antrasha-App='${admin_hdr:-<empty>}' (ожидали admin)"
+      compose logs --tail=80 admin frontend nginx
       exit 1
     fi
     if [[ "$work_hdr" != "work" ]]; then
@@ -94,7 +101,7 @@ for _ in 1 2 3 4 5 6 7 8 9 10; do
       compose logs --tail=80 frontend work nginx
       exit 1
     fi
-    echo "[ok] app identity: frontend=client, work=work"
+    echo "[ok] app identity: frontend=client, admin=admin, work=work"
     warn_xfashion_tls_if_placeholder
     echo "[ok] update complete (nginx)"
     exit 0

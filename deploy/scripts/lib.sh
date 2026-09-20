@@ -103,6 +103,27 @@ warn_xfashion_tls_if_placeholder() {
   echo ""
 }
 
+# Если admin/work попали в APP_DOMAIN_ALIASES, первый server_name в nginx
+# перехватит Host и отдаст клиентский frontend на чужом домене.
+assert_distinct_edge_domains() {
+  local aliases="${APP_DOMAIN_ALIASES:-}"
+  local other a
+  for other in "${ADMIN_DOMAIN:-}" "${WORK_DOMAIN:-}" "${XFASHION_DOMAIN:-}"; do
+    [[ -n "$other" ]] || continue
+    if [[ "${APP_DOMAIN:-}" == "$other" ]]; then
+      echo "[error] APP_DOMAIN=${APP_DOMAIN} совпадает с ${other} — клиент и этот сервис делят Host"
+      exit 1
+    fi
+    for a in $aliases; do
+      if [[ "$a" == "$other" ]]; then
+        echo "[error] APP_DOMAIN_ALIASES содержит ${other} — nginx отдаст клиент на этом домене"
+        echo "        Уберите ${other} из APP_DOMAIN_ALIASES в deploy/env/.env.prod"
+        exit 1
+      fi
+    done
+  done
+}
+
 materialize_nginx_template_from_certs() {
   local active_template="$DEPLOY_DIR/nginx/templates/default.conf.template"
   tls_cert_present() {
