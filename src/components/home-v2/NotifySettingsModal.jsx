@@ -5,7 +5,8 @@ import {
 	getPushUnsupportedHint,
 	isPushActiveOnDevice,
 	isPushAvailableOnServer,
-	isPushSupported,
+	isPushReadyFromProbe,
+	preparePushServiceWorker,
 	pushGenderScopeLabel,
 	subscribeToNewPhotosPush,
 	unsubscribeFromNewPhotosPush,
@@ -27,6 +28,8 @@ export default function NotifySettingsModal({ open, onClose, onPushStateChange }
 	const [deviceActive, setDeviceActive] = useState(false);
 	const [accountActive, setAccountActive] = useState(false);
 	const [accountScope, setAccountScope] = useState(null);
+	const [pushProbe, setPushProbe] = useState(null);
+	const pushReady = pushProbe ? isPushReadyFromProbe(pushProbe) : null;
 
 	useEffect(() => {
 		if (!open) return undefined;
@@ -36,14 +39,17 @@ export default function NotifySettingsModal({ open, onClose, onPushStateChange }
 		setDeviceActive(false);
 		setAccountActive(false);
 		setAccountScope(null);
-
-		if (!isPushSupported()) {
-			setServerOk(false);
-			return undefined;
-		}
+		setPushProbe(null);
 
 		(async () => {
 			try {
+				const probe = await preparePushServiceWorker();
+				if (cancelled) return;
+				setPushProbe(probe);
+				if (!isPushReadyFromProbe(probe)) {
+					setServerOk(false);
+					return;
+				}
 				const ok = await isPushAvailableOnServer();
 				if (cancelled) return;
 				setServerOk(ok);
@@ -120,8 +126,10 @@ export default function NotifySettingsModal({ open, onClose, onPushStateChange }
 				<h2 id="hv2-notify-title" className="hv2-notify-title">
 					Уведомления
 				</h2>
-				{!isPushSupported() ? (
-					<p className="hv2-notify-text">{getPushUnsupportedHint()}</p>
+				{pushReady === null ? (
+					<p className="hv2-notify-text">Проверяем push и service worker…</p>
+				) : pushReady === false ? (
+					<p className="hv2-notify-text">{getPushUnsupportedHint(pushProbe)}</p>
 				) : serverOk === false ? (
 					<p className="hv2-notify-text">Уведомления временно недоступны.</p>
 				) : pushEnabled ? (

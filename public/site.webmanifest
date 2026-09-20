@@ -8,6 +8,7 @@
   "start_url": "/?pwa=antrasha-client",
   "scope": "/",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui", "browser"],
   "orientation": "portrait",
   "theme_color": "#2b2b2a",
   "background_color": "#2b2b2a",

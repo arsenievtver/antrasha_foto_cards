@@ -10,10 +10,12 @@ export default defineConfig({
       srcDir: 'src',
       filename: 'sw.js',
       registerType: 'autoUpdate',
-      injectRegister: 'auto',
+      injectRegister: null,
       manifest: false,
       injectManifest: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,woff2}'],
+        // Кириллица в путях precache ломает install SW на iOS → push «нет service worker»
+        globIgnores: ['**/лого*', '**/*лого*'],
       },
       devOptions: {
         enabled: true,

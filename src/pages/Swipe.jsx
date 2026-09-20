@@ -426,6 +426,8 @@ export default function Swipe() {
 	const [feedEmptyKind, setFeedEmptyKind] = useState(null);
 	const [replayCatalog, setReplayCatalog] = useState(false);
 	const replayCatalogRef = useRef(false);
+	/** Уже показанные карточки в режиме пересмотра — иначе API снова отдаёт тот же top-N. */
+	const replayShownIdsRef = useRef([]);
 	const [chunkSize, setChunkSize] = useState(10);
 	const [feedMeta, setFeedMeta] = useState(null);
 	const [checkpoint, setCheckpoint] = useState(null);
@@ -467,11 +469,20 @@ export default function Swipe() {
 
 	const loadChunk = useCallback(
 		async (limit, { includeSeen = false } = {}) => {
+			const replay = includeSeen || replayCatalogRef.current;
 			const data = await loadFeed(gender, {
 				limit,
-				includeSeen: includeSeen || replayCatalogRef.current,
+				includeSeen: replay,
+				excludePhotoIds: replay ? replayShownIdsRef.current : [],
 			});
 			const list = normalizeFeedPhotos(data.photos ?? []);
+			if (replay && list.length) {
+				const seen = new Set(replayShownIdsRef.current);
+				for (const p of list) {
+					if (p?.id) seen.add(p.id);
+				}
+				replayShownIdsRef.current = Array.from(seen);
+			}
 			setFeedMeta(data.meta ?? null);
 			setPhotos(list);
 			setIndex(0);
@@ -507,6 +518,7 @@ export default function Swipe() {
 		setFeedEmptyKind(null);
 		replayCatalogRef.current = false;
 		setReplayCatalog(false);
+		replayShownIdsRef.current = [];
 		setCheckpoint(null);
 		setSessionLikes(0);
 		setSessionTotal(0);
@@ -710,6 +722,7 @@ export default function Swipe() {
 	const onReplayCatalog = useCallback(async () => {
 		replayCatalogRef.current = true;
 		setReplayCatalog(true);
+		replayShownIdsRef.current = [];
 		setFeedEmptyKind(null);
 		setPhase("swipe");
 		setLoading(true);

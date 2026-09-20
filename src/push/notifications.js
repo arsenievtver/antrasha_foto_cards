@@ -5,10 +5,11 @@ export const PUSH_SUBSCRIBED_KEY = "antrasha_push_subscribed";
 
 export function isStandaloneDisplayMode() {
 	if (typeof window === "undefined") return false;
-	return (
-		window.matchMedia("(display-mode: standalone)").matches ||
-		window.navigator.standalone === true
-	);
+	if (window.navigator.standalone === true) return true;
+	for (const mode of ["standalone", "fullscreen", "minimal-ui"]) {
+		if (window.matchMedia(`(display-mode: ${mode})`).matches) return true;
+	}
+	return false;
 }
 
 function isIosSafari() {
@@ -16,29 +17,123 @@ function isIosSafari() {
 	return /iPad|iPhone|iPod/.test(navigator.userAgent);
 }
 
-/** Почему push недоступен — для текста в UI. */
-export function getPushUnsupportedHint() {
-	if (typeof window === "undefined") return "Push недоступен в этом окружении.";
-	if (!("serviceWorker" in navigator)) {
-		return "Нет service worker — откройте сайт по HTTPS и обновите страницу.";
+function isAntrashaPwaLaunchUrl() {
+	try {
+		return new URL(window.location.href).searchParams.get("pwa") === "antrasha-client";
+	} catch {
+		return false;
 	}
-	if (!("PushManager" in window)) {
-		return "Обновите систему: на iPhone нужен iOS 16.4+, на Mac — актуальный Safari.";
-	}
-	if (isIosSafari() && !isStandaloneDisplayMode()) {
-		return "На iPhone уведомления работают только из приложения на домашнем экране: Safari → Поделиться → «На экран Домой», затем откройте иконку Antrasha (не вкладку Safari).";
-	}
-	return "Ваш браузер не поддерживает push-уведомления.";
 }
 
+/** Синхронная проверка API (без ожидания регистрации SW). */
 export function isPushSupported() {
 	if (typeof window === "undefined") return false;
+	if (!window.isSecureContext) return false;
 	if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
 		return false;
 	}
-	if (isIosSafari() && !isStandaloneDisplayMode()) {
-		return false;
+	return true;
+}
+
+/**
+ * @typedef {Object} PushEnvironmentProbe
+ * @property {boolean} secure
+ * @property {boolean} serviceWorkerApi
+ * @property {boolean} pushManagerApi
+ * @property {boolean} standalone
+ * @property {boolean} pwaLaunchUrl
+ * @property {boolean} registrationReady
+ * @property {string} [registerError]
+ */
+
+/** Регистрация SW + ожидание ready (iOS PWA часто не успевает к первому тапу по колокольчику). */
+export async function preparePushServiceWorker() {
+	/** @type {PushEnvironmentProbe} */
+	const probe = {
+		secure: typeof window !== "undefined" && window.isSecureContext,
+		serviceWorkerApi: typeof navigator !== "undefined" && "serviceWorker" in navigator,
+		pushManagerApi: typeof window !== "undefined" && "PushManager" in window,
+		standalone: isStandaloneDisplayMode(),
+		pwaLaunchUrl: isAntrashaPwaLaunchUrl(),
+		registrationReady: false,
+	};
+
+	if (!probe.secure || !probe.serviceWorkerApi) {
+		return probe;
 	}
+
+	try {
+		let reg = await navigator.serviceWorker.getRegistration("/");
+		if (!reg) {
+			reg = await navigator.serviceWorker.register("/sw.js", {
+				scope: "/",
+				updateViaCache: "none",
+			});
+		}
+		await Promise.race([
+			navigator.serviceWorker.ready,
+			new Promise((_, reject) => {
+				window.setTimeout(
+					() => reject(new Error("Service worker не активировался за 15 с")),
+					15000,
+				);
+			}),
+		]);
+		probe.registrationReady = Boolean(reg?.active || navigator.serviceWorker.controller);
+	} catch (e) {
+		probe.registerError = e?.message || String(e);
+	}
+
+	return probe;
+}
+
+/** Почему push недоступен — для текста в UI. */
+export function getPushUnsupportedHint(probe = null) {
+	if (typeof window === "undefined") return "Push недоступен в этом окружении.";
+	if (!window.isSecureContext) {
+		return "Нужно защищённое соединение (HTTPS). Откройте https://antrasha.ru и обновите страницу.";
+	}
+
+	const ios = isIosSafari();
+	const standalone = probe?.standalone ?? isStandaloneDisplayMode();
+	const pwaUrl = probe?.pwaLaunchUrl ?? isAntrashaPwaLaunchUrl();
+	const swApi = probe?.serviceWorkerApi ?? "serviceWorker" in navigator;
+	const pushApi = probe?.pushManagerApi ?? "PushManager" in window;
+
+	if (!pushApi) {
+		return "Обновите iOS до 16.4 или новее — без этого push на iPhone недоступны.";
+	}
+
+	if (!swApi) {
+		if (ios) {
+			if (standalone || pwaUrl) {
+				return "Service worker не стартовал в приложении с «Домашнего экрана». Полностью закройте ANTRASHA (смахните из переключателя приложений), откройте снова с иконки и повторите. Если не помогло — удалите ярлык и добавьте заново с «Открыть как веб-приложение».";
+			}
+			return "На iPhone push работают только из иконки ANTRASHA на «Домашнем экране» (не из вкладки Safari). Добавьте через Поделиться → «На экран Домой» с включённым «Открыть как веб-приложение».";
+		}
+		return "Service worker недоступен в этом браузере.";
+	}
+
+	if (probe?.registerError) {
+		return `Не удалось запустить service worker: ${probe.registerError}. Закройте приложение полностью и откройте с иконки ANTRASHA ещё раз.`;
+	}
+
+	if (probe && swApi && pushApi && !probe.registrationReady) {
+		return "Service worker ещё не готов. Подождите пару секунд и нажмите «Уведомления» снова или перезапустите приложение с иконки.";
+	}
+
+	if (ios && !standalone && !pwaUrl) {
+		return "Откройте ANTRASHA с иконки на «Домашнем экране» (не Safari) — затем включите уведомления.";
+	}
+
+	return "Push-уведомления недоступны в этом режиме.";
+}
+
+/** Готовность push после попытки регистрации SW. */
+export function isPushReadyFromProbe(probe) {
+	if (!probe?.secure || !probe.serviceWorkerApi || !probe.pushManagerApi) return false;
+	if (!probe.registrationReady) return false;
+	if (isIosSafari() && !probe.standalone && !probe.pwaLaunchUrl) return false;
 	return true;
 }
 
@@ -205,19 +300,17 @@ export async function isPushAvailableOnServer() {
 }
 
 async function waitForServiceWorkerRegistration() {
-	const ready = navigator.serviceWorker.ready;
-	const timeout = new Promise((_, reject) => {
-		window.setTimeout(
-			() => reject(new Error("Service worker не успел зарегистрироваться — обновите страницу")),
-			20000,
-		);
-	});
-	return Promise.race([ready, timeout]);
+	const probe = await preparePushServiceWorker();
+	if (!isPushReadyFromProbe(probe)) {
+		throw new Error(getPushUnsupportedHint(probe));
+	}
+	return navigator.serviceWorker.ready;
 }
 
 export async function subscribeToNewPhotosPush(genderScope = "both") {
-	if (!isPushSupported()) {
-		throw new Error(getPushUnsupportedHint());
+	const probe = await preparePushServiceWorker();
+	if (!isPushReadyFromProbe(probe)) {
+		throw new Error(getPushUnsupportedHint(probe));
 	}
 	const scope =
 		genderScope === "male" || genderScope === "female" || genderScope === "both"
@@ -227,10 +320,13 @@ export async function subscribeToNewPhotosPush(genderScope = "both") {
 	let permission = "default";
 	if ("Notification" in window) {
 		permission = await Notification.requestPermission();
-	} else if (isStandaloneDisplayMode() && isIosSafari()) {
+	} else if (
+		isIosSafari() &&
+		(isStandaloneDisplayMode() || isAntrashaPwaLaunchUrl())
+	) {
 		permission = "default";
 	} else {
-		throw new Error(getPushUnsupportedHint());
+		throw new Error(getPushUnsupportedHint(probe));
 	}
 	if (permission !== "granted") {
 		throw new Error("Разрешение на уведомления не получено");

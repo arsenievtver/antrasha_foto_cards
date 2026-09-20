@@ -149,6 +149,7 @@ def fetch_feed_photos(
     user_id: uuid.UUID | None,
     session_id: uuid.UUID,
     include_seen: bool = False,
+    exclude_photo_ids: set[uuid.UUID] | None = None,
 ) -> tuple[list[Photo], dict[str, float]]:
     g_norm = gender.strip().lower()
     weights = load_weights_map(db, user_id=user_id, session_id=session_id)
@@ -179,6 +180,8 @@ def fetch_feed_photos(
         candidates = list(all_for_gender)
     else:
         candidates = [p for p in all_for_gender if p.id not in seen]
+    if exclude_photo_ids:
+        candidates = [p for p in candidates if p.id not in exclude_photo_ids]
     loop_rewind = False
 
     if not candidates:

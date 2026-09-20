@@ -29,6 +29,10 @@ def get_feed(
         False,
         description="Показать уже просмотренные (пересмотр каталога без новых релизов)",
     ),
+    exclude_photo_id: list[uuid.UUID] = Query(
+        default=[],
+        description="Не показывать эти фото (пагинация при include_seen / пересмотре)",
+    ),
     session_id: uuid.UUID = Depends(parse_session_id),
     user=Depends(get_optional_user),
 ) -> FeedResponse:
@@ -44,6 +48,7 @@ def get_feed(
         session_id,
         uid,
     )
+    exclude_ids = set(exclude_photo_id) if exclude_photo_id else None
     photos, meta = fetch_feed_photos(
         db,
         gender=gender,
@@ -51,6 +56,7 @@ def get_feed(
         user_id=uid,
         session_id=session_id,
         include_seen=include_seen,
+        exclude_photo_ids=exclude_ids,
     )
     badge_text = feed_card_badge_label(db)
     out: list[FeedPhoto] = []

@@ -245,10 +245,16 @@ export async function fetchFeedPublicSettings() {
 	return res.json();
 }
 
-export async function loadFeed(gender, { limit = 30, includeSeen = false } = {}) {
+export async function loadFeed(
+	gender,
+	{ limit = 30, includeSeen = false, excludePhotoIds = [] } = {},
+) {
 	const headers = await sessionAuthHeaders();
 	const q = new URLSearchParams({ gender, limit: String(limit) });
 	if (includeSeen) q.set("include_seen", "true");
+	for (const id of excludePhotoIds) {
+		if (id) q.append("exclude_photo_id", String(id));
+	}
 	const res = await fetch(`${apiUrl("/feed")}?${q}`, { headers });
 	if (!res.ok) {
 		const text = await res.text();
