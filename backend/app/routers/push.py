@@ -6,16 +6,19 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import get_db
-from app.deps import get_optional_user, get_session_or_404, parse_session_id
+from app.deps import get_optional_user, get_session_or_404, parse_session_id, require_user
 from app.models import User
 from app.schemas.push import (
+    PushAccountStatusResponse,
     PushSubscribeRequest,
     PushSubscribeResponse,
     PushUnsubscribeRequest,
     PushVapidPublicKeyResponse,
 )
 from app.services.web_push import (
+    deactivate_all_push_subscriptions_for_user,
     deactivate_push_subscription,
+    push_account_status_for_user,
     upsert_push_subscription,
     web_push_configured,
 )
@@ -69,6 +72,15 @@ def subscribe_push(
     return PushSubscribeResponse()
 
 
+@router.get("/account-status", response_model=PushAccountStatusResponse)
+def push_account_status(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_user),
+) -> PushAccountStatusResponse:
+    active, scope = push_account_status_for_user(db, user.id)
+    return PushAccountStatusResponse(active=active, gender_scope=scope)
+
+
 @router.post("/unsubscribe", status_code=status.HTTP_204_NO_CONTENT)
 def unsubscribe_push(
     body: PushUnsubscribeRequest,
@@ -79,3 +91,13 @@ def unsubscribe_push(
     deactivate_push_subscription(db, body.endpoint.strip())
     db.commit()
     log.info("POST /push/unsubscribe session=%s", session_id)
+
+
+@router.post("/unsubscribe-all", status_code=status.HTTP_204_NO_CONTENT)
+def unsubscribe_all_push_for_user(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_user),
+) -> None:
+    n = deactivate_all_push_subscriptions_for_user(db, user.id)
+    db.commit()
+    log.info("POST /push/unsubscribe-all user=%s count=%s", user.id, n)

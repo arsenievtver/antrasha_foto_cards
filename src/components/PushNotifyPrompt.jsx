@@ -39,7 +39,11 @@ export default function PushNotifyPrompt({ visible, gender }) {
 			setShow(false);
 			return undefined;
 		}
-		if (Notification.permission === "granted" && isPushSubscribedLocally()) {
+		if (
+			typeof Notification !== "undefined" &&
+			Notification.permission === "granted" &&
+			isPushSubscribedLocally()
+		) {
 			setShow(false);
 			return undefined;
 		}

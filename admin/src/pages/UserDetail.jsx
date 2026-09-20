@@ -77,6 +77,18 @@ export default function UserDetail() {
               <th>Последний вход</th>
               <td>{fmtDate(u.last_login_at)}</td>
             </tr>
+            <tr>
+              <th>Push о новинках</th>
+              <td>
+                {data.push_subscribed
+                  ? `Подписан${
+                      data.push_gender_scope
+                        ? ` (${data.push_gender_scope === "male" ? "муж." : data.push_gender_scope === "female" ? "жен." : "оба"})`
+                        : ""
+                    }`
+                  : "Не подписан"}
+              </td>
+            </tr>
           </tbody>
         </table>
       </div>

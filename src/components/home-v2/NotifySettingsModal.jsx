@@ -1,9 +1,14 @@
 import { useEffect, useState } from "react";
+import { useAuth } from "../../context/AuthContext.jsx";
 import {
+	fetchPushAccountStatus,
+	getPushUnsupportedHint,
+	isPushActiveOnDevice,
 	isPushAvailableOnServer,
-	isPushSubscribedLocally,
 	isPushSupported,
+	pushGenderScopeLabel,
 	subscribeToNewPhotosPush,
+	unsubscribeFromNewPhotosPush,
 } from "../../push/notifications.js";
 import "./NotifySettingsModal.css";
 
@@ -13,39 +18,83 @@ const GENDER_OPTIONS = [
 	{ value: "both", label: "Мужские и женские" },
 ];
 
-export default function NotifySettingsModal({ open, onClose }) {
+export default function NotifySettingsModal({ open, onClose, onPushStateChange }) {
+	const { isAuthenticated } = useAuth();
 	const [genderScope, setGenderScope] = useState("both");
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState("");
 	const [serverOk, setServerOk] = useState(null);
-	const subscribed = isPushSubscribedLocally();
+	const [deviceActive, setDeviceActive] = useState(false);
+	const [accountActive, setAccountActive] = useState(false);
+	const [accountScope, setAccountScope] = useState(null);
 
 	useEffect(() => {
 		if (!open) return undefined;
 		let cancelled = false;
 		setError("");
+		setServerOk(null);
+		setDeviceActive(false);
+		setAccountActive(false);
+		setAccountScope(null);
+
 		if (!isPushSupported()) {
 			setServerOk(false);
 			return undefined;
 		}
-		isPushAvailableOnServer().then((ok) => {
-			if (!cancelled) setServerOk(ok);
-		});
+
+		(async () => {
+			try {
+				const ok = await isPushAvailableOnServer();
+				if (cancelled) return;
+				setServerOk(ok);
+				const onDevice = await isPushActiveOnDevice();
+				if (cancelled) return;
+				setDeviceActive(onDevice);
+				if (isAuthenticated) {
+					const acc = await fetchPushAccountStatus();
+					if (cancelled) return;
+					setAccountActive(Boolean(acc?.active));
+					setAccountScope(acc?.gender_scope ?? null);
+					if (acc?.gender_scope) setGenderScope(acc.gender_scope);
+				}
+			} catch (e) {
+				if (!cancelled) setError(e.message || String(e));
+			}
+		})();
+
 		return () => {
 			cancelled = true;
 		};
-	}, [open]);
+	}, [open, isAuthenticated]);
 
 	if (!open) return null;
+
+	const pushEnabled = deviceActive || accountActive;
+	const scopeLabel = pushGenderScopeLabel(accountScope || genderScope);
 
 	async function handleEnable() {
 		setBusy(true);
 		setError("");
 		try {
 			await subscribeToNewPhotosPush(genderScope);
+			onPushStateChange?.(true);
 			onClose?.();
 		} catch (e) {
 			setError(e.message || "Не удалось включить уведомления");
+		} finally {
+			setBusy(false);
+		}
+	}
+
+	async function handleDisable() {
+		setBusy(true);
+		setError("");
+		try {
+			await unsubscribeFromNewPhotosPush();
+			onPushStateChange?.(false);
+			onClose?.();
+		} catch (e) {
+			setError(e.message || "Не удалось отключить уведомления");
 		} finally {
 			setBusy(false);
 		}
@@ -72,19 +121,36 @@ export default function NotifySettingsModal({ open, onClose }) {
 					Уведомления
 				</h2>
 				{!isPushSupported() ? (
-					<p className="hv2-notify-text">
-						Ваш браузер не поддерживает push-уведомления.
-					</p>
+					<p className="hv2-notify-text">{getPushUnsupportedHint()}</p>
 				) : serverOk === false ? (
 					<p className="hv2-notify-text">Уведомления временно недоступны.</p>
-				) : subscribed ? (
-					<p className="hv2-notify-text">
-						Уведомления о новинках уже включены на этом устройстве.
-					</p>
+				) : pushEnabled ? (
+					<>
+						<p className="hv2-notify-text hv2-notify-text--status">
+							Уведомления о новинках <strong>включены</strong>
+							{scopeLabel ? ` (${scopeLabel})` : ""}.
+						</p>
+						<p className="hv2-notify-text">
+							Можно отключить в любой момент — на этом устройстве push перестанут
+							приходить.
+						</p>
+						{error ? <p className="hv2-notify-error">{error}</p> : null}
+						<button
+							type="button"
+							className="hv2-notify-btn hv2-notify-btn--secondary"
+							onClick={handleDisable}
+							disabled={busy}
+						>
+							{busy ? "Отключаем…" : "Отключить уведомления"}
+						</button>
+					</>
 				) : (
 					<>
 						<p className="hv2-notify-text">
 							Сообщим о новых образах — около одного раза в неделю.
+							{isAuthenticated
+								? " После входа подписка привязывается к профилю."
+								: null}
 						</p>
 						<div
 							className="hv2-notify-genders"

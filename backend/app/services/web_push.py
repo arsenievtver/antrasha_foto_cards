@@ -111,6 +111,33 @@ def deactivate_push_subscription(db: Session, endpoint: str) -> None:
         row.is_active = False
 
 
+def deactivate_all_push_subscriptions_for_user(db: Session, user_id: uuid.UUID) -> int:
+    rows = db.execute(
+        select(PushSubscription).where(
+            PushSubscription.user_id == user_id,
+            PushSubscription.is_active.is_(True),
+        )
+    ).scalars().all()
+    for row in rows:
+        row.is_active = False
+    return len(rows)
+
+
+def push_account_status_for_user(db: Session, user_id: uuid.UUID) -> tuple[bool, str | None]:
+    row = db.execute(
+        select(PushSubscription)
+        .where(
+            PushSubscription.user_id == user_id,
+            PushSubscription.is_active.is_(True),
+        )
+        .order_by(PushSubscription.created_at.desc())
+        .limit(1)
+    ).scalar_one_or_none()
+    if not row:
+        return False, None
+    return True, row.gender_scope
+
+
 def _subscription_info(row: PushSubscription) -> dict:
     return {
         "endpoint": row.endpoint,

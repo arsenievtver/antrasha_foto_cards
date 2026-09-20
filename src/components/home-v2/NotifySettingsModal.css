@@ -96,3 +96,15 @@
 .hv2-notify-btn:disabled {
 	opacity: 0.55;
 }
+
+.hv2-notify-btn--secondary {
+	margin-top: 1rem;
+	border-color: rgba(245, 240, 232, 0.22);
+	background: transparent;
+	color: rgba(245, 240, 232, 0.75);
+}
+
+.hv2-notify-text--status strong {
+	color: var(--hv2-gold);
+	font-weight: 500;
+}

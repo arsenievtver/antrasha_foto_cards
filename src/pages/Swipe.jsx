@@ -277,17 +277,20 @@ function normalizeFeedPhotos(raw) {
 }
 
 /** Пустая выдача: исчерпан каталог vs реально нет фото в коллекции. */
-function classifyEmptyFeed(meta) {
-	if (!meta || typeof meta !== "object") return "exhausted";
+function classifyEmptyFeed(meta, { replayMode = false } = {}) {
+	if (!meta || typeof meta !== "object") {
+		return replayMode ? "no_catalog" : "exhausted";
+	}
+	if (Number(meta.include_seen) > 0) return "no_catalog";
 	if (Number(meta.catalog_exhausted) > 0) return "exhausted";
 	const total = Number(meta.total_active_for_gender);
 	const seen = Number(meta.seen_in_this_collection);
 	const candidates = Number(meta.candidates);
-	if (total > 0 && seen >= total) return "exhausted";
-	if (total > 0 && candidates === 0 && seen > 0) return "exhausted";
+	if (total > 0 && seen >= total && !replayMode) return "exhausted";
+	if (total > 0 && candidates === 0 && seen > 0 && !replayMode) return "exhausted";
 	if (total === 0) return "no_catalog";
-	if (Number.isFinite(total) && total > 0) return "exhausted";
-	return "exhausted";
+	if (!replayMode && Number.isFinite(total) && total > 0) return "exhausted";
+	return replayMode ? "no_catalog" : "exhausted";
 }
 
 function CardImage({ url, fetchPriority, photoId, eager, onBroken }) {
@@ -422,6 +425,7 @@ export default function Swipe() {
 	const [phase, setPhase] = useState("swipe");
 	const [feedEmptyKind, setFeedEmptyKind] = useState(null);
 	const [replayCatalog, setReplayCatalog] = useState(false);
+	const replayCatalogRef = useRef(false);
 	const [chunkSize, setChunkSize] = useState(10);
 	const [feedMeta, setFeedMeta] = useState(null);
 	const [checkpoint, setCheckpoint] = useState(null);
@@ -465,7 +469,7 @@ export default function Swipe() {
 		async (limit, { includeSeen = false } = {}) => {
 			const data = await loadFeed(gender, {
 				limit,
-				includeSeen: includeSeen || replayCatalog,
+				includeSeen: includeSeen || replayCatalogRef.current,
 			});
 			const list = normalizeFeedPhotos(data.photos ?? []);
 			setFeedMeta(data.meta ?? null);
@@ -483,7 +487,7 @@ export default function Swipe() {
 			scheduleFeedPreload(urls, 0);
 			return { list, meta: data.meta ?? null };
 		},
-		[gender, dragX, replayCatalog],
+		[gender, dragX],
 	);
 
 	const openFeedEmpty = useCallback((kind, meta) => {
@@ -501,6 +505,7 @@ export default function Swipe() {
 		setPhotos([]);
 		setPhase("swipe");
 		setFeedEmptyKind(null);
+		replayCatalogRef.current = false;
 		setReplayCatalog(false);
 		setCheckpoint(null);
 		setSessionLikes(0);
@@ -531,7 +536,9 @@ export default function Swipe() {
 		return () => {
 			cancelled = true;
 		};
-	}, [gender, dragX, goThankYou, loadChunk, openFeedEmpty]);
+		// Только смена коллекции — не перезагружать ленту при replayCatalog / loadChunk identity
+		// eslint-disable-next-line react-hooks/exhaustive-deps -- см. комментарий выше
+	}, [gender]);
 
 	const currentPhoto = photos[index];
 
@@ -701,6 +708,7 @@ export default function Swipe() {
 	}, [checkpoint, chunkSize, goThankYou, loadChunk, openFeedEmpty]);
 
 	const onReplayCatalog = useCallback(async () => {
+		replayCatalogRef.current = true;
 		setReplayCatalog(true);
 		setFeedEmptyKind(null);
 		setPhase("swipe");
@@ -709,8 +717,7 @@ export default function Swipe() {
 		try {
 			const { list, meta } = await loadChunk(chunkSize, { includeSeen: true });
 			if (!list.length) {
-				const emptyKind = classifyEmptyFeed(meta) || "no_catalog";
-				openFeedEmpty(emptyKind, meta);
+				openFeedEmpty(classifyEmptyFeed(meta, { replayMode: true }), meta);
 			}
 		} catch (e) {
 			setLoadError(e.message || String(e));

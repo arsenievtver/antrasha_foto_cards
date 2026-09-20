@@ -5,7 +5,11 @@ import { wasPromoBannerSeenThisSession } from "../utils/promoBannerSession.js";
 import { useAuth } from "../context/AuthContext";
 import PromoBannerModal from "../components/PromoBannerModal.jsx";
 import UserMenu from "../components/UserMenu";
-import { isPushSubscribedLocally } from "../push/notifications.js";
+import {
+	fetchPushAccountStatus,
+	isPushActiveOnDevice,
+	isPushSubscribedLocally,
+} from "../push/notifications.js";
 import AccentBlocks from "../components/home-v2/AccentBlocks";
 import BrandMarquee from "../components/home-v2/BrandMarquee";
 import GenderCards from "../components/home-v2/GenderCards";
@@ -20,7 +24,7 @@ import "./HomeV2.css";
 
 export default function HomeV2() {
 	const navigate = useNavigate();
-	const { profile } = useAuth();
+	const { profile, isAuthenticated } = useAuth();
 	const [heroes, setHeroes] = useState([HOME_V2_DEFAULT_HERO]);
 	const [promoBanner, setPromoBanner] = useState(null);
 	const [promoDismissed, setPromoDismissed] = useState(false);
@@ -28,7 +32,7 @@ export default function HomeV2() {
 	const [notifyOpen, setNotifyOpen] = useState(false);
 	const [leadOpen, setLeadOpen] = useState(false);
 	const [leadAccent, setLeadAccent] = useState(null);
-	const [hasPush, setHasPush] = useState(() => isPushSubscribedLocally());
+	const [hasPush, setHasPush] = useState(false);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -76,8 +80,25 @@ export default function HomeV2() {
 	}, []);
 
 	useEffect(() => {
-		if (!notifyOpen) setHasPush(isPushSubscribedLocally());
-	}, [notifyOpen]);
+		let cancelled = false;
+		(async () => {
+			try {
+				let active = await isPushActiveOnDevice();
+				if (isAuthenticated) {
+					const acc = await fetchPushAccountStatus();
+					active = active || Boolean(acc?.active);
+				}
+				if (!cancelled) {
+					setHasPush(Boolean(active || isPushSubscribedLocally()));
+				}
+			} catch {
+				if (!cancelled) setHasPush(isPushSubscribedLocally());
+			}
+		})();
+		return () => {
+			cancelled = true;
+		};
+	}, [notifyOpen, isAuthenticated]);
 
 	const onPwaInstalled = useCallback(() => {
 		if (!isPushSubscribedLocally()) setNotifyOpen(true);
@@ -148,7 +169,11 @@ export default function HomeV2() {
 				open={userOpen}
 				onOpenChange={setUserOpen}
 			/>
-			<NotifySettingsModal open={notifyOpen} onClose={() => setNotifyOpen(false)} />
+			<NotifySettingsModal
+				open={notifyOpen}
+				onClose={() => setNotifyOpen(false)}
+				onPushStateChange={(active) => setHasPush(Boolean(active))}
+			/>
 			<LeadRequestModal
 				open={leadOpen}
 				accent={leadAccent}

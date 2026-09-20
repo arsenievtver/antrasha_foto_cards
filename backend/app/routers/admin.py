@@ -93,6 +93,7 @@ from app.services.campaign_stats import (
 )
 from app.services.tagging_validation import validate_catalog_tag_selection
 from app.services.taste_nearest_photos import nearest_feed_photos_to_taste, user_taste_meta
+from app.services.web_push import push_account_status_for_user
 from app.services.photo_embedding import (
     count_catalog_photos_needing_embedding,
     embed_catalog_backfill_batch,
@@ -1574,6 +1575,8 @@ def get_user_detail(
         for row in tp_sorted
     ]
 
+    push_active, push_scope = push_account_status_for_user(db, uid)
+
     taste_emb, taste_updates = user_taste_meta(db, uid)
     taste_nearest: list[AdminUserTastePhotoOut] = []
     if taste_emb:
@@ -1603,6 +1606,8 @@ def get_user_detail(
         taste_vector_ready=taste_emb is not None,
         taste_swipe_updates=taste_updates,
         taste_nearest_photos=taste_nearest,
+        push_subscribed=push_active,
+        push_gender_scope=push_scope,
     )
 
 

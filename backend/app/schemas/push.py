@@ -28,6 +28,13 @@ class PushSubscribeResponse(BaseModel):
     ok: bool = True
 
 
+class PushAccountStatusResponse(BaseModel):
+    """Активная push-подписка в профиле (для зарегистрированных)."""
+
+    active: bool = False
+    gender_scope: PushGenderScope | None = None
+
+
 AdminPushAudience = Literal["all", "male", "female", "both"]
 
 

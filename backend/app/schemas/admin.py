@@ -439,3 +439,5 @@ class AdminUserDetailOut(BaseModel):
     taste_vector_ready: bool = False
     taste_swipe_updates: int = 0
     taste_nearest_photos: list[AdminUserTastePhotoOut] = Field(default_factory=list)
+    push_subscribed: bool = False
+    push_gender_scope: str | None = None
