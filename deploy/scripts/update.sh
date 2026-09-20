@@ -11,8 +11,12 @@ ensure_env_files
 
 cd "$REPO_ROOT"
 
-echo "[step] git pull --ff-only"
-git pull --ff-only
+if [[ "${SKIP_GIT_PULL:-0}" == "1" ]]; then
+  echo "[step] skip git pull (SKIP_GIT_PULL=1)"
+else
+  echo "[step] git pull --ff-only"
+  git pull --ff-only
+fi
 
 echo "[step] rebuilding images (по одному сервису — меньше шанс OOM на VM 2 GB)"
 for _svc in backend ai-ingest-worker frontend admin work xfashion; do
