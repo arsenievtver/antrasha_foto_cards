@@ -131,6 +131,7 @@ def _admin_user_out(u: User) -> AdminUserOut:
         display_name=u.display_name,
         role=u.role,
         admin_permissions=perms,
+        ranking_eval_enabled=bool(u.ranking_eval_enabled),
         created_at=u.created_at,
         last_login_at=u.last_login_at,
     )
@@ -1689,6 +1690,9 @@ def update_user(
         u.admin_permissions = perms or list(DEFAULT_WORKER_PERMISSIONS)
     elif previous_role != UserRole.worker.value and u.role == UserRole.worker.value:
         u.admin_permissions = list(DEFAULT_WORKER_PERMISSIONS)
+
+    if body.ranking_eval_enabled is not None:
+        u.ranking_eval_enabled = bool(body.ranking_eval_enabled)
 
     try:
         db.commit()

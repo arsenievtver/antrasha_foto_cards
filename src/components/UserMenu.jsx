@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
 	formatPhoneMask,
 	formatPinMask,
@@ -38,6 +39,7 @@ export default function UserMenu({
 	const [pin, setPin] = useState("");
 	const [loginErr, setLoginErr] = useState("");
 	const [loginBusy, setLoginBusy] = useState(false);
+	const navigate = useNavigate();
 
 	const showInitial =
 		profile?.display_name?.trim()?.[0] ||
@@ -153,6 +155,18 @@ export default function UserMenu({
 									{profile.display_name?.trim() || "Профиль"}
 								</h3>
 								<p className="user-menu-meta">{profile.phone}</p>
+								{profile.ranking_eval_enabled ? (
+									<button
+										type="button"
+										className="thank-button user-menu-action user-menu-action--secondary"
+										onClick={() => {
+											close();
+											navigate("/eval/ranking");
+										}}
+									>
+										Оценить подборку
+									</button>
+								) : null}
 								<button
 									type="button"
 									className="thank-button user-menu-action"

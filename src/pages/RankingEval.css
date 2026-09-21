@@ -1,0 +1,88 @@
+.ranking-eval-page {
+	max-width: 420px;
+	margin: 0 auto;
+	padding: 1rem 1rem 2rem;
+	color: var(--text, #f5f0e8);
+}
+
+.ranking-eval-back a {
+	color: var(--muted, #a8a29a);
+}
+
+.ranking-eval-title {
+	margin: 0.75rem 0 0.35rem;
+	font-size: 1.35rem;
+}
+
+.ranking-eval-meta {
+	color: var(--muted, #a8a29a);
+	font-size: 0.92rem;
+	line-height: 1.45;
+}
+
+.ranking-eval-error {
+	color: #f87171;
+}
+
+.ranking-eval-toolbar {
+	margin: 1rem 0;
+}
+
+.ranking-eval-toolbar select {
+	margin-left: 0.35rem;
+	padding: 0.35rem 0.5rem;
+	border-radius: 6px;
+}
+
+.ranking-eval-list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 0.65rem;
+}
+
+.ranking-eval-item {
+	display: flex;
+	align-items: center;
+	gap: 0.65rem;
+	padding: 0.5rem;
+	border-radius: 10px;
+	border: 1px solid rgba(255, 255, 255, 0.12);
+	background: rgba(0, 0, 0, 0.25);
+}
+
+.ranking-eval-rank {
+	font-weight: 700;
+	min-width: 1.5rem;
+	text-align: center;
+}
+
+.ranking-eval-thumb {
+	width: 72px;
+	height: 96px;
+	object-fit: cover;
+	border-radius: 8px;
+}
+
+.ranking-eval-actions {
+	margin-left: auto;
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+}
+
+.ranking-eval-actions button {
+	min-width: 2.25rem;
+	padding: 0.25rem;
+}
+
+.ranking-eval-submit {
+	width: 100%;
+	margin-top: 1rem;
+}
+
+.ranking-eval-done {
+	margin-top: 1.5rem;
+}

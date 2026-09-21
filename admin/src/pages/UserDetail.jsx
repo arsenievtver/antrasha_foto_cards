@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { fetchUserDetail } from "../api.js";
+import { fetchUserDetail, getRole, updateUser } from "../api.js";
 
 function fmtDate(iso) {
   if (!iso) return "—";
@@ -81,6 +81,7 @@ export default function UserDetail() {
   const [data, setData] = useState(null);
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(true);
+  const [evalBusy, setEvalBusy] = useState(false);
 
   useEffect(() => {
     let c = false;
@@ -145,6 +146,35 @@ export default function UserDetail() {
               <th>Последний вход</th>
               <td>{fmtDate(u.last_login_at)}</td>
             </tr>
+            {getRole() === "superuser" && u.role === "user" ? (
+              <tr>
+                <th>Оценка ранжирования</th>
+                <td>
+                  <label style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+                    <input
+                      type="checkbox"
+                      checked={Boolean(u.ranking_eval_enabled)}
+                      disabled={evalBusy}
+                      onChange={async (e) => {
+                        setEvalBusy(true);
+                        setErr("");
+                        try {
+                          const updated = await updateUser(u.id, {
+                            ranking_eval_enabled: e.target.checked,
+                          });
+                          setData((prev) => ({ ...prev, user: updated }));
+                        } catch (ex) {
+                          setErr(ex.message || String(ex));
+                        } finally {
+                          setEvalBusy(false);
+                        }
+                      }}
+                    />
+                    Доступ к «Оценить подборку» в приложении
+                  </label>
+                </td>
+              </tr>
+            ) : null}
             <tr>
               <th>Push о новинках</th>
               <td>

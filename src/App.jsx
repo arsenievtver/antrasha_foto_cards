@@ -18,6 +18,7 @@ import Swipe from "./pages/Swipe";
 import ThankYou from "./pages/ThankYou";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TryOnExperiment from "./pages/TryOnExperiment";
+import RankingEval from "./pages/RankingEval.jsx";
 import "./App.css";
 import {
 	captureRefFromUrl,
@@ -35,6 +36,7 @@ function AppShell() {
 		pathname === "/about" ||
 		pathname === "/privacy" ||
 		pathname === "/experiment/try-on" ||
+		pathname === "/eval/ranking" ||
 		pathname.startsWith("/watch/");
 	/* Главная (HomeV2) — свой низ с User; глобальный UserMenu не показываем */
 	const showUserMenu =
@@ -85,6 +87,7 @@ function AppShell() {
 					<Route path="/thank-you" element={<ThankYou />} />
 					<Route path="/privacy" element={<PrivacyPolicy />} />
 					<Route path="/experiment/try-on" element={<TryOnExperiment />} />
+					<Route path="/eval/ranking" element={<RankingEval />} />
 				</Routes>
 			</div>
 		</div>

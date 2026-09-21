@@ -353,6 +353,7 @@ class AdminUserOut(BaseModel):
     display_name: str | None = None
     role: str
     admin_permissions: list[str] = Field(default_factory=list)
+    ranking_eval_enabled: bool = False
     created_at: datetime
     last_login_at: datetime | None
 
@@ -385,6 +386,7 @@ class AdminUserUpdateRequest(BaseModel):
     role: str | None = Field(default=None, pattern="^(user|worker)$")
     display_name: str | None = Field(default=None, max_length=120)
     admin_permissions: list[str] | None = None
+    ranking_eval_enabled: bool | None = None
 
     @model_validator(mode="after")
     def normalize_and_require_one(self) -> Self:
@@ -396,9 +398,11 @@ class AdminUserUpdateRequest(BaseModel):
             and self.role is None
             and self.display_name is None
             and self.admin_permissions is None
+            and self.ranking_eval_enabled is None
         ):
             raise ValueError(
-                "Укажите хотя бы одно поле: phone, pin, role, display_name или admin_permissions"
+                "Укажите хотя бы одно поле: phone, pin, role, display_name, "
+                "admin_permissions или ranking_eval_enabled"
             )
         return self
 

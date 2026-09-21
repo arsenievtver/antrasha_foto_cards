@@ -498,3 +498,38 @@ export async function postInteraction({ photoId, action, viewTimeMs }) {
 	}
 	return res.json();
 }
+
+export async function fetchRankingEvalActive(gender) {
+	const t = getAuthToken();
+	if (!t) throw new Error("Нужно войти в профиль");
+	const q = new URLSearchParams({ gender });
+	const res = await fetch(`${apiUrl("/ranking-eval/active")}?${q}`, {
+		headers: { Authorization: `Bearer ${t}` },
+	});
+	const data = await res.json().catch(() => ({}));
+	if (!res.ok) {
+		throw new Error(parseErrorPayload(data, `Оценка ${res.status}`));
+	}
+	return data;
+}
+
+export async function submitRankingEval({ benchmarkId, humanOrder }) {
+	const t = getAuthToken();
+	if (!t) throw new Error("Нужно войти в профиль");
+	const res = await fetch(apiUrl("/ranking-eval/submit"), {
+		method: "POST",
+		headers: {
+			Authorization: `Bearer ${t}`,
+			"Content-Type": "application/json",
+		},
+		body: JSON.stringify({
+			benchmark_id: benchmarkId,
+			human_order: humanOrder,
+		}),
+	});
+	const data = await res.json().catch(() => ({}));
+	if (!res.ok) {
+		throw new Error(parseErrorPayload(data, `Отправка ${res.status}`));
+	}
+	return data;
+}

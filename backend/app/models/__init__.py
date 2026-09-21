@@ -23,6 +23,11 @@ from app.models.promo_banner import PromoBanner, PromoBannerDisplayMode, PromoBa
 from app.models.push_subscription import PushSubscription
 from app.models.photo import PHOTO_SOURCE_YC_OBJECT_STORAGE, Photo, PhotoTag, Tag, TagGroup
 from app.models.photo_embedding import PhotoEmbedding
+from app.models.ranking_eval import (
+    RankingEvalBenchmark,
+    RankingEvalBenchmarkItem,
+    RankingEvalSubmission,
+)
 from app.models.user_taste_vector import UserTasteVector
 from app.models.season import Season
 from app.models.session import UserSession
@@ -68,6 +73,9 @@ __all__ = [
     "TagGroup",
     "PhotoTag",
     "PhotoEmbedding",
+    "RankingEvalBenchmark",
+    "RankingEvalBenchmarkItem",
+    "RankingEvalSubmission",
     "UserTasteVector",
     "Interaction",
     "UserTagWeight",

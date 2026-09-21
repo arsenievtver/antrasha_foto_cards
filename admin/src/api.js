@@ -1283,3 +1283,97 @@ export async function postWarehouseAiChat({ messages, preset_id } = {}) {
   if (!res.ok) throw new Error(detail(data, res.statusText));
   return data;
 }
+
+export async function fetchRankingEvalBenchmarks() {
+  const res = await fetch(apiUrl("/admin/ranking-eval/benchmarks"), { headers: headersJson() });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
+export async function createRankingEvalBenchmark(body) {
+  const res = await fetch(apiUrl("/admin/ranking-eval/benchmarks"), {
+    method: "POST",
+    headers: headersJson(),
+    body: JSON.stringify(body),
+  });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
+export async function fetchRankingEvalBenchmark(id) {
+  const res = await fetch(apiUrl(`/admin/ranking-eval/benchmarks/${id}`), {
+    headers: headersJson(),
+  });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
+export async function patchRankingEvalBenchmark(id, body) {
+  const res = await fetch(apiUrl(`/admin/ranking-eval/benchmarks/${id}`), {
+    method: "PATCH",
+    headers: headersJson(),
+    body: JSON.stringify(body),
+  });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
+export async function uploadRankingEvalPhotos(benchmarkId, fileList) {
+  const fd = new FormData();
+  for (const f of fileList) fd.append("files", f);
+  const h = {};
+  const t = getToken();
+  if (t) h.Authorization = `Bearer ${t}`;
+  const res = await fetch(apiUrl(`/admin/ranking-eval/benchmarks/${benchmarkId}/photos`), {
+    method: "POST",
+    headers: h,
+    body: fd,
+  });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
+export async function embedRankingEvalBenchmark(id, limit = 4) {
+  const res = await fetch(
+    `${apiUrl(`/admin/ranking-eval/benchmarks/${id}/embed`)}?limit=${limit}`,
+    { method: "POST", headers: headersJson() },
+  );
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
+export async function deleteRankingEvalPhoto(benchmarkId, photoId) {
+  const res = await fetch(
+    apiUrl(`/admin/ranking-eval/benchmarks/${benchmarkId}/photos/${photoId}`),
+    { method: "DELETE", headers: headersJson() },
+  );
+  if (!res.ok) {
+    const data = await parseResponseJson(res);
+    throw new Error(detail(data, res.statusText));
+  }
+}
+
+export async function fetchRankingEvalSubmissions(benchmarkId) {
+  const q = benchmarkId ? `?benchmark_id=${benchmarkId}` : "";
+  const res = await fetch(apiUrl(`/admin/ranking-eval/submissions${q}`), {
+    headers: headersJson(),
+  });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
+export async function fetchRankingEvalSubmission(id) {
+  const res = await fetch(apiUrl(`/admin/ranking-eval/submissions/${id}`), {
+    headers: headersJson(),
+  });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}

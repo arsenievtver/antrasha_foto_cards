@@ -66,6 +66,7 @@ def me(current: User = Depends(require_user)) -> MeOut:
         phone=current.phone,
         display_name=current.display_name,
         role=current.role,
+        ranking_eval_enabled=bool(current.ranking_eval_enabled),
     )
 
 

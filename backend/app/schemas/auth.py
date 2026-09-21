@@ -33,6 +33,7 @@ class MeOut(BaseModel):
     phone: str
     display_name: str | None = None
     role: str
+    ranking_eval_enabled: bool = False
 
 
 class AdminSuperuserLoginRequest(BaseModel):

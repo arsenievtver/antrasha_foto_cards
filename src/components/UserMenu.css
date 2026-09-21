@@ -104,6 +104,11 @@
 	color: #ff8a80;
 }
 
+.user-menu-action--secondary {
+	opacity: 0.92;
+	background: rgba(255, 255, 255, 0.08);
+}
+
 .user-menu-action {
 	width: 100%;
 	margin-top: 12px;

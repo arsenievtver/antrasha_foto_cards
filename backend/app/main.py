@@ -21,6 +21,7 @@ from app.routers import (
     admin_procurement,
     admin_promo_banners,
     admin_push,
+    admin_ranking_eval,
     admin_warehouse_ai,
     auth,
     brands,
@@ -33,6 +34,7 @@ from app.routers import (
     internal_sync,
     promo_banners,
     push,
+    ranking_eval,
     sessions,
     try_on_experiment,
     xfashion_public,
@@ -134,6 +136,8 @@ app.include_router(hero_banners.router)
 app.include_router(modal_videos.router)
 app.include_router(home_v2.router)
 app.include_router(push.router)
+app.include_router(ranking_eval.router)
+app.include_router(admin_ranking_eval.router)
 app.include_router(internal_sync.router)
 app.include_router(ximilar.router)
 app.include_router(try_on_experiment.router)

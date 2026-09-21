@@ -3,6 +3,7 @@ import Layout from "./layout/Layout.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import Login from "./pages/Login.jsx";
 import PhotoRatings from "./pages/PhotoRatings.jsx";
+import RankingEvalAdmin from "./pages/RankingEval.jsx";
 import Photos from "./pages/Photos.jsx";
 import Tags from "./pages/Tags.jsx";
 import Tagging from "./pages/Tagging.jsx";
@@ -108,6 +109,14 @@ export default function App() {
             element={
               <PermissionRoute permission="photos">
                 <PhotoRatings />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/ranking-eval"
+            element={
+              <PermissionRoute permission="photos">
+                <RankingEvalAdmin />
               </PermissionRoute>
             }
           />
