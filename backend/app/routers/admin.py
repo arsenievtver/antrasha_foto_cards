@@ -75,6 +75,7 @@ from app.schemas.admin import (
     AdminTagUpdateRequest,
     AdminUserCreateRequest,
     AdminUserDetailOut,
+    AdminUserTasteGenderPreview,
     AdminUserTastePhotoOut,
     AdminUserListResponse,
     AdminUserOut,
@@ -92,7 +93,7 @@ from app.services.campaign_stats import (
     fetch_campaign_dashboard_rows,
 )
 from app.services.tagging_validation import validate_catalog_tag_selection
-from app.services.taste_nearest_photos import nearest_feed_photos_to_taste, user_taste_meta
+from app.services.taste_nearest_photos import taste_previews_for_user
 from app.services.web_push import push_account_status_for_user
 from app.services.photo_embedding import (
     count_catalog_photos_needing_embedding,
@@ -455,6 +456,7 @@ def get_feed_settings(
             feed_ranking_mode="tags",
             feed_vector_weight=0.65,
             swipe_chunk_size=10,
+            taste_vectors_separate_by_gender=True,
         )
     return FeedSettingsOut(
         require_tagging_review_for_feed=row.require_tagging_review_for_feed,
@@ -462,6 +464,7 @@ def get_feed_settings(
         feed_ranking_mode=row.feed_ranking_mode or "tags",
         feed_vector_weight=float(row.feed_vector_weight),
         swipe_chunk_size=int(row.swipe_chunk_size or 10),
+        taste_vectors_separate_by_gender=bool(row.taste_vectors_separate_by_gender),
     )
 
 
@@ -487,6 +490,7 @@ def patch_feed_settings(
             feed_ranking_mode="tags",
             feed_vector_weight=0.65,
             swipe_chunk_size=10,
+            taste_vectors_separate_by_gender=True,
         )
         db.add(row)
         db.flush()
@@ -498,6 +502,10 @@ def patch_feed_settings(
         row.feed_vector_weight = float(patch["feed_vector_weight"])
     if "swipe_chunk_size" in patch and patch["swipe_chunk_size"] is not None:
         row.swipe_chunk_size = int(patch["swipe_chunk_size"])
+    if "taste_vectors_separate_by_gender" in patch:
+        row.taste_vectors_separate_by_gender = bool(
+            patch["taste_vectors_separate_by_gender"]
+        )
     if "card_badge_label" in patch:
         raw = patch.get("card_badge_label")
         if raw is None or (isinstance(raw, str) and not raw.strip()):
@@ -513,6 +521,7 @@ def patch_feed_settings(
         feed_ranking_mode=row.feed_ranking_mode or "tags",
         feed_vector_weight=float(row.feed_vector_weight),
         swipe_chunk_size=int(row.swipe_chunk_size or 10),
+        taste_vectors_separate_by_gender=bool(row.taste_vectors_separate_by_gender),
     )
 
 
@@ -1577,19 +1586,34 @@ def get_user_detail(
 
     push_active, push_scope = push_account_status_for_user(db, uid)
 
-    taste_emb, taste_updates = user_taste_meta(db, uid)
-    taste_nearest: list[AdminUserTastePhotoOut] = []
-    if taste_emb:
-        for photo, cos in nearest_feed_photos_to_taste(db, taste_emb, k=4):
-            taste_nearest.append(
-                AdminUserTastePhotoOut(
-                    photo_id=photo.id,
-                    url=photo.url,
-                    gender=photo.gender,
-                    brand=photo.brand,
-                    cosine=float(cos),
-                )
+    taste_previews: list[AdminUserTasteGenderPreview] = []
+    taste_updates_total = 0
+    any_taste_ready = False
+    taste_nearest_legacy: list[AdminUserTastePhotoOut] = []
+    for catalog_g, taste_emb, updates, nearest in taste_previews_for_user(db, uid, k=4):
+        taste_updates_total += updates
+        ready = taste_emb is not None
+        any_taste_ready = any_taste_ready or ready
+        photos_out = [
+            AdminUserTastePhotoOut(
+                photo_id=photo.id,
+                url=photo.url,
+                gender=photo.gender,
+                brand=photo.brand,
+                cosine=float(cos),
             )
+            for photo, cos in nearest
+        ]
+        if catalog_g == "female" and not taste_nearest_legacy:
+            taste_nearest_legacy = photos_out
+        taste_previews.append(
+            AdminUserTasteGenderPreview(
+                collection_gender=catalog_g,
+                taste_vector_ready=ready,
+                taste_swipe_updates=updates,
+                nearest_photos=photos_out,
+            )
+        )
 
     return AdminUserDetailOut(
         user=_admin_user_out(u),
@@ -1603,9 +1627,10 @@ def get_user_detail(
         avg_view_time_ms=avg_view_time_ms,
         tag_weights=tag_weights,
         tag_pair_weights=tag_pair_weights,
-        taste_vector_ready=taste_emb is not None,
-        taste_swipe_updates=taste_updates,
-        taste_nearest_photos=taste_nearest,
+        taste_vector_ready=any_taste_ready,
+        taste_swipe_updates=taste_updates_total,
+        taste_nearest_photos=taste_nearest_legacy,
+        taste_previews=taste_previews,
         push_subscribed=push_active,
         push_gender_scope=push_scope,
     )

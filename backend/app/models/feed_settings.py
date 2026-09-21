@@ -19,3 +19,7 @@ class FeedSettings(Base):
     # Доля векторного score в hybrid (0..1); tag_score берёт остаток.
     feed_vector_weight: Mapped[float] = mapped_column(Float, nullable=False, default=0.65)
     swipe_chunk_size: Mapped[int] = mapped_column(Integer, nullable=False, default=10)
+    # True — male/female taste vectors; False — один общий профиль на обе коллекции.
+    taste_vectors_separate_by_gender: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True
+    )

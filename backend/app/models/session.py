@@ -31,9 +31,8 @@ class UserSession(Base):
     interactions = relationship("Interaction", back_populates="session")
     tag_weights = relationship("UserTagWeight", back_populates="session")
     tag_pair_weights = relationship("UserTagPairWeight", back_populates="session")
-    taste_vector = relationship(
+    taste_vectors = relationship(
         "UserTasteVector",
         back_populates="session",
-        uselist=False,
         cascade="all, delete-orphan",
     )

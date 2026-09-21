@@ -225,7 +225,12 @@ def fetch_feed_photos(
 
     ranking_mode = feed_ranking_mode(db)
     vector_w = feed_vector_weight(db)
-    taste_emb = load_taste_embedding(db, user_id=user_id, session_id=session_id)
+    taste_emb = load_taste_embedding(
+        db,
+        user_id=user_id,
+        session_id=session_id,
+        collection_gender=g_norm,
+    )
     emb_by_id = load_embeddings_for_photo_ids(db, [p.id for p in candidates])
 
     tag_scores = [score_for_photo(p, weights, pair_w) for p in candidates]

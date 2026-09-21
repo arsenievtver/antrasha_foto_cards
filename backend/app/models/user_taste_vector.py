@@ -18,6 +18,10 @@ class UserTasteVector(Base):
             "(user_id IS NULL AND session_id IS NOT NULL)",
             name="ck_user_taste_vectors_owner",
         ),
+        CheckConstraint(
+            "collection_gender IS NULL OR collection_gender IN ('male', 'female')",
+            name="ck_user_taste_vectors_gender",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -32,6 +36,8 @@ class UserTasteVector(Base):
         nullable=True,
         index=True,
     )
+    # male | female — отдельный профиль; NULL — общий (legacy / taste_vectors_separate_by_gender=false).
+    collection_gender: Mapped[str | None] = mapped_column(String(10), nullable=True, index=True)
     model_version: Mapped[str] = mapped_column(String(64), nullable=False)
     embedding = mapped_column(Vector(EMBEDDING_DIM), nullable=True)
     swipe_updates: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
@@ -42,5 +48,5 @@ class UserTasteVector(Base):
         nullable=False,
     )
 
-    user = relationship("User", back_populates="taste_vector")
-    session = relationship("UserSession", back_populates="taste_vector")
+    user = relationship("User", back_populates="taste_vectors")
+    session = relationship("UserSession", back_populates="taste_vectors")

@@ -321,6 +321,7 @@ class FeedSettingsOut(BaseModel):
     feed_ranking_mode: str = "tags"
     feed_vector_weight: float = 0.65
     swipe_chunk_size: int = 10
+    taste_vectors_separate_by_gender: bool = True
 
 
 class EmbedCatalogBackfillOut(BaseModel):
@@ -343,6 +344,7 @@ class FeedSettingsPatch(BaseModel):
     feed_ranking_mode: str | None = Field(default=None, pattern="^(tags|vectors|hybrid)$")
     feed_vector_weight: float | None = Field(default=None, ge=0.0, le=1.0)
     swipe_chunk_size: int | None = Field(default=None, ge=1, le=50)
+    taste_vectors_separate_by_gender: bool | None = None
 
 
 class AdminUserOut(BaseModel):
@@ -424,6 +426,13 @@ class AdminUserTastePhotoOut(BaseModel):
     cosine: float
 
 
+class AdminUserTasteGenderPreview(BaseModel):
+    collection_gender: str
+    taste_vector_ready: bool = False
+    taste_swipe_updates: int = 0
+    nearest_photos: list[AdminUserTastePhotoOut] = Field(default_factory=list)
+
+
 class AdminUserDetailOut(BaseModel):
     user: AdminUserOut
     interactions_total: int
@@ -439,5 +448,6 @@ class AdminUserDetailOut(BaseModel):
     taste_vector_ready: bool = False
     taste_swipe_updates: int = 0
     taste_nearest_photos: list[AdminUserTastePhotoOut] = Field(default_factory=list)
+    taste_previews: list[AdminUserTasteGenderPreview] = Field(default_factory=list)
     push_subscribed: bool = False
     push_gender_scope: str | None = None

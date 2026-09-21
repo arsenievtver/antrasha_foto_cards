@@ -40,6 +40,13 @@ def feed_vector_weight(db: Session) -> float:
     return max(0.0, min(1.0, w))
 
 
+def taste_vectors_separate_by_gender(db: Session) -> bool:
+    row = db.get(FeedSettings, 1)
+    if row is None:
+        return True
+    return bool(row.taste_vectors_separate_by_gender)
+
+
 def feed_card_badge_label(db: Session) -> str | None:
     """Единый текст бейджа для карточек с show_badge; None если не задан."""
     row = db.get(FeedSettings, 1)

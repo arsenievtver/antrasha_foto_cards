@@ -134,6 +134,7 @@ def create_interaction(
             k=k,
             user_id=uid,
             session_id=session_id if uid is None else None,
+            photo_gender=photo.gender,
         )
 
     db.commit()

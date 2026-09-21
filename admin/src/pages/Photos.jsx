@@ -114,6 +114,7 @@ export default function Photos() {
             card_badge_label: null,
             feed_ranking_mode: "tags",
             feed_vector_weight: 0.65,
+            taste_vectors_separate_by_gender: true,
           });
           setBadgeLabelDraft("");
         }
@@ -498,6 +499,20 @@ export default function Photos() {
     }
   }
 
+  async function onSeparateTasteChange(checked) {
+    if (getRole() !== "superuser" || rankingSaving) return;
+    setRankingSaving(true);
+    setErr("");
+    try {
+      const data = await patchFeedSettings({ taste_vectors_separate_by_gender: checked });
+      setFeedSettings(data);
+    } catch (e) {
+      setErr(e.message || String(e));
+    } finally {
+      setRankingSaving(false);
+    }
+  }
+
   async function onVectorWeightChange(weight) {
     if (getRole() !== "superuser" || rankingSaving) return;
     const w = Math.max(0, Math.min(1, Number(weight)));
@@ -642,6 +657,32 @@ export default function Photos() {
               </span>
             ) : null}
           </div>
+        </div>
+        <div className="feed-policy-row feed-policy-row--badge">
+          <div className="feed-policy-text">
+            <strong style={{ color: "var(--text)" }}>Раздельный вкус male / female.</strong>{" "}
+            Включено — лайки в мужской коллекции не меняют женский вектор и наоборот; в ленте каждого
+            пола свой профиль. Выключено — один общий вектор на обе коллекции (как раньше).
+            {getRole() !== "superuser" && (
+              <span style={{ display: "block", marginTop: "0.25rem" }}>
+                Меняет только суперпользователь.
+              </span>
+            )}
+          </div>
+          <button
+            type="button"
+            className="switch-toggle"
+            role="switch"
+            aria-checked={feedSettings?.taste_vectors_separate_by_gender ?? true}
+            aria-label="Раздельный вкус по полу"
+            disabled={feedSettingsLoading || getRole() !== "superuser" || rankingSaving}
+            onClick={() => {
+              const v = feedSettings?.taste_vectors_separate_by_gender ?? true;
+              onSeparateTasteChange(!v);
+            }}
+          >
+            <span className="switch-thumb" aria-hidden />
+          </button>
         </div>
         <div className="feed-policy-row feed-policy-row--badge">
           <div className="feed-policy-text">
