@@ -1280,13 +1280,56 @@ button.switch-toggle:not(:disabled):hover {
   cursor: pointer;
 }
 
+.feed-policy-row--ranking,
+.feed-policy-row--badge {
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
 .feed-policy-row--badge {
   margin-top: 0.85rem;
   padding-top: 0.85rem;
   border-top: 1px solid var(--border);
+}
+
+.feed-ranking-form {
+  display: flex;
   flex-wrap: wrap;
-  align-items: flex-start;
-  gap: 0.75rem;
+  gap: 0.5rem 0.75rem;
+  align-items: center;
+  flex-shrink: 0;
+  min-width: min(100%, 220px);
+}
+
+.feed-ranking-form select {
+  padding: 0.4rem 0.5rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--background);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9rem;
+  max-width: 100%;
+}
+
+.feed-ranking-weight {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.82rem;
+  color: var(--muted);
+  min-width: 140px;
+}
+
+.feed-ranking-weight input[type="range"] {
+  width: 100%;
+  max-width: 160px;
+}
+
+.feed-ranking-saving {
+  color: var(--muted);
+  font-size: 0.9rem;
 }
 
 .feed-badge-form {

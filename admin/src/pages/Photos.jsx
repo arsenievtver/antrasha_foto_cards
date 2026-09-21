@@ -55,6 +55,8 @@ export default function Photos() {
   const [embedBackfillProgress, setEmbedBackfillProgress] = useState("");
   const [badgeLabelDraft, setBadgeLabelDraft] = useState("");
   const [badgeLabelSaving, setBadgeLabelSaving] = useState(false);
+  const [rankingSaving, setRankingSaving] = useState(false);
+  const [vectorWeightDraftPct, setVectorWeightDraftPct] = useState(null);
   const [aiBusy, setAiBusy] = useState(false);
   const [aiMessage, setAiMessage] = useState("");
   const [aiDebug, setAiDebug] = useState(null);
@@ -107,7 +109,12 @@ export default function Photos() {
         }
       } catch {
         if (!c) {
-          setFeedSettings({ require_tagging_review_for_feed: false, card_badge_label: null });
+          setFeedSettings({
+            require_tagging_review_for_feed: false,
+            card_badge_label: null,
+            feed_ranking_mode: "tags",
+            feed_vector_weight: 0.65,
+          });
           setBadgeLabelDraft("");
         }
       } finally {
@@ -143,6 +150,11 @@ export default function Photos() {
       c = true;
     };
   }, [loadList]);
+
+  useEffect(() => {
+    const w = Math.max(0, Math.min(1, Number(feedSettings?.feed_vector_weight ?? 0.65)));
+    setVectorWeightDraftPct(Math.round(w * 100));
+  }, [feedSettings?.feed_vector_weight]);
 
   useEffect(() => {
     if (total > 0 && skip >= total) {
@@ -470,14 +482,35 @@ export default function Photos() {
     }
   }
 
-  async function onFeedPolicyChange(checked) {
-    if (getRole() !== "superuser") return;
+  async function onRankingModeChange(mode) {
+    if (getRole() !== "superuser" || rankingSaving) return;
+    const next = String(mode || "tags").trim().toLowerCase();
+    if (!["tags", "vectors", "hybrid"].includes(next)) return;
+    setRankingSaving(true);
     setErr("");
     try {
-      const data = await patchFeedSettings({ require_tagging_review_for_feed: checked });
+      const data = await patchFeedSettings({ feed_ranking_mode: next });
       setFeedSettings(data);
     } catch (e) {
       setErr(e.message || String(e));
+    } finally {
+      setRankingSaving(false);
+    }
+  }
+
+  async function onVectorWeightChange(weight) {
+    if (getRole() !== "superuser" || rankingSaving) return;
+    const w = Math.max(0, Math.min(1, Number(weight)));
+    if (Number.isNaN(w)) return;
+    setRankingSaving(true);
+    setErr("");
+    try {
+      const data = await patchFeedSettings({ feed_vector_weight: w });
+      setFeedSettings(data);
+    } catch (e) {
+      setErr(e.message || String(e));
+    } finally {
+      setRankingSaving(false);
     }
   }
 
@@ -554,36 +587,61 @@ export default function Photos() {
     getRole() === "superuser" &&
     (embedBackfillBusy || (embedCatalogStatus?.needing_embedding ?? 0) > 0);
 
+  const rankingMode = (feedSettings?.feed_ranking_mode || "tags").toLowerCase();
+  const vectorWeightPct =
+    vectorWeightDraftPct ??
+    Math.round(Math.max(0, Math.min(1, Number(feedSettings?.feed_vector_weight ?? 0.65))) * 100);
+
   return (
     <div>
       <h2 style={{ marginTop: 0 }}>Фото и теги</h2>
       <div className="feed-policy-card">
-        <div className="feed-policy-row">
+        <div className="feed-policy-row feed-policy-row--ranking">
           <div className="feed-policy-text">
-            <strong style={{ color: "var(--text)" }}>В ленту только после разметки.</strong> Если
-            выключено — после «Обновить» (синк с бакетом) активные фото попадают в свайпы и без тегов.
-            Режим приоритетно для срочных показов; включите обратно, когда нужна только полностью
-            размеченная выдача.
+            <strong style={{ color: "var(--text)" }}>Ранжирование ленты.</strong> Как смешивать
+            сигналы при выдаче свайпов: теги на фото (когда разметка есть), вектор вкуса пользователя
+            (CLIP после лайков) или оба. Выпуск в ленту по-прежнему через векторизацию и «Записать
+            вектора и выпустить» в AI ingest — это отдельно от этого переключателя.
             {getRole() !== "superuser" && (
               <span style={{ display: "block", marginTop: "0.25rem" }}>
-                Переключает только суперпользователь.
+                Меняет только суперпользователь.
               </span>
             )}
           </div>
-          <button
-            type="button"
-            className="switch-toggle"
-            role="switch"
-            aria-checked={feedSettings?.require_tagging_review_for_feed ?? false}
-            aria-label="В ленту только после разметки"
-            disabled={feedSettingsLoading || getRole() !== "superuser"}
-            onClick={() => {
-              const v = feedSettings?.require_tagging_review_for_feed ?? false;
-              onFeedPolicyChange(!v);
-            }}
-          >
-            <span className="switch-thumb" aria-hidden />
-          </button>
+          <div className="feed-ranking-form">
+            <select
+              value={rankingMode}
+              disabled={feedSettingsLoading || getRole() !== "superuser" || rankingSaving}
+              aria-label="Режим ранжирования ленты"
+              onChange={(e) => onRankingModeChange(e.target.value)}
+            >
+              <option value="tags">Теги</option>
+              <option value="vectors">Векторы</option>
+              <option value="hybrid">Смешанный (теги + вектор)</option>
+            </select>
+            {rankingMode === "hybrid" ? (
+              <label className="feed-ranking-weight">
+                <span>Вектор {vectorWeightPct}%</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  step={5}
+                  value={vectorWeightPct}
+                  disabled={feedSettingsLoading || getRole() !== "superuser" || rankingSaving}
+                  aria-label="Доля векторного score в hybrid"
+                  onChange={(e) => setVectorWeightDraftPct(Number(e.target.value))}
+                  onMouseUp={(e) => onVectorWeightChange(Number(e.target.value) / 100)}
+                  onTouchEnd={(e) => onVectorWeightChange(Number(e.target.value) / 100)}
+                />
+              </label>
+            ) : null}
+            {rankingSaving ? (
+              <span className="feed-ranking-saving" aria-live="polite">
+                …
+              </span>
+            ) : null}
+          </div>
         </div>
         <div className="feed-policy-row feed-policy-row--badge">
           <div className="feed-policy-text">
