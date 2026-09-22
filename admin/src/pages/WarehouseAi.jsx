@@ -6,6 +6,7 @@ import {
   fetchWarehouseAiStatus,
   postWarehouseAiChat,
 } from "../api.js";
+import ChatComposer from "../components/ChatComposer.jsx";
 
 function MessageBubble({ role, content, meta }) {
   const isUser = role === "user";
@@ -211,49 +212,41 @@ export default function WarehouseAi() {
       </section>
 
       <section className="card wh-ai__chat" style={{ marginTop: "1rem" }}>
-        <div className="wh-ai__thread">
-          {messages.length === 0 ? (
-            <p className="muted" style={{ margin: 0 }}>
-              Выберите таб с готовым вопросом или напишите свой запрос про остатки,
-              продажи, заказы.
-            </p>
-          ) : (
-            messages.map((m, i) => (
+        {messages.length === 0 && !busy ? (
+          <p className="muted" style={{ margin: 0 }}>
+            Выберите таб с готовым вопросом или напишите свой запрос про остатки,
+            продажи, заказы.
+          </p>
+        ) : null}
+
+        <ChatComposer
+          value={input}
+          onChange={setInput}
+          onSubmit={onSubmit}
+          disabled={busy || !status?.configured}
+          busy={busy}
+          placeholder="Свободный вопрос, например: сколько единиц Brand X на основном складе?"
+        />
+
+        {messages.length > 0 || busy ? (
+          <div className="wh-ai__thread">
+            {messages.map((m, i) => (
               <MessageBubble
                 key={`${i}-${m.role}`}
                 role={m.role}
                 content={m.display || m.content}
                 meta={m.meta}
               />
-            ))
-          )}
-          {busy ? (
-            <div className="wh-ai-msg wh-ai-msg--bot">
-              <div className="wh-ai-msg__role">Claude</div>
-              <div className="wh-ai-msg__body muted">Думаю и смотрю склад…</div>
-            </div>
-          ) : null}
-          <div ref={bottomRef} />
-        </div>
-
-        <form className="wh-ai__composer" onSubmit={onSubmit}>
-          <textarea
-            rows={3}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Свободный вопрос, например: сколько единиц Brand X на основном складе?"
-            disabled={busy || !status?.configured}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                onSubmit(e);
-              }
-            }}
-          />
-          <button type="submit" disabled={busy || !status?.configured || !input.trim()}>
-            {busy ? "…" : "Отправить"}
-          </button>
-        </form>
+            ))}
+            {busy ? (
+              <div className="wh-ai-msg wh-ai-msg--bot">
+                <div className="wh-ai-msg__role">Claude</div>
+                <div className="wh-ai-msg__body muted">Думаю и смотрю склад…</div>
+              </div>
+            ) : null}
+            <div ref={bottomRef} />
+          </div>
+        ) : null}
       </section>
     </div>
   );

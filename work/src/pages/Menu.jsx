@@ -20,6 +20,10 @@ export default function Menu() {
               <span className="menu-list__title">Для заказа</span>
               <span className="menu-list__hint">Подсказки по сезону и брендам</span>
             </Link>
+            <Link to="/procurement-ai" className="menu-list__item">
+              <span className="menu-list__title">AI закупки</span>
+              <span className="menu-list__hint">Поставки, оплаты, предоплата и курс</span>
+            </Link>
           </>
         ) : null}
         {hasOutletAccess() ? (

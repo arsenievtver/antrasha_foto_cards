@@ -124,6 +124,7 @@ function getPageMeta(pathname) {
   if (pathname === "/outlet") return { title: "Аутлет: фото" };
   if (pathname === "/outlet-transfer") return { title: "Аутлет: перенос" };
   if (pathname === "/ai-assistant") return { title: "AI помощник" };
+  if (pathname === "/procurement-ai") return { title: "AI закупки" };
   if (pathname === "/orders") return { title: "Заказы", addTo: "/orders/new", addLabel: "Добавить заказ" };
   if (pathname === "/for-order") return { title: "Для заказа" };
   if (pathname === "/prepayments") {

@@ -6,6 +6,7 @@ import Menu from "./pages/Menu.jsx";
 import OutletPhoto from "./pages/OutletPhoto.jsx";
 import OutletTransfer from "./pages/OutletTransfer.jsx";
 import AiAssistant from "./pages/AiAssistant.jsx";
+import ProcurementAi from "./pages/ProcurementAi.jsx";
 import OrdersList from "./pages/OrdersList.jsx";
 import OrderDetail from "./pages/OrderDetail.jsx";
 import OrderCreate from "./pages/OrderCreate.jsx";
@@ -116,6 +117,14 @@ export default function App() {
               <RequireAiAssistant>
                 <AiAssistant />
               </RequireAiAssistant>
+            }
+          />
+          <Route
+            path="/procurement-ai"
+            element={
+              <RequireProduct>
+                <ProcurementAi />
+              </RequireProduct>
             }
           />
           <Route

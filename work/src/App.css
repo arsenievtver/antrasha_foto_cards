@@ -2208,3 +2208,102 @@ button.switch-toggle:disabled {
   min-height: 2.8rem;
   font: inherit;
 }
+
+.wh-ai--procurement .wh-ai__chat {
+  flex: 0 1 auto;
+}
+
+.wh-ai--procurement .wh-ai__thread {
+  max-height: none;
+  overflow: visible;
+}
+
+.wh-ai--procurement .wh-ai__composer textarea {
+  resize: none;
+  min-height: 2.75rem;
+  max-height: 10rem;
+  overflow-y: auto;
+  line-height: 1.45;
+}
+
+.pai-chart {
+  margin: 0.65rem 0;
+  padding: 0.75rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+}
+
+.pai-chart__title {
+  font-weight: 650;
+  margin-bottom: 0.6rem;
+}
+
+.pai-chart__raw {
+  margin: 0.45rem 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.8rem;
+}
+
+.pai-bar {
+  display: grid;
+  grid-template-columns: minmax(4.5rem, 7.5rem) 1fr auto;
+  gap: 0.45rem;
+  align-items: center;
+  margin: 0.35rem 0;
+  font-size: 0.82rem;
+}
+
+.pai-bar__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pai-bar__track {
+  height: 8px;
+  background: var(--surface-2);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.pai-bar__fill {
+  height: 100%;
+  border-radius: 99px;
+}
+
+.pai-bar__value {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+.pai-donut {
+  display: flex;
+  gap: 0.85rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.pai-donut__legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.82rem;
+}
+
+.pai-donut__legend li {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.pai-donut__swatch {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 2px;
+  flex-shrink: 0;
+}

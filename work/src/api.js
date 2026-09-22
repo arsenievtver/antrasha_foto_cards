@@ -394,6 +394,35 @@ export async function fetchWarehouseAiPresets() {
   return data;
 }
 
+export async function fetchProcurementAiStatus() {
+  const res = await fetch(apiUrl("/admin/procurement-ai/status"), {
+    headers: headersJson(),
+  });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
+export async function fetchProcurementAiPresets() {
+  const res = await fetch(apiUrl("/admin/procurement-ai/presets"), {
+    headers: headersJson(),
+  });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
+export async function postProcurementAiChat({ messages } = {}) {
+  const res = await fetch(apiUrl("/admin/procurement-ai/chat"), {
+    method: "POST",
+    headers: headersJson(),
+    body: JSON.stringify({ messages }),
+  });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
 export async function postWarehouseAiChat({ messages, preset_id } = {}) {
   const res = await fetch(apiUrl("/admin/warehouse-ai/chat"), {
     method: "POST",

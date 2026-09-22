@@ -7,6 +7,7 @@ import {
   fetchProcurementAiStatus,
   postProcurementAiChat,
 } from "../api.js";
+import ChatComposer from "../components/ChatComposer.jsx";
 import { eur, kgShort, rub } from "../utils/money.js";
 
 const CHART_COLORS = [
@@ -349,49 +350,41 @@ export default function ProcurementAi() {
       </section>
 
       <section className="card wh-ai__chat" style={{ marginTop: "1rem" }}>
-        <div className="wh-ai__thread">
-          {messages.length === 0 ? (
-            <p className="muted" style={{ margin: 0 }}>
-              Спросите про поставки, остаток, предоплату или курс. Если данных для записи
-              не хватит, агент сначала уточнит их.
-            </p>
-          ) : (
-            messages.map((message, index) => (
+        {messages.length === 0 && !busy ? (
+          <p className="muted" style={{ margin: 0 }}>
+            Спросите про поставки, остаток, предоплату или курс. Если данных для записи
+            не хватит, агент сначала уточнит их.
+          </p>
+        ) : null}
+
+        <ChatComposer
+          value={input}
+          onChange={setInput}
+          onSubmit={onSubmit}
+          disabled={busy || !status?.configured}
+          busy={busy}
+          placeholder="Например: что с поставками на осень-зиму 2026/2027?"
+        />
+
+        {messages.length > 0 || busy ? (
+          <div className="wh-ai__thread">
+            {messages.map((message, index) => (
               <MessageBubble
                 key={`${index}-${message.role}`}
                 role={message.role}
                 content={message.display || message.content}
                 meta={message.meta}
               />
-            ))
-          )}
-          {busy ? (
-            <div className="wh-ai-msg wh-ai-msg--bot">
-              <div className="wh-ai-msg__role">Закупки</div>
-              <div className="wh-ai-msg__body muted">Смотрю закупки…</div>
-            </div>
-          ) : null}
-          <div ref={bottomRef} />
-        </div>
-
-        <form className="wh-ai__composer" onSubmit={onSubmit}>
-          <textarea
-            rows={3}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Например: что с поставками на осень-зиму 2026/2027?"
-            disabled={busy || !status?.configured}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                onSubmit(e);
-              }
-            }}
-          />
-          <button type="submit" disabled={busy || !status?.configured || !input.trim()}>
-            {busy ? "…" : "Отправить"}
-          </button>
-        </form>
+            ))}
+            {busy ? (
+              <div className="wh-ai-msg wh-ai-msg--bot">
+                <div className="wh-ai-msg__role">Закупки</div>
+                <div className="wh-ai-msg__body muted">Смотрю закупки…</div>
+              </div>
+            ) : null}
+            <div ref={bottomRef} />
+          </div>
+        ) : null}
       </section>
     </div>
   );
