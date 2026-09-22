@@ -28,6 +28,7 @@ import Payments from "./pages/Payments.jsx";
 import Shipments from "./pages/Shipments.jsx";
 import FxRates from "./pages/FxRates.jsx";
 import McpKey from "./pages/McpKey.jsx";
+import ProcurementAi from "./pages/ProcurementAi.jsx";
 import { getPermissions, getRole, hasPermission, hasValidSession } from "./api.js";
 
 function RequireAuth({ children }) {
@@ -262,6 +263,14 @@ export default function App() {
             element={
               <PermissionRoute permission="product">
                 <FxRates />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/procurement-ai"
+            element={
+              <PermissionRoute permission="product">
+                <ProcurementAi />
               </PermissionRoute>
             }
           />

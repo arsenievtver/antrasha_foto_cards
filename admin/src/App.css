@@ -1841,3 +1841,84 @@ button.switch-toggle:not(:disabled):hover {
 .mcp-key-scope input {
   margin-top: 0.25rem;
 }
+
+.pai-chart {
+  margin: 0.75rem 0;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #12151c;
+}
+
+.pai-chart__title {
+  font-weight: 650;
+  margin-bottom: 0.7rem;
+}
+
+.pai-chart__raw {
+  margin: 0.55rem 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.pai-bar {
+  display: grid;
+  grid-template-columns: minmax(5.5rem, 9rem) 1fr auto;
+  gap: 0.55rem;
+  align-items: center;
+  margin: 0.38rem 0;
+  font-size: 0.86rem;
+}
+
+.pai-bar__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pai-bar__track {
+  height: 8px;
+  background: #2a2f3a;
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.pai-bar__fill {
+  height: 100%;
+  border-radius: 99px;
+}
+
+.pai-bar__value {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+.pai-donut {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.pai-donut__legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.86rem;
+}
+
+.pai-donut__legend li {
+  display: flex;
+  gap: 0.45rem;
+  align-items: center;
+}
+
+.pai-donut__swatch {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
