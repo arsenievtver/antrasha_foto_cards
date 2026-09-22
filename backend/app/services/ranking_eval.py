@@ -6,7 +6,7 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.models import Photo, PhotoEmbedding, RankingEvalBenchmark
+from app.models import Photo, PhotoEmbedding, RankingEvalBenchmark, RankingEvalBenchmarkItem
 from app.models.feed_settings import FeedSettings
 from app.services.feed import load_pair_weights_map, load_weights_map, score_for_photo
 from app.services.feed_policy import (
