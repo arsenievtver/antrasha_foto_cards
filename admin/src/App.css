@@ -1793,3 +1793,51 @@ button.switch-toggle:not(:disabled):hover {
 .wh-ai__composer button {
   flex-shrink: 0;
 }
+
+.mcp-key {
+  max-width: 760px;
+}
+
+.mcp-key-value {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin: 0.75rem 0 0;
+  padding: 0.75rem 0.9rem;
+  background: #12151c;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.mcp-key-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.85rem;
+}
+
+.mcp-key-hint {
+  color: var(--muted);
+  font-size: 0.92rem;
+  margin: 0.45rem 0;
+}
+
+.mcp-key-warning {
+  color: #e7c27a;
+  font-size: 0.92rem;
+  margin: 0.45rem 0;
+}
+
+.mcp-key-scope {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  margin: 0.75rem 0;
+  font-size: 0.92rem;
+}
+
+.mcp-key-scope input {
+  margin-top: 0.25rem;
+}

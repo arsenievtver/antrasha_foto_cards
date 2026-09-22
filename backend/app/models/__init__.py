@@ -14,6 +14,7 @@ from app.models.fitting_request import FittingRequest, FittingRequestLikedPhoto
 from app.models.fx_rate import FxRate
 from app.models.interaction import Interaction
 from app.models.marketing_campaign import MarketingCampaign
+from app.models.mcp_api_key import McpApiKey
 from app.models.xfashion_landing_visit import XfashionLandingVisit
 from app.models.payment import PAYMENT_KINDS, Payment
 from app.models.hero_banner import HeroBanner
@@ -59,6 +60,7 @@ __all__ = [
     "UserRole",
     "UserSession",
     "MarketingCampaign",
+    "McpApiKey",
     "XfashionLandingVisit",
     "HeroBanner",
     "ModalVideo",

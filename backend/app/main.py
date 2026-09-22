@@ -16,6 +16,7 @@ from app.routers import (
     admin_ai_ingest,
     admin_hero_banners,
     admin_home_v2,
+    admin_mcp_keys,
     admin_modal_videos,
     admin_outlet_photo,
     admin_procurement,
@@ -40,6 +41,7 @@ from app.routers import (
     xfashion_public,
     ximilar,
 )
+from app.mcp_procurement.http import mcp_method_not_allowed, mcp_post
 from app.services.ai_ingest_worker import reset_stale_processing_jobs
 from app.services.yc_photo_sync import run_sync_job_commit
 
@@ -129,6 +131,14 @@ app.include_router(admin_home_v2.router)
 app.include_router(admin_ai_ingest.router)
 app.include_router(admin_outlet_photo.router)
 app.include_router(admin_procurement.router)
+app.include_router(admin_mcp_keys.router)
+app.add_api_route("/mcp", mcp_post, methods=["POST"], include_in_schema=False)
+app.add_api_route(
+    "/mcp",
+    mcp_method_not_allowed,
+    methods=["GET", "DELETE"],
+    include_in_schema=False,
+)
 app.include_router(admin_push.router)
 app.include_router(admin_warehouse_ai.router)
 app.include_router(promo_banners.router)

@@ -999,6 +999,22 @@ export function deleteFxRate(rateId) {
   return procurementRequest(`/admin/fx-rates/${rateId}`, { method: "DELETE" });
 }
 
+export function fetchMyMcpKey() {
+  return procurementRequest("/admin/mcp-keys/my");
+}
+
+export function createMcpKey(body) {
+  return procurementRequest("/admin/mcp-keys", { method: "POST", body });
+}
+
+export function rotateMcpKey(keyId) {
+  return procurementRequest(`/admin/mcp-keys/${keyId}/rotate`, { method: "POST" });
+}
+
+export function revokeMcpKey(keyId) {
+  return procurementRequest(`/admin/mcp-keys/${keyId}`, { method: "DELETE" });
+}
+
 export function fetchBrandOrders(query) {
   return procurementRequest("/admin/brand-orders", { query });
 }

@@ -27,6 +27,7 @@ import BrandOrders from "./pages/BrandOrders.jsx";
 import Payments from "./pages/Payments.jsx";
 import Shipments from "./pages/Shipments.jsx";
 import FxRates from "./pages/FxRates.jsx";
+import McpKey from "./pages/McpKey.jsx";
 import { getPermissions, getRole, hasPermission, hasValidSession } from "./api.js";
 
 function RequireAuth({ children }) {
@@ -261,6 +262,14 @@ export default function App() {
             element={
               <PermissionRoute permission="product">
                 <FxRates />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/mcp-key"
+            element={
+              <PermissionRoute permission="product">
+                <McpKey />
               </PermissionRoute>
             }
           />
