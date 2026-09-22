@@ -1,88 +1,164 @@
 .ranking-eval-page {
-	max-width: 420px;
-	margin: 0 auto;
-	padding: 1rem 1rem 2rem;
+	flex: 1;
+	min-height: 0;
+	display: flex;
+	flex-direction: column;
+	width: 100%;
 	color: var(--text, #f5f0e8);
+	background: #1a1a19;
+}
+
+.ranking-eval-head {
+	flex: 0 0 auto;
+	padding: 0.55rem 0.85rem 0.35rem;
+}
+
+.ranking-eval-back {
+	margin: 0;
 }
 
 .ranking-eval-back a {
 	color: var(--muted, #a8a29a);
+	font-size: 0.92rem;
+}
+
+.ranking-eval-head-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
+	margin-top: 0.35rem;
 }
 
 .ranking-eval-title {
-	margin: 0.75rem 0 0.35rem;
-	font-size: 1.35rem;
+	margin: 0;
+	font-size: 1.15rem;
+	font-weight: 650;
 }
 
 .ranking-eval-meta {
+	margin: 0.25rem 0 0;
 	color: var(--muted, #a8a29a);
-	font-size: 0.92rem;
-	line-height: 1.45;
+	font-size: 0.82rem;
+	line-height: 1.3;
 }
 
 .ranking-eval-error {
+	margin: 0.4rem 0.85rem 0;
 	color: #f87171;
 }
 
 .ranking-eval-toolbar {
-	margin: 1rem 0;
+	margin: 0;
 }
 
 .ranking-eval-toolbar select {
-	margin-left: 0.35rem;
-	padding: 0.35rem 0.5rem;
-	border-radius: 6px;
+	padding: 0.3rem 0.45rem;
+	border-radius: 8px;
+	border: 1px solid rgba(255, 255, 255, 0.18);
+	background: #2b2b2a;
+	color: inherit;
+	font-size: 0.92rem;
 }
 
 .ranking-eval-list {
-	list-style: none;
+	container-type: size;
+	flex: 1;
+	min-height: 0;
 	margin: 0;
 	padding: 0;
-	display: flex;
-	flex-direction: column;
-	gap: 0.65rem;
+	list-style: none;
+	overflow-x: hidden;
+	overflow-y: auto;
+	scroll-snap-type: y mandatory;
+	-webkit-overflow-scrolling: touch;
+	overscroll-behavior-y: contain;
 }
 
 .ranking-eval-item {
-	display: flex;
-	align-items: center;
-	gap: 0.65rem;
-	padding: 0.5rem;
-	border-radius: 10px;
-	border: 1px solid rgba(255, 255, 255, 0.12);
-	background: rgba(0, 0, 0, 0.25);
+	position: relative;
+	box-sizing: border-box;
+	width: min(calc(100% - 8px), calc(68dvh * 0.8));
+	aspect-ratio: 4 / 5;
+	margin: 6px auto;
+	scroll-snap-align: center;
+	scroll-snap-stop: always;
+	border-radius: 14px;
+	overflow: hidden;
+	background: #c8c8c6;
+}
+
+@supports (width: 1cqh) {
+	.ranking-eval-item {
+		width: min(calc(100cqi - 8px), calc(78cqh * 0.8));
+	}
+}
+
+.ranking-eval-photo {
+	display: block;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
 }
 
 .ranking-eval-rank {
+	position: absolute;
+	top: 10px;
+	left: 10px;
+	width: 34px;
+	height: 34px;
+	border-radius: 50%;
+	display: grid;
+	place-items: center;
+	background: #111;
+	color: #fff;
 	font-weight: 700;
-	min-width: 1.5rem;
-	text-align: center;
-}
-
-.ranking-eval-thumb {
-	width: 72px;
-	height: 96px;
-	object-fit: cover;
-	border-radius: 8px;
+	font-size: 0.95rem;
+	line-height: 1;
+	box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
 }
 
 .ranking-eval-actions {
-	margin-left: auto;
+	position: absolute;
+	right: 8px;
+	top: 50%;
+	transform: translateY(-50%);
 	display: flex;
 	flex-direction: column;
-	gap: 0.25rem;
+	gap: 10px;
 }
 
 .ranking-eval-actions button {
-	min-width: 2.25rem;
-	padding: 0.25rem;
+	width: 44px;
+	height: 44px;
+	padding: 0;
+	border: 0;
+	border-radius: 50%;
+	background: #111;
+	color: #fff;
+	font-size: 1.15rem;
+	line-height: 1;
+	box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+	cursor: pointer;
+}
+
+.ranking-eval-actions button:disabled {
+	opacity: 0.28;
+	cursor: default;
+}
+
+.ranking-eval-footer {
+	flex: 0 0 auto;
+	padding: 0.45rem 0.85rem calc(0.55rem + env(safe-area-inset-bottom, 0px));
 }
 
 .ranking-eval-submit {
 	width: 100%;
-	margin-top: 1rem;
+	margin: 0;
+	padding: 12px 20px;
+	font-size: 16px;
 }
 
 .ranking-eval-done {
-	margin-top: 1.5rem;
+	margin: 1.5rem 0.85rem 0;
 }

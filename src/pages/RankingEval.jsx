@@ -82,24 +82,21 @@ export default function RankingEval() {
 
 	return (
 		<div className="ranking-eval-page">
-			<p className="ranking-eval-back">
-				<Link to="/">← Главная</Link>
-			</p>
-			<h1 className="ranking-eval-title">Оценить подборку</h1>
-			<p className="ranking-eval-meta">
-				Сверху — то, что нравится больше. Мы сравним ваш порядок с ранжированием по вектору
-				вкуса.
-			</p>
-
-			<div className="ranking-eval-toolbar">
-				<label>
-					Коллекция{" "}
-					<select value={gender} onChange={(e) => setGender(e.target.value)} disabled={busy}>
-						<option value="female">Женская</option>
-						<option value="male">Мужская</option>
-					</select>
-				</label>
-			</div>
+			<header className="ranking-eval-head">
+				<p className="ranking-eval-back">
+					<Link to="/">← Главная</Link>
+				</p>
+				<div className="ranking-eval-head-row">
+					<h1 className="ranking-eval-title">Оценить подборку</h1>
+					<label className="ranking-eval-toolbar">
+						<select value={gender} onChange={(e) => setGender(e.target.value)} disabled={busy}>
+							<option value="female">Женская</option>
+							<option value="male">Мужская</option>
+						</select>
+					</label>
+				</div>
+				<p className="ranking-eval-meta">Сверху — то, что нравится больше.</p>
+			</header>
 
 			{loading ? <p className="ranking-eval-meta">Загрузка набора…</p> : null}
 			{err ? <p className="ranking-eval-error">{err}</p> : null}
@@ -115,23 +112,26 @@ export default function RankingEval() {
 
 			{!loading && !done && data ? (
 				<>
-					<p className="ranking-eval-meta">
-						<strong>{data.name}</strong> · {order.length} фото
-					</p>
 					<ul className="ranking-eval-list">
 						{order.map((pid, idx) => {
 							const p = byId[pid];
 							if (!p) return null;
 							return (
 								<li key={pid} className="ranking-eval-item">
+									<img src={p.url} alt="" className="ranking-eval-photo" />
 									<span className="ranking-eval-rank">{idx + 1}</span>
-									<img src={p.url} alt="" className="ranking-eval-thumb" />
 									<div className="ranking-eval-actions">
-										<button type="button" disabled={idx === 0 || busy} onClick={() => move(idx, -1)}>
+										<button
+											type="button"
+											aria-label="Выше"
+											disabled={idx === 0 || busy}
+											onClick={() => move(idx, -1)}
+										>
 											↑
 										</button>
 										<button
 											type="button"
+											aria-label="Ниже"
 											disabled={idx === order.length - 1 || busy}
 											onClick={() => move(idx, 1)}
 										>
@@ -142,9 +142,11 @@ export default function RankingEval() {
 							);
 						})}
 					</ul>
-					<button type="button" className="thank-button ranking-eval-submit" disabled={busy} onClick={onSubmit}>
-						{busy ? "Отправка…" : "Отправить"}
-					</button>
+					<div className="ranking-eval-footer">
+						<button type="button" className="thank-button ranking-eval-submit" disabled={busy} onClick={onSubmit}>
+							{busy ? "Отправка…" : "Отправить"}
+						</button>
+					</div>
 				</>
 			) : null}
 		</div>
