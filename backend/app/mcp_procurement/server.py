@@ -21,6 +21,7 @@ from app.mcp_procurement.registry import (
 )
 from app.services.mcp_keys import McpActor
 
+import app.mcp_procurement.ranking_eval_tools  # noqa: F401,E402
 import app.mcp_procurement.tools  # noqa: F401,E402
 
 logger = logging.getLogger("app.mcp_procurement")
@@ -48,7 +49,12 @@ SERVER_INSTRUCTIONS = (
     "is_primary показывает сезон на дашборде PWA, таких сезонов может быть несколько. "
     "Удаления нет: сезон, бренд, заказ, оплату, поставку и курс можно только "
     "создать или изменить. Удаление — вручную в админке. "
-    "Инструменты изменения видны, только если ключ выпущен с правом записи."
+    "Инструменты изменения видны, только если ключ выпущен с правом записи. "
+    "Оценка ранжирования — только чтение: list_ranking_eval_submissions и "
+    "get_ranking_eval_submission. Это сравнение порядка человека с порядком модели "
+    "на эталонном наборе. В деталях — оба ранга, url фото, снимок настроек ленты, "
+    "разброс эмбеддингов набора и вектор вкуса (swipe_updates и like/dislike по полу). "
+    "Сырые векторы не отдаются."
 )
 
 PARSE_ERROR = -32700
