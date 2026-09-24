@@ -29,6 +29,7 @@ from app.routers import (
     brands,
     feed,
     guest,
+    gift_certificates,
     hero_banners,
     home_v2,
     modal_videos,
@@ -124,6 +125,7 @@ app.include_router(brands.router)
 app.include_router(feed.router)
 app.include_router(interactions.router)
 app.include_router(auth.router)
+app.include_router(gift_certificates.router)
 app.include_router(admin.router)
 app.include_router(admin_promo_banners.router)
 app.include_router(admin_hero_banners.router)

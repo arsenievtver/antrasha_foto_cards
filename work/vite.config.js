@@ -1,6 +1,10 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
+
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 export default defineConfig({
   plugins: [
@@ -34,6 +38,7 @@ export default defineConfig({
     },
   },
   server: {
+    fs: { allow: [repoRoot] },
     host: "0.0.0.0",
     port: 5175,
     strictPort: true,

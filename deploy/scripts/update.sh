@@ -19,7 +19,7 @@ else
 fi
 
 echo "[step] rebuilding images (по одному сервису — меньше шанс OOM на VM 2 GB)"
-for _svc in backend ai-ingest-worker frontend admin work xfashion; do
+for _svc in backend ai-ingest-worker frontend admin work xfashion giftcard; do
   echo "[step] docker build: $_svc"
   compose build "$_svc"
 done
@@ -86,6 +86,7 @@ for _ in 1 2 3 4 5 6 7 8 9 10; do
     app_hdr="$(_header_from_container frontend || true)"
     admin_hdr="$(_header_from_container admin || true)"
     work_hdr="$(_header_from_container work || true)"
+    gift_hdr="$(_header_from_container giftcard || true)"
     if [[ "$app_hdr" != "client" ]]; then
       echo "[error] container frontend отдал X-Antrasha-App='${app_hdr:-<empty>}' (ожидали client)"
       compose logs --tail=80 frontend work nginx
@@ -101,7 +102,12 @@ for _ in 1 2 3 4 5 6 7 8 9 10; do
       compose logs --tail=80 frontend work nginx
       exit 1
     fi
-    echo "[ok] app identity: frontend=client, admin=admin, work=work"
+    if [[ "$gift_hdr" != "giftcard" ]]; then
+      echo "[error] container giftcard отдал X-Antrasha-App='${gift_hdr:-<empty>}' (ожидали giftcard)"
+      compose logs --tail=80 giftcard nginx
+      exit 1
+    fi
+    echo "[ok] app identity: frontend=client, admin=admin, work=work, giftcard=giftcard"
     warn_xfashion_tls_if_placeholder
     echo "[ok] update complete (nginx)"
     exit 0

@@ -11,7 +11,7 @@ ensure_backend_venv
 echo "[install] npm — корень (клиент ANTRASHA)"
 (cd "$REPO_ROOT" && npm install)
 
-for spec in "admin:админка" "work:рабочее PWA" "xfashion:лендинг Xfashion"; do
+for spec in "admin:админка" "work:рабочее PWA" "xfashion:лендинг Xfashion" "giftcard:сертификаты"; do
 	dir="${spec%%:*}"
 	label="${spec##*:}"
 	echo "[install] npm — $label ($dir/)"

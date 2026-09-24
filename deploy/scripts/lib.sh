@@ -75,6 +75,22 @@ ensure_xfashion_placeholder_cert() {
   "
 }
 
+ensure_giftcard_placeholder_cert() {
+  local domain="${GIFT_DOMAIN:-giftcard.antrasha.ru}"
+  if compose_certbot_sh -c "test -f \"/etc/letsencrypt/live/$domain/fullchain.pem\"" >/dev/null 2>&1; then
+    return 0
+  fi
+  echo "[step] placeholder TLS cert for ${domain} (иначе nginx не стартует с TLS-шаблоном)"
+  compose_certbot_sh -c "
+    set -e
+    mkdir -p /etc/letsencrypt/live/$domain
+    openssl req -x509 -nodes -newkey rsa:2048 -days 3 \
+      -keyout /etc/letsencrypt/live/$domain/privkey.pem \
+      -out /etc/letsencrypt/live/$domain/fullchain.pem \
+      -subj '/CN=$domain'
+  "
+}
+
 warn_xfashion_tls_if_placeholder() {
   local domain
   domain="$(xfashion_domain_resolved)"
@@ -108,7 +124,7 @@ warn_xfashion_tls_if_placeholder() {
 assert_distinct_edge_domains() {
   local aliases="${APP_DOMAIN_ALIASES:-}"
   local other a
-  for other in "${ADMIN_DOMAIN:-}" "${WORK_DOMAIN:-}" "${XFASHION_DOMAIN:-}"; do
+  for other in "${ADMIN_DOMAIN:-}" "${WORK_DOMAIN:-}" "${XFASHION_DOMAIN:-}" "${GIFT_DOMAIN:-}"; do
     [[ -n "$other" ]] || continue
     if [[ "${APP_DOMAIN:-}" == "$other" ]]; then
       echo "[error] APP_DOMAIN=${APP_DOMAIN} совпадает с ${other} — клиент и этот сервис делят Host"
@@ -136,15 +152,22 @@ materialize_nginx_template_from_certs() {
     XFASHION_DOMAIN=xfashion.pro
     export XFASHION_DOMAIN
   fi
+  if [[ -z "${GIFT_DOMAIN:-}" ]]; then
+    echo "  WARNING: GIFT_DOMAIN не задан — используем giftcard.antrasha.ru"
+    GIFT_DOMAIN=giftcard.antrasha.ru
+    export GIFT_DOMAIN
+  fi
 
   if tls_cert_present; then
     echo "  using TLS template (cert для ${APP_DOMAIN})"
     cp "$DEPLOY_DIR/nginx/default.tls.conf.template" "$active_template"
     ensure_xfashion_placeholder_cert
+    ensure_giftcard_placeholder_cert
   elif [[ -f "$active_template" ]] && grep -q "listen 443" "$active_template"; then
     echo "  WARNING: cert APP не виден, активный шаблон уже TLS — оставляем TLS"
     cp "$DEPLOY_DIR/nginx/default.tls.conf.template" "$active_template"
     ensure_xfashion_placeholder_cert
+    ensure_giftcard_placeholder_cert
   else
     echo "  using HTTP template (нет TLS-серта для ${APP_DOMAIN:-<unset>})"
     cp "$DEPLOY_DIR/nginx/default.http.conf.template" "$active_template"

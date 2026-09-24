@@ -146,6 +146,7 @@ def admin_me(
         "role": principal.role,
         "permissions": principal.permissions,
         "user_id": str(principal.user.id) if principal.user else None,
+        "display_name": principal.user.display_name if principal.user else None,
     }
 
 

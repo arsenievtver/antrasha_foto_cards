@@ -81,6 +81,30 @@ bash deploy/scripts/check-xfashion-tls.sh
 В `deploy/env/.env.backend.prod`: `PUBLIC_XFASHION_URL=https://xfashion.pro`, CORS с xfashion.pro.  
 Рекламные ссылки Xfashion — в админке: **Xfashion — ссылки**.
 
+## 5a2) Сертификаты
+
+Десктоп `giftcard.antrasha.ru`. В `deploy/env/.env.prod`: `GIFT_DOMAIN=giftcard.antrasha.ru`. В `deploy/env/.env.backend.prod`: `PUBLIC_GIFTCARD_URL=https://giftcard.antrasha.ru` и этот origin в `CORS_ORIGINS`. SMS и Telegram: `MTS_SMS_ENABLED`, `MTS_LOGIN`, `MTS_PASSWORD`, `MTS_NAME`, `TELEGRAM_TOKEN`.
+
+Только это приложение:
+
+```bash
+bash deploy/scripts/update-giftcard.sh
+```
+
+Вместе с API и миграцией:
+
+```bash
+WITH_BACKEND=1 bash deploy/scripts/update-giftcard.sh
+```
+
+Первый TLS, когда DNS уже смотрит на эту VM:
+
+```bash
+bash deploy/scripts/tls-add-giftcard.sh
+```
+
+Пока сертификат Let's Encrypt не выпущен, nginx держит временный self-signed, как у xfashion. Полный деплой всего проекта по-прежнему `bash deploy/scripts/update.sh`.
+
 ## 5) Updates (one command)
 
 На сервере из каталога репозитория (например `/opt/antrasha_tinder`):

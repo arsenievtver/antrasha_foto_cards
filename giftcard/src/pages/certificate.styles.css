@@ -1,0 +1,207 @@
+.certificate-page {
+    min-height: 100vh;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Helios', sans-serif;
+    background:
+            linear-gradient(rgba(0,0,0,0.15), rgba(0,0,0,0.25)),
+            url("/images/bg.webp") center / cover no-repeat;
+}
+
+.certificate-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+
+}
+
+.certificate-scene {
+    position: relative;
+    width: 500px;
+    height: 400px;
+    max-width: 95vw;
+}
+
+.envelope-back,
+.envelope-front {
+    position: absolute;
+    left: 50%;
+    bottom: -50px;
+    transform: translateX(-50%);
+    width: 100%;
+    pointer-events: none;
+}
+
+.envelope-back { z-index: 1; }
+.envelope-front { z-index: 4; }
+
+.certificate-card-wrapper {
+    position: absolute;
+    left: 50%;
+    bottom: 0;
+    width: 300px;
+    max-width: 70%;
+    height: min(170px);
+    transform: translateX(-50%) translateY(0);
+    opacity: 0;
+    background: #fff;
+    padding: 20px;
+    box-shadow: 0 25px 50px rgba(0,0,0,0.35);
+    z-index: 2;
+    border-radius: 0;
+    font-family: 'Helios', sans-serif;
+    transition: opacity 0.4s ease;
+    touch-action: none;
+}
+
+.certificate-card-wrapper.show {
+    opacity: 1;
+    animation: card-pop 0.9s cubic-bezier(0.22, 1.1, 0.36, 1) forwards;
+}
+
+@keyframes card-pop {
+    0% { transform: translateX(-50%) translateY(0); }
+    70% { transform: translateX(-50%) translateY(-82%); }
+    100% { transform: translateX(-50%) translateY(-77%); }
+}
+
+.certificate-card-wrapper::before {
+    content: '';
+    position: absolute;
+    top: 5px;
+    left: 5px;
+    right: 5px;
+    bottom: 5px;
+    border: 2px solid transparent;
+    border-image: linear-gradient(
+            135deg,
+            #d4af37,
+            #ffd700,
+            #fff1a8,
+            #ffd700,
+            #d4af37
+    ) 1;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.certificate-card { position: relative; z-index: 1; color: #222; }
+.certificate-card h2 { margin-bottom: 12px; font-size: 16px; }
+.certificate-card p { margin: 6px 0; font-size: 14px; line-height: 1.2; }
+
+.certificate-status-icon {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    font-size: 16px;
+    line-height: 1;
+    pointer-events: none;
+}
+
+.certificate-loading {
+    position: absolute;
+    bottom: -48px;
+    width: 100%;
+    text-align: center;
+    font-size: 14px;
+    color: #eee;
+    letter-spacing: 0.3px;
+    animation: fadePulse 1.4s ease-in-out infinite;
+}
+@keyframes fadePulse { 0% { opacity: 0.3; } 50% { opacity: 1; } 100% { opacity: 0.3; } }
+
+.certificate-status-hint {
+    margin-top: 14px;
+    font-size: 13px;
+    text-align: center;
+    letter-spacing: 0.3px;
+    opacity: 0.85;
+    color: #fff;
+}
+
+.certificate-rules-link {
+    margin-top: 18px;
+    font-size: 13px;
+    color: rgba(255,255,255,0.75);
+    text-decoration: none;
+    letter-spacing: 0.3px;
+    transition: color 0.25s ease, opacity 0.25s ease;
+}
+.certificate-rules-link:hover { color: #fff; opacity: 1; text-decoration: underline; }
+
+@media (max-width: 480px) {
+    .certificate-scene { height: 500px; }
+}
+
+/* убираем absolute из .certificate-loading */
+.certificate-footer {
+    min-height: 60px; /* место под loading + статус + ссылку */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center; /* по вертикали центрируем при загрузке */
+    margin-top: 14px;
+    color: #eee;
+    font-size: 14px;
+    letter-spacing: 0.3px;
+    text-align: center;
+    animation: fadePulse 1.4s ease-in-out infinite;
+}
+
+@keyframes fadePulse {
+    0% { opacity: 0.3; }
+    50% { opacity: 1; }
+    100% { opacity: 0.3; }
+}
+
+.certificate-loading {
+    font-size: 14px;
+    color: #eee;
+    letter-spacing: 0.3px;
+    animation: fadePulse 1.4s ease-in-out infinite;
+    text-align: center;
+}
+
+.certificate-status-hint {
+    font-size: 13px;
+    text-align: center;
+    letter-spacing: 0.3px;
+    opacity: 0.85;
+    color: #fff;
+    margin-bottom: 4px;
+}
+
+.certificate-rules-link {
+    font-size: 13px;
+    color: rgba(255,255,255,0.75);
+    text-decoration: none;
+    letter-spacing: 0.3px;
+    transition: color 0.25s ease, opacity 0.25s ease;
+}
+
+.certificate-rules-link:hover {
+    color: #ffffff;
+    opacity: 1;
+    text-decoration: underline;
+}
+
+.certificate-telegram-link {
+    display: flex;
+    align-items: center;
+    margin-top: 8px;
+    color: #0088cc;
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.certificate-telegram-link:hover {
+    text-decoration: underline;
+}
+
+.telegram-icon {
+    width: 20px;
+    height: 20px;
+    margin-right: 6px;
+}

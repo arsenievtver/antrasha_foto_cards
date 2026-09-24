@@ -158,6 +158,17 @@ services:
     networks:
       - antrasha_net
 
+  giftcard:
+    build:
+      context: ..
+      dockerfile: giftcard/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - antrasha_net
+
   nginx:
     image: nginx:1.27-alpine
     restart: unless-stopped
@@ -166,6 +177,7 @@ services:
     environment:
       # иначе envsubst оставляет ${XFASHION_DOMAIN} и nginx падает: unknown "xfashion_domain"
       XFASHION_DOMAIN: ${XFASHION_DOMAIN:-xfashion.pro}
+      GIFT_DOMAIN: ${GIFT_DOMAIN:-giftcard.antrasha.ru}
     depends_on:
       backend:
         condition: service_healthy
@@ -176,6 +188,8 @@ services:
       work:
         condition: service_started
       xfashion:
+        condition: service_started
+      giftcard:
         condition: service_started
     ports:
       - "80:80"

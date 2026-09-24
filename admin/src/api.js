@@ -12,6 +12,7 @@ export const ADMIN_PERMISSIONS = [
   { key: "outlet", label: "Аутлет: съёмка (PWA)" },
   { key: "outlet_transfer", label: "Аутлет: очередь переноса (PWA)" },
   { key: "ai_assistant", label: "AI помощник" },
+  { key: "giftcards", label: "Сертификаты" },
 ];
 
 export const DEFAULT_WORKER_PERMISSIONS = ["photos"];

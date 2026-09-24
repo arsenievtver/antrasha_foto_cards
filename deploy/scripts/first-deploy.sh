@@ -21,7 +21,7 @@ done
 ensure_env_files
 
 echo "[step] build images"
-compose build backend frontend admin work
+compose build backend frontend admin work giftcard
 
 echo "[step] start postgres only"
 compose up -d postgres

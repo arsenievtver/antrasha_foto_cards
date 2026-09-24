@@ -1,96 +1,4 @@
-:root {
-  --bg: #141618;
-  --surface: #1e2126;
-  --surface-2: #262b32;
-  --border: #343a44;
-  --text: #f0f2f5;
-  --muted: #9aa1ab;
-  --accent: #c4a574;
-  --accent-text: #1a1c1f;
-  --warn: #e8a87c;
-  --danger: #e07a7a;
-  --ok: #7dbe9a;
-  --nav-h: 56px;
-  --safe-bottom: env(safe-area-inset-bottom, 0px);
-  --safe-top: env(safe-area-inset-top, 0px);
-  --header-h: 56px;
-  font-family: "SF Pro Text", "Segoe UI", system-ui, -apple-system, sans-serif;
-  line-height: 1.45;
-  color: var(--text);
-  background: var(--bg);
-  -webkit-tap-highlight-color: transparent;
-}
-
-* {
-  box-sizing: border-box;
-}
-
-html,
-body,
-#root {
-  margin: 0;
-  min-height: 100%;
-}
-
-body {
-  min-height: 100dvh;
-  background: var(--bg);
-}
-
-button {
-  font: inherit;
-  cursor: pointer;
-  border: none;
-  border-radius: 12px;
-  padding: 0.75rem 1rem;
-  background: var(--accent);
-  color: var(--accent-text);
-  font-weight: 600;
-}
-
-button.secondary {
-  background: var(--surface-2);
-  color: var(--text);
-  border: 1px solid var(--border);
-}
-
-button:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-input,
-select,
-textarea {
-  font: inherit;
-  padding: 0.7rem 0.8rem;
-  border-radius: 12px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text);
-  width: 100%;
-  appearance: none;
-}
-
-label {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  font-size: 0.85rem;
-  color: var(--muted);
-}
-
-.field-hint {
-  font-size: 0.8rem;
-  color: var(--muted);
-  margin: 0.25rem 0 0;
-}
-
-.error {
-  color: var(--danger);
-  margin: 0.5rem 0;
-  font-size: 0.9rem;
-}
+/* Токены, кнопки, поля, вход — shared/staff-ui.css */
 
 /* —— Shell —— */
 .app-shell {
@@ -367,12 +275,6 @@ label {
 }
 
 /* —— Forms —— */
-.form-stack {
-  display: flex;
-  flex-direction: column;
-  gap: 0.85rem;
-}
-
 .form-row {
   display: grid;
   gap: 0.65rem;
@@ -629,40 +531,6 @@ label {
   letter-spacing: 0.04em;
   color: var(--muted);
   font-weight: 650;
-}
-
-/* —— Login —— */
-.login-wrap {
-  min-height: 100dvh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1.5rem;
-  padding-top: calc(1.5rem + var(--safe-top));
-  background:
-    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(196, 165, 116, 0.18), transparent),
-    var(--bg);
-}
-
-.login-card {
-  width: 100%;
-  max-width: 380px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  padding: 1.5rem 1.25rem;
-}
-
-.login-card h1 {
-  margin: 0 0 0.25rem;
-  font-size: 1.5rem;
-  letter-spacing: -0.02em;
-}
-
-.login-card .lead {
-  margin: 0 0 1.25rem;
-  color: var(--muted);
-  font-size: 0.9rem;
 }
 
 /* —— Modal —— */

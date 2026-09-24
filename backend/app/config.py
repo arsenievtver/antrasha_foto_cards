@@ -36,12 +36,14 @@ class Settings(BaseSettings):
         "http://localhost:5173,http://127.0.0.1:5173,"
         "http://localhost:5174,http://127.0.0.1:5174,"
         "http://localhost:5175,http://127.0.0.1:5175,"
-        "http://localhost:5176,http://127.0.0.1:5176"
+        "http://localhost:5176,http://127.0.0.1:5176,"
+        "http://localhost:5177,http://127.0.0.1:5177"
     )
     # Базовый URL публичного приложения для ссылок кампаний (?ref=slug)
     public_app_url: str = "http://localhost:5173"
     # Лендинг Xfashion — отдельный домен для ?ref= кампаний product=xfashion
     public_xfashion_url: str = "http://localhost:5176"
+    public_giftcard_url: str = "http://localhost:5177"
 
     # Суперпользователь админки: логин + пароль (JWT role=superuser).
     # Задайте username и один из вариантов пароля: хеш bcrypt (как у PIN) или plain только для локальной разработки.
@@ -184,6 +186,32 @@ class Settings(BaseSettings):
         default=None,
         validation_alias=AliasChoices("MOYSKLAD_TOKEN", "moysklad_token"),
     )
+
+    # Подарочные сертификаты: SMS МТС и Telegram. Без MTS_SMS_ENABLED код пишется в лог.
+    mts_sms_enabled: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("MTS_SMS_ENABLED", "mts_sms_enabled"),
+    )
+    mts_login: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("MTS_LOGIN", "mts_login"),
+    )
+    mts_password: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("MTS_PASSWORD", "mts_password"),
+    )
+    mts_name: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("MTS_NAME", "mts_name"),
+    )
+    telegram_token: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("TELEGRAM_TOKEN", "telegram_token"),
+    )
+    telegram_default_image_url: str = (
+        "https://storage.yandexcloud.net/files-for-sites/sert.png"
+    )
+    gift_confirm_minutes: int = 30
 
     # Fashn AI (product-to-model) — в .env: FASHN_API_KEY
     fashn_api_key: str | None = None
