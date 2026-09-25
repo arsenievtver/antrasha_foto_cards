@@ -66,9 +66,22 @@ def new_ulid() -> str:
     return "".join(chars)
 
 
+_SLUG_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+_SLUG_LENGTH = 7
+
+
 def allocate_code(db: Session) -> str:
     number = db.execute(text("SELECT nextval('gift_certificate_code_seq')")).scalar_one()
     return f"AN-{int(number):06d}"
+
+
+def allocate_public_slug(db: Session) -> str:
+    for _ in range(8):
+        slug = "".join(secrets.choice(_SLUG_ALPHABET) for _ in range(_SLUG_LENGTH))
+        taken = db.scalar(select(GiftCertificate.id).where(GiftCertificate.public_slug == slug))
+        if taken is None:
+            return slug
+    raise RuntimeError("Не удалось выделить короткую ссылку")
 
 
 def generate_confirm_code(length: int = 4) -> str:
@@ -132,9 +145,9 @@ def expire_open_transactions(db: Session, cert: GiftCertificate) -> None:
                 cert.actual_tran_id = None
 
 
-def certificate_link(cert_id: str) -> str:
+def certificate_link(slug: str) -> str:
     base = (settings.public_giftcard_url or "").rstrip("/")
-    return f"{base}/certificates/{cert_id}"
+    return f"{base}/c/{slug}"
 
 
 def telegram_text(cert: GiftCertificate) -> str:
@@ -147,7 +160,7 @@ def telegram_text(cert: GiftCertificate) -> str:
         amount=cert.amount,
         phone=hide_phone(cert.phone),
         expire_date=expire,
-        link=certificate_link(cert.id),
+        link=certificate_link(cert.public_slug),
     )
 
 
@@ -162,19 +175,53 @@ def _mts_phone(phone: str) -> str:
     raise ValueError("Некорректный телефон для SMS")
 
 
-def send_confirm_sms(cert: GiftCertificate, charge_sum: float, confirm_code: str) -> tuple[str | None, bool, str | None]:
-    text = _SMS_TEMPLATE.format(
-        charge_sum=charge_sum,
-        cert_code=cert.code,
-        confirm_code=confirm_code,
-    )
+def _owner_label(cert: GiftCertificate) -> str:
+    parts = [part.strip() for part in (cert.name, cert.last_name) if part and part.strip()]
+    return " ".join(parts)
+
+
+def share_sms_messages(cert: GiftCertificate) -> list[dict]:
+    link = certificate_link(cert.public_slug)
+    giver = (cert.giver_name or "").strip()
+    giver_phone = (cert.giver_phone or "").strip()
+    owner = _owner_label(cert)
+    messages = []
+    if giver:
+        messages.append(
+            {
+                "role": "owner",
+                "phone": cert.phone,
+                "text": f"{giver} дарит вам сертификат ANTRASHA: {link}",
+            }
+        )
+        if giver_phone:
+            target = f" для {owner}" if owner else ""
+            messages.append(
+                {
+                    "role": "giver",
+                    "phone": giver_phone,
+                    "text": f"Вы оформили сертификат ANTRASHA{target}. Поделиться можно ссылкой: {link}",
+                }
+            )
+    else:
+        messages.append(
+            {
+                "role": "owner",
+                "phone": cert.phone,
+                "text": f"Вам оформлен сертификат ANTRASHA: {link}",
+            }
+        )
+    return messages
+
+
+def _post_mts_sms(phone: str, text: str) -> tuple[str | None, bool, str | None]:
     if not settings.mts_sms_enabled:
-        log.info("SMS выключена, код для %s: %s", cert.code, confirm_code)
+        log.info("SMS выключена, текст для %s: %s", phone, text)
         return f"test_{uuid.uuid4()}", True, None
     if not settings.mts_login or not settings.mts_password or not settings.mts_name:
         return None, False, "SMS МТС не настроена"
     try:
-        phone = _mts_phone(cert.phone)
+        msisdn = _mts_phone(phone)
     except ValueError as exc:
         return None, False, str(exc)
     try:
@@ -185,7 +232,7 @@ def send_confirm_sms(cert: GiftCertificate, charge_sum: float, confirm_code: str
                     {
                         "content": {"short_text": text},
                         "from": {"sms_address": settings.mts_name},
-                        "to": [{"msisdn": phone}],
+                        "to": [{"msisdn": msisdn}],
                     }
                 ]
             },
@@ -205,6 +252,23 @@ def send_confirm_sms(cert: GiftCertificate, charge_sum: float, confirm_code: str
     if response.status_code >= 400 or not message_id:
         return None, False, f"МТС HTTP {response.status_code}"
     return str(message_id), True, None
+
+
+def send_confirm_sms(cert: GiftCertificate, charge_sum: float, confirm_code: str) -> tuple[str | None, bool, str | None]:
+    text = _SMS_TEMPLATE.format(
+        charge_sum=charge_sum,
+        cert_code=cert.code,
+        confirm_code=confirm_code,
+    )
+    return _post_mts_sms(cert.phone, text)
+
+
+def send_share_sms(cert: GiftCertificate) -> list[dict]:
+    sent = []
+    for item in share_sms_messages(cert):
+        sms_id, sms_sent, sms_error = _post_mts_sms(item["phone"], item["text"])
+        sent.append({**item, "sms_id": sms_id, "sent": sms_sent, "error": sms_error})
+    return sent
 
 
 def send_telegram(chat_id: int, text: str, image_url: str | None) -> None:

@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { hasGiftAccess, hasValidSession } from "./api.js";
 import Shell from "./layout/Shell.jsx";
 import CertificatePage from "./pages/CertificatePage.jsx";
+import RulesPage from "./pages/RulesPage.jsx";
 import CertificatesPage from "./pages/CertificatesPage.jsx";
 import Login from "./pages/Login.jsx";
 
@@ -17,6 +18,8 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/certificates/:id" element={<CertificatePage />} />
+      <Route path="/rules" element={<RulesPage />} />
+      <Route path="/c/:code" element={<CertificatePage />} />
       <Route
         path="/"
         element={

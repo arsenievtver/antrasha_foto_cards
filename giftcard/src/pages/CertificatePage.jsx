@@ -1,26 +1,24 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { fetchPublicCertificate } from "../api.js";
 import CertificateCard from "./CertificateCard.jsx";
 import "./certificate.styles.css";
 
 export default function CertificatePage() {
-  const { id } = useParams();
+  const { id, code } = useParams();
+  const ref = id || code;
+  const backPath = id ? `/certificates/${encodeURIComponent(id)}` : `/c/${encodeURIComponent(code || "")}`;
   const [certificate, setCertificate] = useState(null);
   const [stage, setStage] = useState("loading");
-  const [offsetY, setOffsetY] = useState(30);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    fetchPublicCertificate(id)
+    fetchPublicCertificate(ref)
       .then((data) => {
         if (cancelled) return;
         setCertificate(data);
-        setTimeout(() => {
-          setOffsetY(0);
-          setStage("shown");
-        }, 50);
+        setTimeout(() => setStage("shown"), 700);
       })
       .catch(() => {
         if (!cancelled) setFailed(true);
@@ -28,7 +26,7 @@ export default function CertificatePage() {
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [ref]);
 
   let statusHint = "Статус: ";
   if (certificate?.status === "ACTIVE") statusHint = "*Статус: Действует";
@@ -41,13 +39,7 @@ export default function CertificatePage() {
       <div className="certificate-wrapper">
         <div className="certificate-scene">
           <img src="/images/envelope-back.png" alt="" className="envelope-back" />
-          <div
-            className={certificate ? "certificate-card-wrapper show" : "certificate-card-wrapper"}
-            style={{
-              transform: `translateX(-50%) translateY(${offsetY}px)`,
-              transition: "transform 0.6s cubic-bezier(0.22, 1, 0.36, 1)",
-            }}
-          >
+          <div className={certificate ? "certificate-card-wrapper show" : "certificate-card-wrapper"}>
             {certificate ? <CertificateCard certificate={certificate} /> : null}
           </div>
           <img src="/images/envelope-front.png" alt="" className="envelope-front" />
@@ -56,16 +48,11 @@ export default function CertificatePage() {
           {!certificate && !failed ? <div className="certificate-loading">Подождите, загружаем сертификат…</div> : null}
           {failed ? <div className="certificate-loading">Сертификат не найден</div> : null}
           {stage === "shown" ? <div className="certificate-status-hint">{statusHint}</div> : null}
-          <a
-            href="https://antrasha.ru/giftcards"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="certificate-rules-link"
-          >
+          <Link to={`/rules?from=${encodeURIComponent(backPath)}`} className="certificate-rules-link">
             Правила использования сертификата
-          </a>
-          <a href="https://t.me/AntrashaBot" target="_blank" rel="noopener noreferrer" className="certificate-telegram-link">
-            <img src="/telegram.svg" alt="Telegram" className="telegram-icon" />
+          </Link>
+          <a href="https://antrasha.ru" target="_blank" rel="noopener noreferrer" className="certificate-site-link">
+            <img src="/favicon.svg" alt="ANTRASHA" className="certificate-site-icon" />
           </a>
         </div>
       </div>

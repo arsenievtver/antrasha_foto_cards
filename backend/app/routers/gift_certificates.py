@@ -24,12 +24,15 @@ from app.schemas.gift_certificates import (
 )
 from app.services.gift_certificates import (
     allocate_code,
+    allocate_public_slug,
     expire_open_transactions,
     generate_confirm_code,
     hide_name,
     hide_phone,
     new_ulid,
     send_confirm_sms,
+    send_share_sms,
+    share_sms_messages,
     send_telegram,
     set_actual_status,
     telegram_text,
@@ -45,6 +48,7 @@ def _out(cert: GiftCertificate) -> GiftCertificateOut:
     return GiftCertificateOut(
         id=cert.id,
         code=cert.code,
+        public_slug=cert.public_slug,
         nominal=cert.nominal,
         amount=cert.amount,
         description=cert.description,
@@ -58,6 +62,8 @@ def _out(cert: GiftCertificate) -> GiftCertificateOut:
         name=cert.name,
         last_name=cert.last_name,
         phone=cert.phone,
+        giver_name=cert.giver_name,
+        giver_phone=cert.giver_phone,
     )
 
 
@@ -94,6 +100,15 @@ def _public_out(cert: GiftCertificate, *, full: bool) -> GiftCertificatePublicOu
 
 def _get_or_404(db: Session, cert_id: str) -> GiftCertificate:
     cert = db.get(GiftCertificate, cert_id)
+    if cert is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Сертификат не найден")
+    return cert
+
+
+def _get_public_or_404(db: Session, key: str) -> GiftCertificate:
+    cert = db.get(GiftCertificate, key)
+    if cert is None:
+        cert = db.scalar(select(GiftCertificate).where(GiftCertificate.public_slug == key))
     if cert is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Сертификат не найден")
     return cert
@@ -136,7 +151,7 @@ def get_certificate(
     db: Session = Depends(get_db),
     principal: AdminPrincipal | None = Depends(_optional_principal),
 ) -> GiftCertificatePublicOut:
-    cert = _get_or_404(db, cert_id)
+    cert = _get_public_or_404(db, cert_id)
     set_actual_status(cert)
     db.commit()
     db.refresh(cert)
@@ -165,6 +180,7 @@ def create_certificate(
     cert = GiftCertificate(
         id=new_ulid(),
         code=allocate_code(db),
+        public_slug=allocate_public_slug(db),
         nominal=body.nominal,
         amount=body.nominal,
         description=body.description or "",
@@ -177,6 +193,8 @@ def create_certificate(
         name=body.name,
         last_name=body.last_name,
         phone=phone,
+        giver_name=(body.giver_name or "").strip() or None,
+        giver_phone=(body.giver_phone or "").strip() or None,
     )
     set_actual_status(cert)
     db.add(cert)
@@ -292,6 +310,33 @@ def charge_certificate(
     set_actual_status(cert)
     db.commit()
     return {"result": "ok", "amount": cert.amount, "status": cert.status}
+
+
+@router.get("/share-sms/{cert_id}")
+def preview_share_sms(
+    cert_id: str,
+    db: Session = Depends(get_db),
+    _: AdminPrincipal = Depends(require_permission("giftcards")),
+) -> dict:
+    cert = _get_or_404(db, cert_id)
+    return {"messages": share_sms_messages(cert)}
+
+
+@router.post("/share-sms/{cert_id}")
+def deliver_share_sms(
+    cert_id: str,
+    db: Session = Depends(get_db),
+    _: AdminPrincipal = Depends(require_permission("giftcards")),
+) -> dict:
+    cert = _get_or_404(db, cert_id)
+    set_actual_status(cert)
+    db.commit()
+    if cert.status != GiftCertificateStatus.ACTIVE.value:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Сертификат не действует")
+    sent = send_share_sms(cert)
+    if any(item["sent"] is False for item in sent):
+        log.warning("Не все SMS по %s ушли: %s", cert.code, sent)
+    return {"messages": sent}
 
 
 @router.post("/send-telegram/{cert_id}")

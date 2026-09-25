@@ -25,6 +25,7 @@ class GiftCertificate(Base):
 
     id: Mapped[str] = mapped_column(String(26), primary_key=True)
     code: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    public_slug: Mapped[str] = mapped_column(String(16), unique=True, nullable=False)
     nominal: Mapped[float | None] = mapped_column(Float, nullable=True)
     amount: Mapped[float] = mapped_column(Float, nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -40,6 +41,8 @@ class GiftCertificate(Base):
     name: Mapped[str | None] = mapped_column(String(256), nullable=True)
     last_name: Mapped[str | None] = mapped_column(String(256), nullable=True)
     phone: Mapped[str] = mapped_column(String(256), nullable=False)
+    giver_name: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    giver_phone: Mapped[str | None] = mapped_column(String(32), nullable=True)
     actual_tran_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
 
     transactions: Mapped[list["GiftCertificateTransaction"]] = relationship(

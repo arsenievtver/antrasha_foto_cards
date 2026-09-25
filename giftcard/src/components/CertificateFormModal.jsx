@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { createCertificate } from "../api.js";
+import Switch from "./Switch.jsx";
 
 function digitsPhone(raw) {
   let value = String(raw || "").replace(/\D/g, "");
@@ -12,6 +13,8 @@ export default function CertificateFormModal({ employeeDefault, onClose, onCreat
     name: "",
     last_name: "",
     phone: "7",
+    giver_name: "",
+    giver_phone: "",
     nominal: "",
     description: "",
     employee: employeeDefault || "",
@@ -41,6 +44,8 @@ export default function CertificateFormModal({ employeeDefault, onClose, onCreat
         name: form.name || null,
         last_name: form.last_name || null,
         phone: form.phone,
+        giver_name: form.giver_name.trim() || null,
+        giver_phone: form.giver_phone.trim() ? digitsPhone(form.giver_phone) : null,
         created_at: new Date().toISOString().slice(0, 10),
       });
       onCreated();
@@ -57,19 +62,35 @@ export default function CertificateFormModal({ employeeDefault, onClose, onCreat
         <h2>Создать сертификат</h2>
         <form className="form-stack" onSubmit={onSubmit}>
           <label>
-            Имя
+            Имя владельца
             <input value={form.name} onChange={(event) => setField("name", event.target.value)} />
           </label>
           <label>
-            Фамилия
+            Фамилия владельца
             <input value={form.last_name} onChange={(event) => setField("last_name", event.target.value)} />
           </label>
           <label>
-            Телефон
+            Телефон владельца
             <input
               value={form.phone}
               required
               onChange={(event) => setField("phone", digitsPhone(event.target.value))}
+            />
+          </label>
+          <label>
+            Даритель
+            <input
+              value={form.giver_name}
+              placeholder="ФИО, как в сообщении"
+              onChange={(event) => setField("giver_name", event.target.value)}
+            />
+          </label>
+          <label>
+            Телефон дарителя
+            <input
+              value={form.giver_phone}
+              placeholder="Куда продублировать сообщение"
+              onChange={(event) => setField("giver_phone", event.target.value.replace(/\D/g, "").slice(0, 11))}
             />
           </label>
           <label>
@@ -90,14 +111,11 @@ export default function CertificateFormModal({ employeeDefault, onClose, onCreat
             Сотрудник
             <input value={form.employee} onChange={(event) => setField("employee", event.target.value)} />
           </label>
-          <label className="check-inline">
-            <input
-              type="checkbox"
-              checked={form.indefinite}
-              onChange={(event) => setField("indefinite", event.target.checked)}
-            />
-            Бессрочный
-          </label>
+          <Switch
+            label="Бессрочный"
+            checked={form.indefinite}
+            onChange={(value) => setField("indefinite", value)}
+          />
           <label>
             Период (дней)
             <input

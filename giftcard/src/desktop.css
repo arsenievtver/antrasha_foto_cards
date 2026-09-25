@@ -44,16 +44,50 @@
   max-width: 360px;
 }
 
-.check-inline {
+.switch-row {
+  display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 0.5rem;
+  justify-content: space-between;
+  gap: 0.75rem;
   color: var(--text);
   white-space: nowrap;
+  font-size: 0.92rem;
 }
 
-.check-inline input {
-  width: auto;
+button.switch-toggle {
+  flex-shrink: 0;
+  width: 48px;
+  height: 28px;
+  min-width: 48px;
+  padding: 0;
+  border-radius: 999px;
+  background: #3a4150;
+  border: 1px solid var(--border);
+  position: relative;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+button.switch-toggle[aria-checked="true"] {
+  background: var(--accent);
+  border-color: transparent;
+}
+
+button.switch-toggle .switch-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #f2f4f8;
+  transition: transform 0.15s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+
+button.switch-toggle[aria-checked="true"] .switch-thumb {
+  transform: translateX(22px);
 }
 
 .table-wrap {
@@ -71,10 +105,38 @@ table.certs {
 
 table.certs th,
 table.certs td {
-  padding: 0.7rem 0.85rem;
+  padding: 0.65rem 0.75rem;
   text-align: left;
   border-bottom: 1px solid var(--border);
   vertical-align: middle;
+}
+
+table.certs .nowrap {
+  white-space: nowrap;
+}
+
+table.certs .cell-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+table.certs .cell-sub {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+table.certs .cell-desc {
+  max-width: 240px;
+  overflow-wrap: anywhere;
+}
+
+table.certs .row-actions {
+  display: flex;
+  gap: 0.4rem;
+  white-space: nowrap;
 }
 
 table.certs th {

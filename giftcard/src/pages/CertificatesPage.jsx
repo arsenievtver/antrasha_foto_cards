@@ -2,24 +2,32 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { getDisplayName, listCertificates } from "../api.js";
 import CertificateFormModal from "../components/CertificateFormModal.jsx";
+import Switch from "../components/Switch.jsx";
 import ChargeModal from "../components/ChargeModal.jsx";
-import TelegramModal from "../components/TelegramModal.jsx";
+import SmsModal from "../components/SmsModal.jsx";
 
-function formatDateRu(value) {
+function formatShortDate(value) {
   if (!value) return "—";
-  return new Date(value).toLocaleDateString("ru-RU", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
+  const [year, month, day] = String(value).slice(0, 10).split("-");
+  if (!year || !month || !day) return "—";
+  return `${day}.${month}.${year.slice(-2)}`;
 }
 
 function expirationText(cert) {
   if (cert.indefinite) return "бессрочно";
   if (!cert.created_at || !cert.period) return "—";
-  const date = new Date(cert.created_at);
+  const [year, month, day] = String(cert.created_at).slice(0, 10).split("-").map(Number);
+  const date = new Date(year, month - 1, day);
   date.setDate(date.getDate() + cert.period);
-  return `до ${formatDateRu(date)}`;
+  const dd = String(date.getDate()).padStart(2, "0");
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const yy = String(date.getFullYear()).slice(-2);
+  return `до ${dd}.${mm}.${yy}`;
+}
+
+function formatMoney(value) {
+  if (value === null || value === undefined || value === "") return "—";
+  return Number(value).toLocaleString("ru-RU");
 }
 
 export default function CertificatesPage() {
@@ -30,7 +38,7 @@ export default function CertificatesPage() {
   const [onlyActive, setOnlyActive] = useState(true);
   const [creating, setCreating] = useState(false);
   const [chargeCert, setChargeCert] = useState(null);
-  const [telegramCert, setTelegramCert] = useState(null);
+  const [smsCert, setSmsCert] = useState(null);
 
   async function reload() {
     setLoading(true);
@@ -53,7 +61,7 @@ export default function CertificatesPage() {
     return rows.filter((cert) => {
       if (onlyActive && cert.status !== "ACTIVE") return false;
       if (!needle) return true;
-      return [cert.code, cert.phone, cert.name, cert.last_name, cert.employee, cert.description]
+      return [cert.code, cert.phone, cert.name, cert.last_name, cert.giver_name, cert.giver_phone, cert.employee, cert.description]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(needle));
     });
@@ -68,14 +76,11 @@ export default function CertificatesPage() {
           value={query}
           onChange={(event) => setQuery(event.target.value)}
         />
-        <label className="check-inline">
-          <input
-            type="checkbox"
-            checked={onlyActive}
-            onChange={(event) => setOnlyActive(event.target.checked)}
-          />
-          Только действующие
-        </label>
+        <Switch
+          label="Только действующие"
+          checked={onlyActive}
+          onChange={setOnlyActive}
+        />
         <button type="button" onClick={() => setCreating(true)}>
           Создать сертификат
         </button>
@@ -90,13 +95,12 @@ export default function CertificatesPage() {
             <thead>
               <tr>
                 <th>Код</th>
-                <th>Номинал</th>
-                <th>Остаток</th>
+                <th>Сумма</th>
                 <th>Описание</th>
                 <th>Телефон</th>
+                <th>Даритель</th>
                 <th>Сотрудник</th>
-                <th>Выдан</th>
-                <th>Срок</th>
+                <th>Даты</th>
                 <th>Статус</th>
                 <th></th>
               </tr>
@@ -104,36 +108,52 @@ export default function CertificatesPage() {
             <tbody>
               {visible.length === 0 ? (
                 <tr>
-                  <td colSpan={10}>Нет сертификатов</td>
+                  <td colSpan={9}>Нет сертификатов</td>
                 </tr>
               ) : (
                 visible.map((cert) => (
                   <tr key={cert.id}>
-                    <td>
-                      <Link to={`/certificates/${cert.id}`} target="_blank" rel="noreferrer">
+                    <td className="nowrap">
+                      <Link to={`/c/${cert.public_slug}`} target="_blank" rel="noreferrer">
                         {cert.code}
                       </Link>
                     </td>
-                    <td>{cert.nominal}</td>
-                    <td>{cert.amount}</td>
-                    <td>{cert.description || "—"}</td>
-                    <td>{cert.phone}</td>
-                    <td>{cert.employee || "—"}</td>
-                    <td>{formatDateRu(cert.created_at)}</td>
-                    <td>{expirationText(cert)}</td>
-                    <td className={`status-${cert.status}`}>{cert.status}</td>
+                    <td className="cell-stack">
+                      <span>{formatMoney(cert.nominal)} ₽</span>
+                      <span className="cell-sub">остаток {formatMoney(cert.amount)} ₽</span>
+                    </td>
+                    <td className="cell-desc">{cert.description || "—"}</td>
+                    <td className="nowrap">{cert.phone}</td>
+                    <td className="cell-stack">
+                      {cert.giver_name || cert.giver_phone ? (
+                        <>
+                          <span>{cert.giver_name || "—"}</span>
+                          {cert.giver_phone ? <span className="cell-sub">{cert.giver_phone}</span> : null}
+                        </>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    <td className="nowrap">{cert.employee || "—"}</td>
+                    <td className="cell-stack">
+                      <span>{formatShortDate(cert.created_at)}</span>
+                      <span className="cell-sub">{expirationText(cert)}</span>
+                    </td>
+                    <td className={`nowrap status-${cert.status}`}>{cert.status}</td>
                     <td>
-                      <button type="button" className="secondary icon-btn" onClick={() => setTelegramCert(cert)}>
-                        Telegram
-                      </button>{" "}
-                      <button
-                        type="button"
-                        className="icon-btn"
-                        disabled={cert.status !== "ACTIVE"}
-                        onClick={() => setChargeCert(cert)}
-                      >
-                        Списать
-                      </button>
+                      <div className="row-actions">
+                        <button type="button" className="secondary icon-btn" onClick={() => setSmsCert(cert)}>
+                          СМС
+                        </button>
+                        <button
+                          type="button"
+                          className="icon-btn"
+                          disabled={cert.status !== "ACTIVE"}
+                          onClick={() => setChargeCert(cert)}
+                        >
+                          Списать
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -163,9 +183,7 @@ export default function CertificatesPage() {
           }}
         />
       ) : null}
-      {telegramCert ? (
-        <TelegramModal certificate={telegramCert} onClose={() => setTelegramCert(null)} />
-      ) : null}
+      {smsCert ? <SmsModal certificate={smsCert} onClose={() => setSmsCert(null)} /> : null}
     </>
   );
 }

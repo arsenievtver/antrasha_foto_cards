@@ -21,7 +21,9 @@ function detail(data, fallback) {
 async function parseResponseJson(res) {
   if (res.status === 401 && getToken()) {
     clearSession();
-    if (!window.location.pathname.startsWith("/certificates/")) {
+    const path = window.location.pathname;
+    const publicCard = path.startsWith("/certificates/") || path.startsWith("/c/");
+    if (!publicCard && path !== "/rules") {
       window.location.replace("/login");
     }
     throw new Error("Сессия истекла");
@@ -167,6 +169,14 @@ export function chargeCertificate(id, confirmCode) {
     method: "POST",
     query: { confirm_code: confirmCode },
   });
+}
+
+export function previewShareSms(id) {
+  return request(`/gift-certificates/share-sms/${id}`);
+}
+
+export function sendShareSms(id) {
+  return request(`/gift-certificates/share-sms/${id}`, { method: "POST" });
 }
 
 export function sendTelegram(id, chatId) {

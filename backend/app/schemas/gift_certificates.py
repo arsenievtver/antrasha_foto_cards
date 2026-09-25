@@ -15,6 +15,7 @@ class GiftTransactionOut(BaseModel):
 class GiftCertificateOut(BaseModel):
     id: str
     code: str
+    public_slug: str
     nominal: float | None
     amount: float
     description: str | None
@@ -28,6 +29,8 @@ class GiftCertificateOut(BaseModel):
     name: str | None
     last_name: str | None
     phone: str
+    giver_name: str | None = None
+    giver_phone: str | None = None
 
 
 class GiftCertificatePublicOut(BaseModel):
@@ -58,6 +61,8 @@ class GiftCertificateCreate(BaseModel):
     name: str | None = None
     last_name: str | None = None
     phone: str
+    giver_name: str | None = None
+    giver_phone: str | None = None
 
 
 class GiftCertificateUpdate(BaseModel):
@@ -70,6 +75,8 @@ class GiftCertificateUpdate(BaseModel):
     name: str | None = None
     last_name: str | None = None
     phone: str | None = None
+    giver_name: str | None = None
+    giver_phone: str | None = None
 
 
 class TelegramSendBody(BaseModel):
