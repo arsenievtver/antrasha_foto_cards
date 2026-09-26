@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { getDisplayName, listCertificates } from "../api.js";
+import { listCertificates } from "../api.js";
 import CertificateFormModal from "../components/CertificateFormModal.jsx";
 import Switch from "../components/Switch.jsx";
 import ChargeModal from "../components/ChargeModal.jsx";
@@ -28,6 +28,10 @@ function expirationText(cert) {
 function formatMoney(value) {
   if (value === null || value === undefined || value === "") return "—";
   return Number(value).toLocaleString("ru-RU");
+}
+
+function ownerName(cert) {
+  return [cert.name, cert.last_name].filter(Boolean).join(" ").trim();
 }
 
 export default function CertificatesPage() {
@@ -97,8 +101,8 @@ export default function CertificatesPage() {
                 <th>Код</th>
                 <th>Сумма</th>
                 <th>Описание</th>
-                <th>Телефон</th>
-                <th>Даритель</th>
+                <th>Кому</th>
+                <th>От кого</th>
                 <th>Сотрудник</th>
                 <th>Даты</th>
                 <th>Статус</th>
@@ -123,12 +127,17 @@ export default function CertificatesPage() {
                       <span className="cell-sub">остаток {formatMoney(cert.amount)} ₽</span>
                     </td>
                     <td className="cell-desc">{cert.description || "—"}</td>
-                    <td className="nowrap">{cert.phone}</td>
+                    <td className="cell-stack">
+                      {ownerName(cert) ? <span>{ownerName(cert)}</span> : null}
+                      <span className={ownerName(cert) ? "cell-sub" : undefined}>{cert.phone || "—"}</span>
+                    </td>
                     <td className="cell-stack">
                       {cert.giver_name || cert.giver_phone ? (
                         <>
-                          <span>{cert.giver_name || "—"}</span>
-                          {cert.giver_phone ? <span className="cell-sub">{cert.giver_phone}</span> : null}
+                          {cert.giver_name ? <span>{cert.giver_name}</span> : null}
+                          {cert.giver_phone ? (
+                            <span className={cert.giver_name ? "cell-sub" : undefined}>{cert.giver_phone}</span>
+                          ) : null}
                         </>
                       ) : (
                         "—"
@@ -165,7 +174,6 @@ export default function CertificatesPage() {
 
       {creating ? (
         <CertificateFormModal
-          employeeDefault={getDisplayName()}
           onClose={() => setCreating(false)}
           onCreated={() => {
             setCreating(false);

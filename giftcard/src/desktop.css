@@ -116,11 +116,12 @@ table.certs .nowrap {
 }
 
 table.certs .cell-stack {
-  display: flex;
-  flex-direction: column;
-  gap: 0.12rem;
   line-height: 1.25;
   white-space: nowrap;
+}
+
+table.certs .cell-stack > span {
+  display: block;
 }
 
 table.certs .cell-sub {

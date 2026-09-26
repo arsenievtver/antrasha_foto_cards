@@ -30,6 +30,7 @@ from app.services.gift_certificates import (
     hide_name,
     hide_phone,
     new_ulid,
+    notify_owner_push,
     send_confirm_sms,
     send_share_sms,
     share_sms_messages,
@@ -200,6 +201,10 @@ def create_certificate(
     db.add(cert)
     db.commit()
     db.refresh(cert)
+    try:
+        notify_owner_push(db, cert)
+    except Exception:
+        log.exception("gift_certificate push failed for %s", cert.id)
     return _out(cert)
 
 

@@ -6,8 +6,7 @@ import { useAuth } from "../context/AuthContext";
 import PromoBannerModal from "../components/PromoBannerModal.jsx";
 import UserMenu from "../components/UserMenu";
 import {
-	fetchPushAccountStatus,
-	isPushActiveOnDevice,
+	isPushPermissionMissing,
 	isPushSubscribedLocally,
 } from "../push/notifications.js";
 import AccentBlocks from "../components/home-v2/AccentBlocks";
@@ -16,8 +15,8 @@ import GenderCards from "../components/home-v2/GenderCards";
 import HeroBanner from "../components/home-v2/HeroBanner";
 import HomeBottomBar from "../components/home-v2/HomeBottomBar";
 import LeadRequestModal from "../components/home-v2/LeadRequestModal";
-import NotifySettingsModal from "../components/home-v2/NotifySettingsModal";
 import PwaInstallPrompt from "../components/home-v2/PwaInstallPrompt";
+import GiftMark from "../components/GiftMark";
 import { HOME_V2_DEFAULT_HERO } from "../components/home-v2/homeV2Constants";
 import logoMark from "../assets/image/logo-a-transparent.png";
 import "./HomeV2.css";
@@ -29,10 +28,9 @@ export default function HomeV2() {
 	const [promoBanner, setPromoBanner] = useState(null);
 	const [promoDismissed, setPromoDismissed] = useState(false);
 	const [userOpen, setUserOpen] = useState(false);
-	const [notifyOpen, setNotifyOpen] = useState(false);
 	const [leadOpen, setLeadOpen] = useState(false);
 	const [leadAccent, setLeadAccent] = useState(null);
-	const [hasPush, setHasPush] = useState(false);
+	const [pushGranted, setPushGranted] = useState(() => !isPushPermissionMissing());
 
 	useEffect(() => {
 		let cancelled = false;
@@ -80,34 +78,18 @@ export default function HomeV2() {
 	}, []);
 
 	useEffect(() => {
-		let cancelled = false;
-		(async () => {
-			try {
-				let active = await isPushActiveOnDevice();
-				if (isAuthenticated) {
-					const acc = await fetchPushAccountStatus();
-					active = active || Boolean(acc?.active);
-				}
-				if (!cancelled) {
-					setHasPush(Boolean(active || isPushSubscribedLocally()));
-				}
-			} catch {
-				if (!cancelled) setHasPush(isPushSubscribedLocally());
-			}
-		})();
-		return () => {
-			cancelled = true;
-		};
-	}, [notifyOpen, isAuthenticated]);
+		setPushGranted(!isPushPermissionMissing());
+	}, [userOpen, isAuthenticated]);
 
 	const onPwaInstalled = useCallback(() => {
-		if (!isPushSubscribedLocally()) setNotifyOpen(true);
+		if (!isPushSubscribedLocally() || isPushPermissionMissing()) setUserOpen(true);
 	}, []);
 
 	const userInitial =
 		profile?.display_name?.trim()?.[0] ||
 		profile?.phone?.replace(/\D/g, "")?.slice(-1) ||
 		"";
+	const hasGift = (profile?.gift_certificates || []).length > 0;
 
 	return (
 		<div className="hv2-page">
@@ -121,19 +103,27 @@ export default function HomeV2() {
 				</div>
 				<button
 					type="button"
-					className="hv2-bell"
-					onClick={() => setNotifyOpen(true)}
-					aria-label="Уведомления"
+					className={
+						userInitial ? "hv2-account" : "hv2-account hv2-account--guest"
+					}
+					onClick={() => setUserOpen(true)}
+					aria-label={
+						userInitial
+							? hasGift
+								? "Аккаунт, есть подарочный сертификат"
+								: "Аккаунт"
+							: "Войти"
+					}
 				>
-					<svg viewBox="0 0 24 24" className="hv2-bell__icon" aria-hidden>
-						<path
-							fill="none"
-							stroke="currentColor"
-							strokeWidth="1.3"
-							d="M6.5 17.5h11M7.2 17.2V11a4.8 4.8 0 0 1 9.6 0v6.2M10 17.5a2 2 0 0 0 4 0"
-						/>
-					</svg>
-					{!hasPush ? <span className="hv2-bell__dot" aria-hidden /> : null}
+					{userInitial ? (
+						<span className="hv2-account__initial">{userInitial}</span>
+					) : (
+						"Войти"
+					)}
+					{userInitial && !pushGranted ? (
+						<span className="hv2-account__dot" aria-hidden />
+					) : null}
+					{hasGift ? <GiftMark className="hv2-account__gift" /> : null}
 				</button>
 			</header>
 
@@ -148,11 +138,7 @@ export default function HomeV2() {
 						setLeadOpen(true);
 					}}
 				/>
-				<HomeBottomBar
-					userInitial={userInitial}
-					onUserClick={() => setUserOpen(true)}
-					onAboutClick={() => navigate("/about")}
-				/>
+				<HomeBottomBar onAboutClick={() => navigate("/about")} />
 			</div>
 
 			<PwaInstallPrompt onInstalled={onPwaInstalled} />
@@ -168,11 +154,7 @@ export default function HomeV2() {
 				hideTrigger
 				open={userOpen}
 				onOpenChange={setUserOpen}
-			/>
-			<NotifySettingsModal
-				open={notifyOpen}
-				onClose={() => setNotifyOpen(false)}
-				onPushStateChange={(active) => setHasPush(Boolean(active))}
+				onPushPermissionChange={setPushGranted}
 			/>
 			<LeadRequestModal
 				open={leadOpen}

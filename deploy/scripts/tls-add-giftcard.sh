@@ -76,14 +76,14 @@ if has_letsencrypt_cert && live_cert_is_letsencrypt; then
   exit 0
 fi
 
-if has_any_cert_files && ! live_cert_is_letsencrypt; then
-  echo "[warn] сертификат для ${DOMAIN} не от Let's Encrypt (placeholder или битый live/) — перевыпуск"
-  remove_placeholder_cert
-elif ! has_any_cert_files; then
+# Placeholder снимать до старта nginx нельзя: без файла серта nginx
+# не поднимает и :80, и Let’s Encrypt получает connection refused.
+if ! has_any_cert_files; then
   write_placeholder_cert
+elif ! live_cert_is_letsencrypt; then
+  echo "[warn] сертификат для ${DOMAIN} не от Let's Encrypt — nginx стартует на нём, потом перевыпуск"
 else
-  echo "[info] есть файлы серта без renewal — заменим через ACME"
-  remove_placeholder_cert
+  echo "[info] есть файлы серта без renewal — nginx оставляем на них до ACME"
 fi
 
 cp "$DEPLOY_DIR/nginx/default.tls.conf.template" \
@@ -91,26 +91,45 @@ cp "$DEPLOY_DIR/nginx/default.tls.conf.template" \
 compose up -d --force-recreate nginx
 
 echo "[step] wait nginx :80"
+ready=0
 for _ in 1 2 3 4 5 6 7 8 9 10; do
   if curl -fsS -o /dev/null -w "%{http_code}" "http://127.0.0.1/" -H "Host: ${DOMAIN}" \
     | grep -qE '^[0-9]+$'; then
+    ready=1
     break
   fi
   sleep 2
 done
 
+if [[ "$ready" != "1" ]]; then
+  echo "[error] nginx не слушает :80 — сертификат не выпускаем, иначе лягут все сайты"
+  compose logs --tail=40 nginx || true
+  exit 1
+fi
+
 code="$(curl -sS -o /dev/null -w "%{http_code}" \
   "http://${DOMAIN}/.well-known/acme-challenge/ping-test" || echo fail)"
 echo "  HTTP ${code} for http://${DOMAIN}/.well-known/… (404 ок, refused — DNS/nginx)"
+if [[ "$code" == "000fail" || "$code" == "000" ]]; then
+  echo "[error] http://${DOMAIN} не отвечает, ACME не запускаем"
+  exit 1
+fi
 
-remove_placeholder_cert
+if ! live_cert_is_letsencrypt; then
+  remove_placeholder_cert
+fi
 
 echo "[step] issue Let's Encrypt for ${DOMAIN}"
-compose run --rm certbot certonly \
+if ! compose run --rm certbot certonly \
   --webroot -w /var/www/certbot \
   -d "$DOMAIN" \
   --email "$LETSENCRYPT_EMAIL" \
-  --agree-tos --no-eff-email --non-interactive
+  --agree-tos --no-eff-email --non-interactive; then
+  echo "[error] certbot не выпустил сертификат — возвращаем placeholder, чтобы nginx снова стартовал"
+  write_placeholder_cert
+  compose up -d --force-recreate nginx
+  exit 1
+fi
 
 compose up -d --force-recreate nginx
 echo "[ok] https://${DOMAIN}"

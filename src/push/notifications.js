@@ -16,6 +16,12 @@ function isIosSafari() {
 	return /iPad|iPhone|iPod/.test(navigator.userAgent);
 }
 
+/** Браузер без Notification API не помечаем: разрешение там запросить нельзя. */
+export function isPushPermissionMissing() {
+	if (typeof Notification === "undefined") return false;
+	return Notification.permission !== "granted";
+}
+
 export function isPushSupported() {
 	if (typeof window === "undefined") return false;
 	if (!("serviceWorker" in navigator) || !("PushManager" in window)) {

@@ -14,6 +14,8 @@ from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.utils.phone import normalize_ru_phone
+from app.models import User
 from app.models.gift_certificate import (
     GiftCertificate,
     GiftCertificateStatus,
@@ -148,6 +150,53 @@ def expire_open_transactions(db: Session, cert: GiftCertificate) -> None:
 def certificate_link(slug: str) -> str:
     base = (settings.public_giftcard_url or "").rstrip("/")
     return f"{base}/c/{slug}"
+
+
+def phone_lookup_values(phone: str) -> list[str]:
+    norm = normalize_ru_phone(phone)
+    if not norm:
+        return []
+    digits = norm[1:]
+    return list(dict.fromkeys([norm, digits, f"8{digits[1:]}"]))
+
+
+def active_certificates_for_phone(db: Session, phone: str) -> list[GiftCertificate]:
+    values = phone_lookup_values(phone)
+    if not values:
+        return []
+    rows = db.execute(
+        select(GiftCertificate)
+        .where(
+            GiftCertificate.phone.in_(values),
+            GiftCertificate.status == GiftCertificateStatus.ACTIVE.value,
+        )
+        .order_by(GiftCertificate.created_at.desc(), GiftCertificate.code.desc())
+    ).scalars()
+    return list(rows)
+
+
+def notify_owner_push(db: Session, cert: GiftCertificate) -> None:
+    """Если владелец уже зарегистрирован — пуш тем же текстом, что SMS."""
+    norm = normalize_ru_phone(cert.phone)
+    if not norm:
+        return
+    user = db.execute(select(User).where(User.phone == norm)).scalar_one_or_none()
+    if user is None:
+        return
+    text = next((item["text"] for item in share_sms_messages(cert) if item["role"] == "owner"), "")
+    if not text:
+        return
+    from app.services.web_push import send_push_to_user
+
+    send_push_to_user(
+        db,
+        user_id=user.id,
+        settings=settings,
+        title="Сертификат",
+        body=text,
+        url=certificate_link(cert.public_slug),
+        tag=f"gift-{cert.public_slug}",
+    )
 
 
 def telegram_text(cert: GiftCertificate) -> str:

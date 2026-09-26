@@ -123,6 +123,39 @@ def deactivate_all_push_subscriptions_for_user(db: Session, user_id: uuid.UUID) 
     return len(rows)
 
 
+def send_push_to_user(
+    db: Session,
+    *,
+    user_id: uuid.UUID,
+    settings: Settings,
+    title: str,
+    body: str,
+    url: str,
+    tag: str,
+) -> int:
+    """Разовое уведомление пользователю. Не сдвигает кулдаун рассылки новинок."""
+    rows = list(
+        db.execute(
+            select(PushSubscription).where(
+                PushSubscription.user_id == user_id,
+                PushSubscription.is_active.is_(True),
+            )
+        ).scalars()
+    )
+    if not rows:
+        return 0
+    if not web_push_configured(settings):
+        log.info("web_push: VAPID не задан, текст для user %s: %s", user_id, body or title)
+        return 0
+    payload = {"title": title, "body": body, "url": url, "tag": tag}
+    sent = 0
+    for row in rows:
+        if _send_one(row, settings=settings, payload=payload):
+            sent += 1
+    db.commit()
+    return sent
+
+
 def push_account_status_for_user(db: Session, user_id: uuid.UUID) -> tuple[bool, str | None]:
     row = db.execute(
         select(PushSubscription)

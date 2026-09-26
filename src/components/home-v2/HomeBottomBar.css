@@ -1,7 +1,6 @@
 .hv2-bottom {
 	display: flex;
 	align-items: center;
-	gap: 8px;
 	/*
 	 * Safe-area только здесь (главная immersive, без padding у shell).
 	 * Делим inset пополам: кнопки по центру зоны над home-индикатором,
@@ -14,34 +13,6 @@
 	box-sizing: border-box;
 	width: 100%;
 	flex: 0 0 auto;
-}
-
-.hv2-bottom__user {
-	flex: 0 0 42px;
-	width: 42px;
-	height: 42px;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	padding: 0;
-	border: 1px solid rgba(245, 240, 232, 0.35);
-	border-radius: 9px;
-	background: rgba(255, 255, 255, 0.04);
-	color: #f5f0e8;
-	cursor: pointer;
-	-webkit-tap-highlight-color: transparent;
-}
-
-.hv2-bottom__user-icon {
-	width: 20px;
-	height: 20px;
-}
-
-.hv2-bottom__user-initial {
-	font-family: var(--hv2-sans);
-	font-size: 0.9rem;
-	font-weight: 600;
-	text-transform: uppercase;
 }
 
 .hv2-bottom__about {
@@ -65,17 +36,10 @@
 
 @media (min-width: 720px) {
 	.hv2-bottom {
-		gap: 10px;
 		padding:
 			calc(10px + env(safe-area-inset-bottom, 0px) * 0.5)
 			18px
 			calc(10px + env(safe-area-inset-bottom, 0px) * 0.5);
-	}
-
-	.hv2-bottom__user {
-		flex-basis: 48px;
-		width: 48px;
-		height: 48px;
 	}
 
 	.hv2-bottom__about {

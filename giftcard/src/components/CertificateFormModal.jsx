@@ -1,23 +1,23 @@
 import { useState } from "react";
 import { createCertificate } from "../api.js";
+import { normalizePhoneRu } from "../utils/masks.js";
+import PhoneField from "./PhoneField.jsx";
 import Switch from "./Switch.jsx";
 
-function digitsPhone(raw) {
-  let value = String(raw || "").replace(/\D/g, "");
-  if (!value.startsWith("7")) value = `7${value}`;
-  return value.slice(0, 11);
+function phoneForApi(masked) {
+  const normalized = normalizePhoneRu(masked);
+  return normalized ? normalized.slice(1) : "";
 }
 
-export default function CertificateFormModal({ employeeDefault, onClose, onCreated }) {
+export default function CertificateFormModal({ onClose, onCreated }) {
   const [form, setForm] = useState({
     name: "",
     last_name: "",
-    phone: "7",
+    phone: "",
     giver_name: "",
     giver_phone: "",
     nominal: "",
     description: "",
-    employee: employeeDefault || "",
     indefinite: true,
     period: "",
   });
@@ -33,19 +33,30 @@ export default function CertificateFormModal({ employeeDefault, onClose, onCreat
     setError("");
     setLoading(true);
     try {
+      const phone = phoneForApi(form.phone);
+      if (!phone) {
+        setError("Укажите корректный телефон владельца");
+        return;
+      }
+      const giverPhoneRaw = form.giver_phone.trim();
+      const giverPhone = giverPhoneRaw ? phoneForApi(giverPhoneRaw) : "";
+      if (giverPhoneRaw && !giverPhone) {
+        setError("Укажите корректный телефон дарителя");
+        return;
+      }
       await createCertificate({
         nominal: Number(form.nominal) || 0,
         description: form.description,
-        employee: form.employee,
+        employee: "",
         check_amount: 0,
         status: "ACTIVE",
         indefinite: form.indefinite,
         period: form.indefinite ? null : Number(form.period) || 0,
         name: form.name || null,
         last_name: form.last_name || null,
-        phone: form.phone,
+        phone,
         giver_name: form.giver_name.trim() || null,
-        giver_phone: form.giver_phone.trim() ? digitsPhone(form.giver_phone) : null,
+        giver_phone: giverPhone || null,
         created_at: new Date().toISOString().slice(0, 10),
       });
       onCreated();
@@ -69,30 +80,24 @@ export default function CertificateFormModal({ employeeDefault, onClose, onCreat
             Фамилия владельца
             <input value={form.last_name} onChange={(event) => setField("last_name", event.target.value)} />
           </label>
+          <PhoneField
+            label="Телефон владельца"
+            value={form.phone}
+            onChange={(value) => setField("phone", value)}
+            required
+          />
           <label>
-            Телефон владельца
-            <input
-              value={form.phone}
-              required
-              onChange={(event) => setField("phone", digitsPhone(event.target.value))}
-            />
-          </label>
-          <label>
-            Даритель
+            Даритель — ФИО, как в сообщении
             <input
               value={form.giver_name}
-              placeholder="ФИО, как в сообщении"
               onChange={(event) => setField("giver_name", event.target.value)}
             />
           </label>
-          <label>
-            Телефон дарителя
-            <input
-              value={form.giver_phone}
-              placeholder="Куда продублировать сообщение"
-              onChange={(event) => setField("giver_phone", event.target.value.replace(/\D/g, "").slice(0, 11))}
-            />
-          </label>
+          <PhoneField
+            label="Телефон дарителя — куда продублировать сообщение"
+            value={form.giver_phone}
+            onChange={(value) => setField("giver_phone", value)}
+          />
           <label>
             Сумма
             <input
@@ -106,10 +111,6 @@ export default function CertificateFormModal({ employeeDefault, onClose, onCreat
           <label>
             Описание
             <input value={form.description} onChange={(event) => setField("description", event.target.value)} />
-          </label>
-          <label>
-            Сотрудник
-            <input value={form.employee} onChange={(event) => setField("employee", event.target.value)} />
           </label>
           <Switch
             label="Бессрочный"

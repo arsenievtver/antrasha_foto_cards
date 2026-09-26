@@ -45,7 +45,7 @@
 }
 
 .hv2-brand,
-.hv2-bell {
+.hv2-account {
 	pointer-events: auto;
 }
 
@@ -89,36 +89,70 @@
 	color: var(--hv2-gold);
 }
 
-.hv2-bell {
+.hv2-account {
 	position: relative;
-	width: 36px;
-	height: 36px;
 	display: flex;
 	align-items: center;
 	justify-content: center;
+	height: 36px;
+	min-width: 36px;
 	padding: 0;
 	border: 1px solid rgba(201, 169, 110, 0.55);
 	border-radius: 50%;
-	background: transparent;
+	background: rgba(12, 11, 10, 0.35);
 	color: var(--hv2-gold);
+	font-family: var(--hv2-sans);
 	cursor: pointer;
 	-webkit-tap-highlight-color: transparent;
 }
 
-.hv2-bell__icon {
-	width: 16px;
-	height: 16px;
+.hv2-account--guest {
+	padding: 0 14px;
+	border-radius: 18px;
+	font-size: 0.72rem;
+	letter-spacing: 0.08em;
 }
 
-.hv2-bell__dot {
+.hv2-account__initial {
+	font-size: 0.9rem;
+	font-weight: 600;
+	text-transform: uppercase;
+	line-height: 1;
+}
+
+.hv2-account__dot {
 	position: absolute;
-	top: 7px;
-	right: 8px;
-	width: 6px;
-	height: 6px;
+	top: 1px;
+	right: 1px;
+	width: 8px;
+	height: 8px;
 	border-radius: 50%;
-	background: #c45c3e;
-	border: 1px solid #0c0b0a;
+	background: #e23d3d;
+	border: 1.5px solid #0c0b0a;
+}
+
+.hv2-account__gift {
+	position: absolute;
+	right: -5px;
+	bottom: -3px;
+	width: 16px;
+	height: 16px;
+	display: grid;
+	place-items: center;
+	border-radius: 50%;
+	background: linear-gradient(145deg, #f6edd4, #c9a96e 58%, #a07d3e);
+	color: #1a140c;
+	border: 1.5px solid #0c0b0a;
+	box-shadow: 0 0 8px rgba(201, 169, 110, 0.55);
+	pointer-events: none;
+}
+
+.hv2-account__gift svg {
+	display: block;
+}
+
+.hv2-account:active {
+	opacity: 0.88;
 }
 
 .hv2-below {

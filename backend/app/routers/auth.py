@@ -22,6 +22,7 @@ from app.schemas.auth import (
     AdminSuperuserLoginRequest,
     FittingRequestCreateRequest,
     FittingRequestCreateResponse,
+    GiftCertificateLinkOut,
     LoginRequest,
     MeOut,
     RefreshRequest,
@@ -39,6 +40,7 @@ from app.security import (
     hash_pin,
     verify_pin,
 )
+from app.services.gift_certificates import active_certificates_for_phone, certificate_link
 from app.services.max_notify import send_fitting_request_notification
 from app.services.weights import merge_session_into_user
 from app.utils.phone import normalize_ru_phone
@@ -60,13 +62,23 @@ def _user_token_response(user: User) -> TokenResponse:
 
 
 @router.get("/me", response_model=MeOut)
-def me(current: User = Depends(require_user)) -> MeOut:
+def me(current: User = Depends(require_user), db: Session = Depends(get_db)) -> MeOut:
+    links = [
+        GiftCertificateLinkOut(
+            code=cert.code,
+            url=certificate_link(cert.public_slug),
+            amount=cert.amount,
+            giver_name=(cert.giver_name or "").strip() or None,
+        )
+        for cert in active_certificates_for_phone(db, current.phone)
+    ]
     return MeOut(
         id=current.id,
         phone=current.phone,
         display_name=current.display_name,
         role=current.role,
         ranking_eval_enabled=bool(current.ranking_eval_enabled),
+        gift_certificates=links,
     )
 
 

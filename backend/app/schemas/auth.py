@@ -28,12 +28,20 @@ class RefreshRequest(BaseModel):
     refresh_token: str
 
 
+class GiftCertificateLinkOut(BaseModel):
+    code: str
+    url: str
+    amount: float | None = None
+    giver_name: str | None = None
+
+
 class MeOut(BaseModel):
     id: uuid.UUID
     phone: str
     display_name: str | None = None
     role: str
     ranking_eval_enabled: bool = False
+    gift_certificates: list[GiftCertificateLinkOut] = Field(default_factory=list)
 
 
 class AdminSuperuserLoginRequest(BaseModel):

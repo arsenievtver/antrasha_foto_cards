@@ -7,7 +7,8 @@ import {
   loginWorker,
   setSession,
 } from "../api.js";
-import { formatPhoneMask, formatPinMask, normalizePhoneRu, pinDigits } from "../utils/masks.js";
+import PhoneField from "../components/PhoneField.jsx";
+import { formatPinMask, normalizePhoneRu, pinDigits } from "../utils/masks.js";
 
 export default function Login() {
   const nav = useNavigate();
@@ -57,17 +58,7 @@ export default function Login() {
         <h1>Сертификаты</h1>
         <p className="lead">Вход для сотрудников</p>
         <form className="form-stack" onSubmit={onSubmit}>
-          <label>
-            Телефон
-            <input
-              inputMode="tel"
-              autoComplete="tel"
-              placeholder="+7 (999) 123-45-67"
-              value={phone}
-              onChange={(event) => setPhone(formatPhoneMask(event.target.value))}
-              required
-            />
-          </label>
+          <PhoneField label="Телефон" value={phone} onChange={setPhone} required />
           <label>
             PIN (6 цифр)
             <input

@@ -38,7 +38,7 @@ function AppShell() {
 		pathname === "/experiment/try-on" ||
 		pathname === "/eval/ranking" ||
 		pathname.startsWith("/watch/");
-	/* Главная (HomeV2) — свой низ с User; глобальный UserMenu не показываем */
+	/* Главная (HomeV2) — кнопка аккаунта в шапке; глобальный UserMenu не показываем */
 	const showUserMenu =
 		pathname === "/thank-you" ||
 		pathname === "/about" ||

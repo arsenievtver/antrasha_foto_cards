@@ -5,6 +5,7 @@ import {
 	getPushUnsupportedHint,
 	isPushActiveOnDevice,
 	isPushAvailableOnServer,
+	isPushPermissionMissing,
 	isPushSupported,
 	pushGenderScopeLabel,
 	subscribeToNewPhotosPush,
@@ -18,7 +19,7 @@ const GENDER_OPTIONS = [
 	{ value: "both", label: "Мужские и женские" },
 ];
 
-export default function NotifySettingsModal({ open, onClose, onPushStateChange }) {
+export default function NotifySettingsPanel({ active = true, onPushStateChange }) {
 	const { isAuthenticated } = useAuth();
 	const [genderScope, setGenderScope] = useState("both");
 	const [busy, setBusy] = useState(false);
@@ -29,7 +30,7 @@ export default function NotifySettingsModal({ open, onClose, onPushStateChange }
 	const [accountScope, setAccountScope] = useState(null);
 
 	useEffect(() => {
-		if (!open) return undefined;
+		if (!active) return undefined;
 		let cancelled = false;
 		setError("");
 		setServerOk(null);
@@ -65,9 +66,9 @@ export default function NotifySettingsModal({ open, onClose, onPushStateChange }
 		return () => {
 			cancelled = true;
 		};
-	}, [open, isAuthenticated]);
+	}, [active, isAuthenticated]);
 
-	if (!open) return null;
+	if (!active) return null;
 
 	const pushEnabled = deviceActive || accountActive;
 	const scopeLabel = pushGenderScopeLabel(accountScope || genderScope);
@@ -77,12 +78,14 @@ export default function NotifySettingsModal({ open, onClose, onPushStateChange }
 		setError("");
 		try {
 			await subscribeToNewPhotosPush(genderScope);
-			onPushStateChange?.(true);
-			onClose?.();
+			setDeviceActive(true);
+			setAccountActive(isAuthenticated);
+			setAccountScope(genderScope);
 		} catch (e) {
 			setError(e.message || "Не удалось включить уведомления");
 		} finally {
 			setBusy(false);
+			onPushStateChange?.(!isPushPermissionMissing());
 		}
 	}
 
@@ -91,8 +94,9 @@ export default function NotifySettingsModal({ open, onClose, onPushStateChange }
 		setError("");
 		try {
 			await unsubscribeFromNewPhotosPush();
-			onPushStateChange?.(false);
-			onClose?.();
+			setDeviceActive(false);
+			setAccountActive(false);
+			setAccountScope(null);
 		} catch (e) {
 			setError(e.message || "Не удалось отключить уведомления");
 		} finally {
@@ -101,22 +105,7 @@ export default function NotifySettingsModal({ open, onClose, onPushStateChange }
 	}
 
 	return (
-		<div className="hv2-notify-backdrop" role="presentation" onClick={onClose}>
-			<div
-				className="hv2-notify-modal"
-				role="dialog"
-				aria-modal
-				aria-labelledby="hv2-notify-title"
-				onClick={(ev) => ev.stopPropagation()}
-			>
-				<button
-					type="button"
-					className="hv2-notify-close"
-					onClick={onClose}
-					aria-label="Закрыть"
-				>
-					×
-				</button>
+		<section className="hv2-notify-panel" aria-labelledby="hv2-notify-title">
 				<h2 id="hv2-notify-title" className="hv2-notify-title">
 					Уведомления
 				</h2>
@@ -186,7 +175,6 @@ export default function NotifySettingsModal({ open, onClose, onPushStateChange }
 						</button>
 					</>
 				)}
-			</div>
-		</div>
+		</section>
 	);
 }
