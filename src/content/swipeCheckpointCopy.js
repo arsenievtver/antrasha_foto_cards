@@ -1,15 +1,39 @@
-/** Тексты промежуточного экрана после чанка свайпов. */
-
-const HIGH_MATCH_RATIO = 0.5;
+/** Короткие тексты экрана после блока свайпов. Одно действие — одна золотая кнопка. */
 
 function pct(likes, total) {
 	if (!total) return 0;
 	return Math.round((likes / total) * 100);
 }
 
-function isHighMatch(likes, total) {
-	return total > 0 && likes > 0 && likes / total >= HIGH_MATCH_RATIO;
+function titled(name, phrase) {
+	if (name) return `${name}, ${phrase}`;
+	return phrase.charAt(0).toUpperCase() + phrase.slice(1);
 }
+
+function chunkStat(chunk) {
+	const ratio = pct(chunk.likes, chunk.total);
+	return {
+		stat: `${chunk.likes}/${chunk.total}`,
+		caption: chunk.likes > 0 ? `${ratio}% в этом блоке` : "в этом блоке",
+	};
+}
+
+function visitStat(session) {
+	const ratio = pct(session.likes, session.total);
+	return {
+		stat: `${session.likes}/${session.total}`,
+		caption: session.likes > 0 ? `${ratio}% за визит` : "за этот визит",
+	};
+}
+
+function sessionMeta(session, chunk) {
+	if (!session?.total || session.total <= chunk.total) return null;
+	return `За визит — ${session.likes} из ${session.total}`;
+}
+
+const btn = (id, label, tone) => ({ id, label, tone });
+
+const home = () => btn("home", "На главную", "quiet");
 
 /**
  * @param {{
@@ -18,143 +42,86 @@ function isHighMatch(likes, total) {
  *   chunk: { likes: number, total: number },
  *   session: { likes: number, total: number },
  *   hasMore: boolean,
- *   tasteVectorReady?: boolean,
  * }} ctx
  */
 export function getSwipeCheckpointCopy(ctx) {
-	const { isAuthenticated, displayName, chunk, session, hasMore, tasteVectorReady } =
-		ctx;
+	const { isAuthenticated, displayName, chunk, session, hasMore } = ctx;
 	const name = displayName?.trim() || null;
-	const chunkPct = pct(chunk.likes, chunk.total);
-	const sessionPct = pct(session.likes, session.total);
-	const high = isHighMatch(chunk.likes, chunk.total);
-	const chunkNoLikes = chunk.total > 0 && chunk.likes === 0;
+	const noLikes = chunk.total > 0 && chunk.likes === 0;
+	const high = chunk.total > 0 && chunk.likes / chunk.total >= 0.5;
 	const isFinal = !hasMore;
 
-	const tasteHint =
-		tasteVectorReady && chunk.likes > 0
-			? "По вашим отметкам подборка сужается — дальше чаще будут образы ближе к вашим лайкам."
-			: tasteVectorReady
-				? "Профиль вкуса уже считается — лайки и дизлайки уточняют его; «Дальше» только отмечает просмотр."
-				: null;
+	if (!isAuthenticated && isFinal) {
+		const saved = session.likes > 0;
+		return {
+			kicker: "Antrasha",
+			title: saved ? "Подборка собрана" : "Вы посмотрели всё",
+			...visitStat(session),
+			line: saved
+				? "Сохраните лайки — и можно оставить заявку на примерку."
+				: "Сохраните профиль — в следующий визит лента узнает вас.",
+			actions: [btn("register", "Сохранить профиль", "primary"), home()],
+		};
+	}
 
 	if (!isAuthenticated) {
-		if (isFinal) {
-			return {
-				kicker: ["Antrasha", "персональная подборка"],
-				title: "Вы посмотрели всё, что было в подборке сейчас",
-				stats: `За визит: ${session.likes} из ${session.total} с лайком${session.total ? ` (${sessionPct}%)` : ""}.`,
-				body:
-					chunkNoLikes && session.likes === 0
-						? "Если захотите быть в курсе новых образов — вступите в программу: сохраним прогресс и будем присылать подборки под ваш стиль."
-						: "Вступите в Antrasha — сохраним лайки и будем присылать новинки под ваш вкус.",
-				tasteHint,
-				showGuestProgram: true,
-				primaryLabel: "Итоги и регистрация",
-				secondaryLabel: "На главную",
-			};
-		}
-
-		if (chunkNoLikes) {
-			return {
-				kicker: ["Antrasha", "персональная подборка"],
-				title: "Пока без совпадений — это нормально",
-				stats: `В этом блоке: 0 из ${chunk.total}. За сессию: ${session.likes} из ${session.total}.`,
-				body:
-					"Можно идти дальше — в следующих образах часто появляется то, что цепляет. Или вернуться на главную.",
-				tasteHint,
-				showGuestProgram: true,
-				primaryLabel: "Продолжить",
-				secondaryLabel: "На главную",
-				continueLabel: null,
-			};
-		}
-
-		if (high) {
-			return {
-				kicker: ["Antrasha", "персональная подборка"],
-				title: "Сильное совпадение в этом блоке",
-				stats: `${chunk.likes} из ${chunk.total} — ${chunkPct}% лайков. За сессию: ${session.likes} из ${session.total}.`,
-				body:
-					"Похоже, коллекция вам близка. Закрепите профиль — точнее подберём новинки и откроем заявку на примерку после регистрации.",
-				tasteHint,
-				showGuestProgram: true,
-				primaryLabel: "Продолжить",
-				secondaryLabel: "На главную",
-				continueLabel: null,
-			};
-		}
-
 		return {
-			kicker: ["Antrasha", "персональная подборка"],
-			title: "Уже виден ваш ритм",
-			stats: `В этом блоке: ${chunk.likes} из ${chunk.total} — ${chunkPct}%. За сессию: ${session.likes} из ${session.total}.`,
-			body: tasteHint,
-			tasteHint: null,
-			showGuestProgram: true,
-			guestProgramLead:
-				"Сохраните прогресс в программе Antrasha — перенесём лайки в профиль, будем присылать новинки под ваш стиль (около одного раза в неделю).",
-			primaryLabel: "Продолжить",
-			secondaryLabel: "На главную",
-			continueLabel: null,
+			kicker: "Antrasha",
+			title: noLikes
+				? "Пока без совпадений"
+				: high
+					? "Сильное совпадение"
+					: "Ваш ритм",
+			...chunkStat(chunk),
+			meta: sessionMeta(session, chunk),
+			line: noLikes
+				? "Дальше часто появляется то, что цепляет."
+				: high
+					? "Сохраните профиль — после этого откроется примерка."
+					: "Лайки можно оставить в профиле.",
+			actions: noLikes
+				? [
+						btn("continue", "Смотреть дальше", "primary"),
+						btn("register", "Сохранить профиль", "ghost"),
+						home(),
+					]
+				: [
+						btn("register", "Сохранить профиль", "primary"),
+						btn("continue", "Смотреть дальше", "ghost"),
+						home(),
+					],
 		};
 	}
 
-	// Авторизован
 	if (isFinal) {
+		const saved = session.likes > 0;
 		return {
-			kicker: ["Antrasha", "программа лояльности вкуса"],
-			title: name
-				? `${name}, на сегодня всё из текущего каталога`
-				: "На сегодня всё из текущего каталога",
-			stats: `За визит: ${session.likes} из ${session.total} с лайком${session.total ? ` (${sessionPct}%)` : ""}.`,
-			body:
-				"Когда появятся новые образы — подстроим ленту под ваш профиль. Можно оформить заявку на примерку или вернуться на главную.",
-			tasteHint,
-			showGuestProgram: false,
-			primaryLabel: "Итоги и примерка",
-			secondaryLabel: "На главную",
-			continueLabel: null,
-		};
-	}
-
-	if (chunkNoLikes) {
-		return {
-			kicker: ["Antrasha", "программа лояльности вкуса"],
-			title: name ? `${name}, в этом блоке мимо — бывает` : "В этом блоке мимо — бывает",
-			stats: `0 из ${chunk.total} в этом блоке. За визит: ${session.likes} из ${session.total}.`,
-			body: "Продолжим подборку — ваши прошлые лайки учитываются в рекомендациях.",
-			tasteHint,
-			showGuestProgram: false,
-			primaryLabel: "Смотреть дальше",
-			secondaryLabel: "На главную",
-			continueLabel: null,
-		};
-	}
-
-	if (high) {
-		return {
-			kicker: ["Antrasha", "программа лояльности вкуса"],
-			title: name ? `${name}, отличный темп` : "Отличный темп",
-			stats: `В этом блоке: ${chunk.likes} из ${chunk.total} (${chunkPct}%). Всего за визит: ${session.likes} из ${session.total}.`,
-			body: "Профиль вкуса обновляется — следующие образы ранжируем точнее под вас.",
-			tasteHint,
-			showGuestProgram: false,
-			primaryLabel: "Смотреть дальше",
-			secondaryLabel: "На главную",
-			continueLabel: null,
+			kicker: "Antrasha",
+			title: titled(name, "на сегодня всё"),
+			...visitStat(session),
+			line: saved
+				? "Соберём отмеченное на примерку."
+				: "Новое подстроим под ваш профиль.",
+			actions: saved
+				? [btn("results", "Заявка на примерку", "primary"), home()]
+				: [btn("home", "На главную", "primary")],
+			showContacts: !saved,
 		};
 	}
 
 	return {
-		kicker: ["Antrasha", "программа лояльности вкуса"],
-		title: name ? `${name}, хороший ритм` : "Хороший ритм",
-		stats: `В этом блоке: ${chunk.likes} из ${chunk.total} (${chunkPct}%). За визит: ${session.likes} из ${session.total}.`,
-		body: "Профиль вкуса обновляется — следующие образы будем подстраивать под вас.",
-		tasteHint,
-		showGuestProgram: false,
-		primaryLabel: "Смотреть дальше",
-		secondaryLabel: "На главную",
-		continueLabel: null,
+		kicker: "Antrasha",
+		title: titled(
+			name,
+			noLikes ? "без совпадений" : high ? "сильное совпадение" : "ваш ритм",
+		),
+		...chunkStat(chunk),
+		meta: sessionMeta(session, chunk),
+		line: noLikes
+			? "Прошлые отметки уже в подборке."
+			: high
+				? "Ещё образы уточнят подборку."
+				: "Дальше — ближе к вашим лайкам.",
+		actions: [btn("continue", "Смотреть дальше", "primary"), home()],
 	};
 }

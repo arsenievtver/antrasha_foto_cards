@@ -1,14 +1,16 @@
-/** Экран, когда в ленте нет непросмотренных фото (каталог исчерпан) или каталог пуст. */
+/** Экран, когда непросмотренных фото нет или каталог пуст. */
 
-const GENDER_LABEL = {
-	male: "мужская коллекция",
-	female: "женская коллекция",
+const GENDER_IN = {
+	male: "мужской коллекции",
+	female: "женской коллекции",
 };
 
-function genderLabel(gender) {
-	const g = (gender || "").trim().toLowerCase();
-	return GENDER_LABEL[g] || "эта коллекция";
+function inCollection(gender) {
+	const key = (gender || "").trim().toLowerCase();
+	return GENDER_IN[key] || "этой коллекции";
 }
+
+const btn = (id, label, tone) => ({ id, label, tone });
 
 /**
  * @param {{
@@ -21,47 +23,43 @@ function genderLabel(gender) {
  */
 export function getSwipeFeedEmptyCopy(ctx) {
 	const { kind, gender, isAuthenticated, displayName, totalInCatalog } = ctx;
-	const collection = genderLabel(gender);
+	const where = inCollection(gender);
 	const name = displayName?.trim() || null;
+	const seen = Number(totalInCatalog) > 0 ? Number(totalInCatalog) : 0;
 
 	if (kind === "no_catalog") {
 		return {
-			kicker: ["Antrasha", "подборка образов"],
-			title: "В этой коллекции пока нет образов",
-			body: `Сейчас в ${collection} нет активных фото. Загляните в другую коллекцию или на главную — мы добавляем новые пакеты регулярно.`,
-			primaryLabel: "На главную",
-			secondaryLabel: null,
-			showReplay: false,
+			kicker: "Antrasha",
+			title: "Пока пусто",
+			line: `В ${where} нет образов. Загляните в другую коллекцию.`,
+			actions: [btn("home", "На главную", "primary")],
 		};
 	}
 
-	// catalog exhausted — всё уже просмотрено
 	if (isAuthenticated) {
 		return {
-			kicker: ["Antrasha", "программа лояльности вкуса"],
-			title: name
-				? `${name}, вы уже оценили всё в ${collection}`
-				: `Вы уже оценили всё в ${collection}`,
-			body:
-				totalInCatalog && totalInCatalog > 0
-					? `Новых образов здесь пока нет (${totalInCatalog} вы уже видели). Когда выйдет свежий пакет — подстроим ленту под ваш профиль. А пока можно спокойно пересмотреть увиденное — лайки и «Дальше» по-прежнему уточняют ваш вкус.`
-					: "Новых образов здесь пока нет. Когда появится свежий пакет — подстроим ленту под ваш профиль. А пока можно пересмотреть уже увиденное.",
-			primaryLabel: "Пересмотреть увиденное",
-			secondaryLabel: "На главную",
-			showReplay: true,
+			kicker: "Antrasha",
+			title: name ? `${name}, вы всё оценили` : "Вы всё оценили",
+			stat: seen ? String(seen) : null,
+			caption: seen ? "уже просмотрено" : null,
+			line: `В ${where} нового нет. Пересмотр уточняет вкус.`,
+			actions: [
+				btn("replay", "Пересмотреть", "primary"),
+				btn("home", "На главную", "quiet"),
+			],
 		};
 	}
 
 	return {
-		kicker: ["Antrasha", "персональная подборка"],
-		title: "Вы посмотрели всё, что было в этой подборке",
-		body:
-			totalInCatalog && totalInCatalog > 0
-				? `Сейчас ${totalInCatalog} образов — вы их уже листали. Новые появятся позже; можно пересмотреть каталог или вступить в программу, чтобы сохранить лайки и получать подборки (около одного раза в неделю).`
-				: "Новые образы появятся позже. Можно пересмотреть каталог или вступить в программу Antrasha.",
-		primaryLabel: "Пересмотреть увиденное",
-		secondaryLabel: "На главную",
-		showReplay: true,
-		showGuestHint: true,
+		kicker: "Antrasha",
+		title: "Вы всё посмотрели",
+		stat: seen ? String(seen) : null,
+		caption: seen ? "уже просмотрено" : null,
+		line: "Сохраните профиль — в следующий визит лента узнает вас с первого кадра.",
+		actions: [
+			btn("register", "Сохранить профиль", "primary"),
+			btn("replay", "Пересмотреть", "ghost"),
+			btn("home", "На главную", "quiet"),
+		],
 	};
 }

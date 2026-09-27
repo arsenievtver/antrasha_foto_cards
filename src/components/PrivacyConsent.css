@@ -6,8 +6,17 @@
 	text-align: center;
 }
 
-.privacy-consent--left {
+.privacy-consent--left,
+.privacy-consent--journal {
 	text-align: left;
+}
+
+.privacy-consent--journal {
+	color: rgba(245, 240, 232, 0.42);
+}
+
+.privacy-consent--journal .privacy-consent__link {
+	color: #c9a96e;
 }
 
 .privacy-consent__link {

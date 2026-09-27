@@ -1,0 +1,39 @@
+.journal-preview {
+	min-height: 100%;
+	display: flex;
+	flex-direction: column;
+	background: #0c0b0a;
+}
+
+.journal-preview__bar {
+	display: flex;
+	gap: 8px;
+	overflow-x: auto;
+	padding: 10px 12px 4px;
+	background: #0c0b0a;
+	-webkit-overflow-scrolling: touch;
+}
+
+.journal-preview__chip {
+	flex: 0 0 auto;
+	padding: 7px 10px;
+	border-radius: 999px;
+	border: 1px solid rgba(201, 169, 110, 0.35);
+	background: transparent;
+	color: rgba(245, 240, 232, 0.72);
+	font-family: "Manrope", system-ui, sans-serif;
+	font-size: 0.68rem;
+	letter-spacing: 0.04em;
+	cursor: pointer;
+}
+
+.journal-preview__chip.is-active {
+	border-color: #c9a96e;
+	color: #1a140c;
+	background: linear-gradient(105deg, #f3e6c4 0%, #c9a96e 55%, #f8edd4 100%);
+}
+
+.journal-preview .journal-page {
+	flex: 1 0 auto;
+	min-height: 0;
+}

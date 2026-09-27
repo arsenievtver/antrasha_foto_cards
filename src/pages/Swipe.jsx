@@ -626,7 +626,6 @@ export default function Swipe() {
 				chunk: { likes: nextChunkLikes, total: nextChunkTotal },
 				session: { likes: nextSessionLikes, total: nextSessionTotal },
 				hasMore,
-				tasteVectorReady: Number(feedMeta?.taste_vector_ready) > 0,
 				likedPhotoIds: nextLikedIds,
 			});
 			setPhase("checkpoint");
@@ -826,7 +825,6 @@ export default function Swipe() {
 				chunk={checkpoint.chunk}
 				session={checkpoint.session}
 				hasMore={checkpoint.hasMore}
-				tasteVectorReady={checkpoint.tasteVectorReady}
 				onContinue={onCheckpointContinue}
 				onGoThankYou={onCheckpointThankYou}
 				onHome={() => navigate("/")}

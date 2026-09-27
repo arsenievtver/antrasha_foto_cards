@@ -16,6 +16,7 @@ import About from "./pages/About";
 import Watch from "./pages/Watch";
 import Swipe from "./pages/Swipe";
 import ThankYou from "./pages/ThankYou";
+import JournalPreview from "./pages/JournalPreview";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TryOnExperiment from "./pages/TryOnExperiment";
 import RankingEval from "./pages/RankingEval.jsx";
@@ -33,6 +34,7 @@ function AppShell() {
 	const scrollMain =
 		pathname.startsWith("/swipe/") ||
 		pathname === "/thank-you" ||
+		pathname === "/journal-preview" ||
 		pathname === "/about" ||
 		pathname === "/privacy" ||
 		pathname === "/experiment/try-on" ||
@@ -85,6 +87,7 @@ function AppShell() {
 					<Route path="/watch/:slug" element={<Watch />} />
 					<Route path="/swipe/:gender" element={<Swipe />} />
 					<Route path="/thank-you" element={<ThankYou />} />
+					<Route path="/journal-preview" element={<JournalPreview />} />
 					<Route path="/privacy" element={<PrivacyPolicy />} />
 					<Route path="/experiment/try-on" element={<TryOnExperiment />} />
 					<Route path="/eval/ranking" element={<RankingEval />} />
