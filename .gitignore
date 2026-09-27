@@ -40,3 +40,6 @@ deploy/nginx/templates/default.conf.template
 exports/
 *.xlsx
 *.xls
+
+# Локальные прогоны Fashn (scripts/run_fashn_local_batch.py) — десятки МБ PNG
+.fashn_test/
