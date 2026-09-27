@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session, noload
 
 from app.config import Settings, settings
 from app.database import SessionLocal
-from app.externals.http.fashn import FashnClient
+from app.externals.http.fashn import FRAME_FEED, FashnClient, normalize_content_mode
 from app.models import AiIngestJob
 from app.services.feed_release_batch import get_or_create_draft_batch
 from app.services.image_prepare import (
@@ -130,12 +130,12 @@ def run_single_ingest_job(cfg: Settings, job_id: uuid.UUID) -> None:
         if job.status != "processing":
             return
         path = Path(job.temp_path)
-        source_mode = (job.source_mode or "flatlay").strip().lower()
+        content_mode = normalize_content_mode(job.source_mode)
         log.info(
-            "ai_ingest job_id=%s gender=%s source_mode=%s temp_path=%s exists=%s",
+            "ai_ingest job_id=%s gender=%s content_mode=%s temp_path=%s exists=%s",
             job_id,
             job.gender,
-            source_mode,
+            content_mode,
             path,
             path.is_file(),
         )
@@ -151,9 +151,9 @@ def run_single_ingest_job(cfg: Settings, job_id: uuid.UUID) -> None:
             return
 
         log.info(
-            "ai_ingest job_id=%s → Fashn product-to-model source_mode=%s (data_url ~%s символов)",
+            "ai_ingest job_id=%s → Fashn product-to-model content_mode=%s (data_url ~%s символов)",
             job_id,
-            source_mode,
+            content_mode,
             len(data_url),
         )
         t0 = time.monotonic()
@@ -170,7 +170,8 @@ def run_single_ingest_job(cfg: Settings, job_id: uuid.UUID) -> None:
                 client.run_product_to_model(
                     gender=job.gender,
                     product_image_data_url=data_url,
-                    source_mode=source_mode,
+                    content_mode=content_mode,
+                    frame=FRAME_FEED,
                 )
             )
         except Exception as e:

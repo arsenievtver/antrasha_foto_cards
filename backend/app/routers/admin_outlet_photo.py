@@ -17,7 +17,7 @@ from app.config import settings
 from app.database import get_db
 from app.deps import AdminPrincipal, require_permission
 from app.externals.http.exceptions import ApiClientAbortableException
-from app.externals.http.fashn import SOURCE_MODE_OUTLET_CATALOG, FashnClient
+from app.externals.http.fashn import CONTENT_MODE_SINGLE, FRAME_OUTLET, FashnClient
 from app.externals.http.moysklad import MoySkladClient
 from app.models.outlet_photo_upload import OutletPhotoUpload
 from app.schemas.outlet_photo import (
@@ -258,10 +258,12 @@ async def outlet_photo_generate(
         download_timeout=settings.fashn_http_read_timeout_download,
     )
     try:
+        # Товар ищется по штрихкоду, то есть герой всегда один — даже если в кадре весь образ.
         png_bytes = await client.run_product_to_model(
             gender=g,
             product_image_data_url=data_url,
-            source_mode=SOURCE_MODE_OUTLET_CATALOG,
+            content_mode=CONTENT_MODE_SINGLE,
+            frame=FRAME_OUTLET,
         )
         png_bytes = normalize_png_bytes(png_bytes)
     except Exception as e:

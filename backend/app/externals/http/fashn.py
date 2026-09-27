@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import random
 import time
 from pathlib import Path
 
@@ -16,53 +17,85 @@ POLL_INTERVAL_SEC = 3.0
 POLL_TIMEOUT_SEC = 300.0
 MAX_RETRIES = 2
 
-ASPECT_RATIO = "4:5"
-RESOLUTION = "1k"
+RESOLUTION = "2k"
+GENERATION_MODE = "quality"
+# Выбор лучшего кадра из нескольких не делаем — стараемся попасть с первого.
 NUM_IMAGES = 1
-SEED = 42
+MAX_SEED = 2**32 - 1
 
-SOURCE_MODE_FLATLAY = "flatlay"
-SOURCE_MODE_ON_MODEL = "on_model"
-SOURCE_MODE_OUTLET_CATALOG = "outlet_catalog"
-# AI ingest UI / очередь — только эти режимы.
-VALID_INGEST_SOURCE_MODES = frozenset({SOURCE_MODE_FLATLAY, SOURCE_MODE_ON_MODEL})
-VALID_SOURCE_MODES = frozenset(
-    {*VALID_INGEST_SOURCE_MODES, SOURCE_MODE_OUTLET_CATALOG}
-)
+# Что делать с остальной одеждой: досочинить вокруг вещи-героя или сохранить весь образ.
+# Вешалка это или человек, Fashn видит сам по картинке — в промпте различать не нужно.
+CONTENT_MODE_SINGLE = "single"
+CONTENT_MODE_LOOK = "look"
+VALID_CONTENT_MODES = frozenset({CONTENT_MODE_SINGLE, CONTENT_MODE_LOOK})
 
-# on_model / outlet_catalog: tighter garment fidelity; costs more credits / slower.
-GENERATION_MODE_BY_SOURCE = {
-    SOURCE_MODE_FLATLAY: "balanced",
-    SOURCE_MODE_ON_MODEL: "quality",
-    SOURCE_MODE_OUTLET_CATALOG: "quality",
+# Значения source_mode до миграции 055; старые сборки админки могут ещё их присылать.
+_LEGACY_CONTENT_MODES = {
+    "flatlay": CONTENT_MODE_SINGLE,
+    "on_model": CONTENT_MODE_LOOK,
+}
+
+# Куда уедет кадр: свайп-лента PWA или картинка товара в МойСклад.
+FRAME_FEED = "feed"
+FRAME_OUTLET = "outlet"
+VALID_FRAMES = frozenset({FRAME_FEED, FRAME_OUTLET})
+
+# Карточка ленты — 400×700 (≈9:16), картинка товара в МойСклад — 3:4.
+# Промах по соотношению съедает пиксели в object-fit: cover ещё до показа.
+ASPECT_RATIO_BY_FRAME = {
+    FRAME_FEED: "9:16",
+    FRAME_OUTLET: "3:4",
 }
 
 _PROMPTS_DIR = Path(__file__).resolve().parent.parent.parent / "prompts"
-_PROMPT_CACHE: dict[str, str] = {}
+_PROMPT_PART_CACHE: dict[str, str] = {}
 
 
-def normalize_source_mode(source_mode: str | None) -> str:
-    mode = (source_mode or SOURCE_MODE_FLATLAY).strip().lower()
-    if mode not in VALID_SOURCE_MODES:
-        raise ValueError(
-            "source_mode must be flatlay, on_model, or outlet_catalog"
-        )
+def normalize_content_mode(content_mode: str | None) -> str:
+    mode = (content_mode or CONTENT_MODE_SINGLE).strip().lower()
+    mode = _LEGACY_CONTENT_MODES.get(mode, mode)
+    if mode not in VALID_CONTENT_MODES:
+        raise ValueError("content_mode must be single or look")
     return mode
 
 
-def load_prompt_for_gender(gender: str, source_mode: str = SOURCE_MODE_FLATLAY) -> str:
+def normalize_frame(frame: str | None) -> str:
+    f = (frame or FRAME_FEED).strip().lower()
+    if f not in VALID_FRAMES:
+        raise ValueError("frame must be feed or outlet")
+    return f
+
+
+def _load_prompt_part(name: str) -> str:
+    if name in _PROMPT_PART_CACHE:
+        return _PROMPT_PART_CACHE[name]
+    path = _PROMPTS_DIR / f"{name}.txt"
+    if not path.is_file():
+        raise FileNotFoundError(f"Prompt part missing: {path}")
+    _PROMPT_PART_CACHE[name] = path.read_text(encoding="utf-8").strip()
+    return _PROMPT_PART_CACHE[name]
+
+
+def load_prompt(
+    gender: str,
+    content_mode: str = CONTENT_MODE_SINGLE,
+    frame: str = FRAME_FEED,
+) -> str:
+    """
+    Собирает промпт из блоков в порядке, который советует Fashn: сначала тип кадра
+    и субъект, затем правило по содержанию, в конце свет и палитра — хвост длинного
+    промпта модель игнорирует, поэтому важное идёт первым.
+    """
     g = gender.strip().lower()
     if g not in ("male", "female"):
         raise ValueError("gender must be male or female")
-    mode = normalize_source_mode(source_mode)
-    cache_key = f"{g}:{mode}"
-    if cache_key in _PROMPT_CACHE:
-        return _PROMPT_CACHE[cache_key]
-    path = _PROMPTS_DIR / f"promt_{g}_{mode}.txt"
-    if not path.is_file():
-        raise FileNotFoundError(f"Prompt file missing: {path}")
-    _PROMPT_CACHE[cache_key] = path.read_text(encoding="utf-8")
-    return _PROMPT_CACHE[cache_key]
+    parts = (
+        f"frame_{normalize_frame(frame)}",
+        f"model_{g}",
+        f"content_{normalize_content_mode(content_mode)}",
+        "style",
+    )
+    return "\n".join(_load_prompt_part(p) for p in parts)
 
 
 class FashnClient(BaseApiClient):
@@ -105,7 +138,9 @@ class FashnClient(BaseApiClient):
         *,
         product_image_data_url: str,
         prompt: str,
-        generation_mode: str = "balanced",
+        aspect_ratio: str,
+        seed: int,
+        generation_mode: str = GENERATION_MODE,
     ) -> str:
         """Submits a job to the Fashn API, returns job_id."""
         payload = {
@@ -113,13 +148,13 @@ class FashnClient(BaseApiClient):
             "inputs": {
                 "product_image": product_image_data_url,
                 "prompt": prompt,
-                "aspect_ratio": ASPECT_RATIO,
+                "aspect_ratio": aspect_ratio,
                 "resolution": RESOLUTION,
                 "generation_mode": generation_mode,
                 "num_images": NUM_IMAGES,
                 "output_format": "png",
                 "return_base64": False,
-                "seed": SEED,
+                "seed": seed,
             },
         }
         try:
@@ -261,28 +296,38 @@ class FashnClient(BaseApiClient):
         *,
         gender: str,
         product_image_data_url: str,
-        source_mode: str = SOURCE_MODE_FLATLAY,
+        content_mode: str = CONTENT_MODE_SINGLE,
+        frame: str = FRAME_FEED,
     ) -> bytes:
         """Full submit → poll → download cycle with MAX_RETRIES attempts."""
-        mode = normalize_source_mode(source_mode)
-        prompt = load_prompt_for_gender(gender, mode)
-        generation_mode = GENERATION_MODE_BY_SOURCE[mode]
+        mode = normalize_content_mode(content_mode)
+        frm = normalize_frame(frame)
+        prompt = load_prompt(gender, mode, frm)
+        aspect_ratio = ASPECT_RATIO_BY_FRAME[frm]
+        # Seed на задачу, а не на модуль: на фиксированном seed лента из сотни фото
+        # сходилась к одному лицу и одной позе.
+        seed = random.randint(0, MAX_SEED)
         last_err: Exception = RuntimeError("Unknown error")
         try:
             for attempt in range(MAX_RETRIES):
                 log.info(
-                    "fashn product-to-model attempt %s/%s gender=%s source_mode=%s generation_mode=%s",
+                    "fashn product-to-model attempt %s/%s gender=%s content_mode=%s "
+                    "frame=%s aspect=%s resolution=%s seed=%s",
                     attempt + 1,
                     MAX_RETRIES,
                     gender,
                     mode,
-                    generation_mode,
+                    frm,
+                    aspect_ratio,
+                    RESOLUTION,
+                    seed,
                 )
                 try:
                     job_id = await self.submit(
                         product_image_data_url=product_image_data_url,
                         prompt=prompt,
-                        generation_mode=generation_mode,
+                        aspect_ratio=aspect_ratio,
+                        seed=seed,
                     )
                     urls = await self.poll_status(job_id)
                     if not urls:

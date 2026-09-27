@@ -27,7 +27,7 @@ class AiIngestLimitsOut(BaseModel):
 class AiIngestJobOut(BaseModel):
     id: uuid.UUID
     gender: str
-    source_mode: str = "flatlay"
+    source_mode: str = "single"
     brand_id: uuid.UUID | None = None
     brand_name: str | None = None
     show_badge: bool = False

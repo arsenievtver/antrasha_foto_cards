@@ -25,7 +25,7 @@ from app.schemas.ai_ingest import (
     AiIngestReleaseDraftOut,
     AiIngestUploadResponse,
 )
-from app.externals.http.fashn import VALID_INGEST_SOURCE_MODES, normalize_source_mode
+from app.externals.http.fashn import VALID_CONTENT_MODES, normalize_content_mode
 from app.services.ai_ingest_worker import count_pending_jobs
 from app.services.feed_release_batch import (
     count_failed_fashn_for_draft,
@@ -88,7 +88,7 @@ def _job_out(j: AiIngestJob) -> AiIngestJobOut:
     return AiIngestJobOut(
         id=j.id,
         gender=j.gender,
-        source_mode=j.source_mode or "flatlay",
+        source_mode=j.source_mode or "single",
         brand_id=j.brand_id,
         brand_name=brand_name,
         show_badge=bool(j.show_badge),
@@ -274,8 +274,8 @@ async def upload_batch(
     _p: AdminPrincipal = Depends(get_admin_principal),
     gender: str = Form(..., description="male | female"),
     source_mode: str = Form(
-        "flatlay",
-        description="flatlay | on_model — тип исходника для промпта Fashn",
+        "single",
+        description="single (одна вещь-герой) | look (готовый образ) — правило для промпта Fashn",
     ),
     brand_id: uuid.UUID = Form(..., description="ID бренда, см. GET /admin/brands"),
     show_badge: str = Form(
@@ -294,17 +294,12 @@ async def upload_batch(
     if g not in ("male", "female"):
         raise HTTPException(status_code=400, detail="gender: укажите male или female")
     try:
-        mode = normalize_source_mode(source_mode)
+        mode = normalize_content_mode(source_mode)
     except ValueError:
         raise HTTPException(
             status_code=400,
-            detail=f"source_mode: укажите {' или '.join(sorted(VALID_INGEST_SOURCE_MODES))}",
+            detail=f"source_mode: укажите {' или '.join(sorted(VALID_CONTENT_MODES))}",
         ) from None
-    if mode not in VALID_INGEST_SOURCE_MODES:
-        raise HTTPException(
-            status_code=400,
-            detail=f"source_mode: укажите {' или '.join(sorted(VALID_INGEST_SOURCE_MODES))}",
-        )
     badge_on = _form_bool(show_badge)
 
     db_brand = SessionLocal()

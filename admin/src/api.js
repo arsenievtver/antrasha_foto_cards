@@ -760,7 +760,7 @@ export async function uploadAiIngestBatch(
   gender,
   brandId,
   fileList,
-  { showBadge = false, sourceMode = "flatlay" } = {},
+  { showBadge = false, sourceMode = "single" } = {},
 ) {
   const fd = new FormData();
   fd.append("gender", gender);

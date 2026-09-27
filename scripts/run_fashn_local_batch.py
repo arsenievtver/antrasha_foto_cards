@@ -14,7 +14,7 @@ _REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO / "backend"))
 
 from app.config import Settings  # noqa: E402
-from app.externals.http.fashn import FashnClient, SOURCE_MODE_FLATLAY  # noqa: E402
+from app.externals.http.fashn import CONTENT_MODE_SINGLE, FRAME_FEED, FashnClient  # noqa: E402
 from app.services.image_prepare import build_fashn_product_image_data_url  # noqa: E402
 
 _IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif"}
@@ -37,13 +37,15 @@ async def _run_one(
     gender: str,
     src: Path,
     out: Path,
-    source_mode: str,
+    content_mode: str,
+    frame: str,
 ) -> None:
     data_url = build_fashn_product_image_data_url(src)
     png = await client.run_product_to_model(
         gender=gender,
         product_image_data_url=data_url,
-        source_mode=source_mode,
+        content_mode=content_mode,
+        frame=frame,
     )
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_bytes(png)
@@ -54,7 +56,8 @@ async def _run_batch(
     gender: str,
     input_dir: Path,
     output_dir: Path,
-    source_mode: str,
+    content_mode: str,
+    frame: str,
     skip_existing: bool,
     cfg: Settings,
 ) -> tuple[int, int]:
@@ -82,7 +85,14 @@ async def _run_batch(
             print(f"[{i}/{len(images)}] {src.name} → {out.name} …", flush=True)
             t0 = time.monotonic()
             try:
-                await _run_one(client, gender=gender, src=src, out=out, source_mode=source_mode)
+                await _run_one(
+                    client,
+                    gender=gender,
+                    src=src,
+                    out=out,
+                    content_mode=content_mode,
+                    frame=frame,
+                )
                 print(f"    OK {out.stat().st_size // 1024} KiB in {time.monotonic() - t0:.1f}s")
                 ok += 1
             except Exception as e:
@@ -99,9 +109,16 @@ def main() -> int:
     p.add_argument("--input", type=Path, required=True)
     p.add_argument("--output", type=Path, required=True)
     p.add_argument(
-        "--source-mode",
-        default=SOURCE_MODE_FLATLAY,
-        choices=("flatlay", "on_model"),
+        "--content-mode",
+        default=CONTENT_MODE_SINGLE,
+        choices=("single", "look"),
+        help="single — одна вещь-герой, остальное досочиняется; look — сохранить весь образ",
+    )
+    p.add_argument(
+        "--frame",
+        default=FRAME_FEED,
+        choices=("feed", "outlet"),
+        help="feed — кадр для свайп-ленты; outlet — плотный кроп для карточки МойСклад",
     )
     p.add_argument("--skip-existing", action="store_true")
     args = p.parse_args()
@@ -116,7 +133,8 @@ def main() -> int:
             gender=args.gender,
             input_dir=args.input,
             output_dir=args.output,
-            source_mode=args.source_mode,
+            content_mode=args.content_mode,
+            frame=args.frame,
             skip_existing=args.skip_existing,
             cfg=cfg,
         )

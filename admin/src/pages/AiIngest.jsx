@@ -31,8 +31,8 @@ const statusLabel = (s) => {
 };
 
 const sourceModeLabel = (m) => {
-  if (m === "on_model") return "На модели";
-  if (m === "flatlay") return "Вешалка / 1 вещь";
+  if (m === "look" || m === "on_model") return "Образ в сборе";
+  if (m === "single" || m === "flatlay") return "Одна вещь";
   return m || "—";
 };
 
@@ -44,7 +44,7 @@ export default function AiIngest() {
   const [skip, setSkip] = useState(0);
   const limit = 40;
   const [gender, setGender] = useState("male");
-  const [sourceMode, setSourceMode] = useState("flatlay");
+  const [sourceMode, setSourceMode] = useState("single");
   const [brands, setBrands] = useState([]);
   const [brandId, setBrandId] = useState("");
   const [showBadge, setShowBadge] = useState(false);
@@ -399,10 +399,10 @@ export default function AiIngest() {
             </select>
           </label>
           <label style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-            <span>Тип исходника</span>
+            <span>Что на фото</span>
             <select value={sourceMode} onChange={(e) => setSourceMode(e.target.value)}>
-              <option value="flatlay">Вешалка / одна вещь</option>
-              <option value="on_model">Готовый образ на человеке</option>
+              <option value="single">Одна вещь — остальное подберёт AI</option>
+              <option value="look">Образ в сборе — сохранить всё</option>
             </select>
           </label>
         </div>
