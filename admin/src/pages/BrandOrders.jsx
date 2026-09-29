@@ -103,6 +103,11 @@ export default function BrandOrders() {
     };
   }, [form.season_id, form.brand_id]);
 
+  const sortedItems = useMemo(
+    () => [...data.items].sort((a, b) => num(b.balance_to_pay_eur) - num(a.balance_to_pay_eur)),
+    [data.items],
+  );
+
   const linesTotal = useMemo(
     () => lines.reduce((acc, ln) => acc + num(ln.amount_eur), 0),
     [lines],
@@ -497,7 +502,7 @@ export default function BrandOrders() {
               </tr>
             </thead>
             <tbody>
-              {data.items.map((row) => (
+              {sortedItems.map((row) => (
                 <Fragment key={row.id}>
                   <tr>
                     <td>{row.season_name}</td>

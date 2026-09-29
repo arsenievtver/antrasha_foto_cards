@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { fetchBrandOrders, fetchProcurementRefs } from "../api.js";
 import EntityRow from "../components/EntityRow.jsx";
-import { balanceStyle, dateRu, eur, genderLabel } from "../utils/money.js";
+import { balanceStyle, dateRu, eur, genderLabel, num } from "../utils/money.js";
 
 export default function OrdersList() {
   const [refs, setRefs] = useState(null);
@@ -32,6 +32,11 @@ export default function OrdersList() {
       .then(setRefs)
       .catch((e) => setErr(e.message));
   }, []);
+
+  const sortedItems = useMemo(
+    () => [...data.items].sort((a, b) => num(b.balance_to_pay_eur) - num(a.balance_to_pay_eur)),
+    [data.items],
+  );
 
   return (
     <div>
@@ -98,7 +103,7 @@ export default function OrdersList() {
         <p className="empty">Заказов нет</p>
       ) : (
         <div className="entity-list">
-          {data.items.map((row) => (
+          {sortedItems.map((row) => (
             <EntityRow
               key={row.id}
               to={`/orders/${row.id}`}

@@ -1150,6 +1150,8 @@ def update_payment(
         row.amount_eur = _money(body.amount_eur)
     if body.eur_rub_rate is not None:
         row.eur_rub_rate = body.eur_rub_rate
+    if row.eur_rub_rate is None:
+        row.eur_rub_rate = _resolve_rate(db, None, row.paid_on)
     if body.comment is not None:
         row.comment = body.comment.strip() if body.comment else None
 
@@ -1321,6 +1323,8 @@ def update_shipment(
         row.weight_kg = body.weight_kg
     if body.eur_rub_rate is not None:
         row.eur_rub_rate = body.eur_rub_rate
+    if row.eur_rub_rate is None:
+        row.eur_rub_rate = _resolve_rate(db, None, row.shipped_on)
     if body.comment is not None:
         row.comment = body.comment.strip() if body.comment else None
     if body.logistics_amount_rub is not None:
