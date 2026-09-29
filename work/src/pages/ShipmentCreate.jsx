@@ -1,18 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import {
-  createShipment,
-  fetchBrandOrders,
-  fetchProcurementRefs,
-} from "../api.js";
+import { createShipment, fetchProcurementRefs } from "../api.js";
 import BrandSelect from "../components/BrandSelect.jsx";
+import PairOrderHint from "../components/PairOrderHint.jsx";
 import ShipmentLogisticsSection from "../components/ShipmentLogisticsSection.jsx";
-import { dateRu, eur, num, rub, today } from "../utils/money.js";
+import { num, rub, today } from "../utils/money.js";
 
 const EMPTY = {
   season_id: "",
   brand_id: "",
-  order_id: "",
   shipped_on: today(),
   amount_eur: "",
   weight_kg: "",
@@ -26,7 +22,6 @@ const EMPTY = {
 export default function ShipmentCreate() {
   const nav = useNavigate();
   const [refs, setRefs] = useState(null);
-  const [orders, setOrders] = useState([]);
   const [form, setForm] = useState(EMPTY);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
@@ -43,27 +38,13 @@ export default function ShipmentCreate() {
       .catch((e) => setErr(e.message));
   }, []);
 
-  useEffect(() => {
-    if (!form.season_id || !form.brand_id) {
-      setOrders([]);
-      return;
-    }
-    fetchBrandOrders({ season_id: form.season_id, brand_id: form.brand_id, limit: 200 })
-      .then((res) => setOrders(res.items || []))
-      .catch((e) => setErr(e.message));
-  }, [form.season_id, form.brand_id]);
-
   const amountRub = useMemo(() => {
     if (!form.amount_eur || !form.eur_rub_rate) return null;
     return num(form.amount_eur) * num(form.eur_rub_rate);
   }, [form.amount_eur, form.eur_rub_rate]);
 
   function set(field, value) {
-    setForm((prev) => {
-      const next = { ...prev, [field]: value };
-      if (field === "season_id" || field === "brand_id") next.order_id = "";
-      return next;
-    });
+    setForm((prev) => ({ ...prev, [field]: value }));
   }
 
   async function onSubmit(e) {
@@ -74,7 +55,6 @@ export default function ShipmentCreate() {
       const row = await createShipment({
         season_id: form.season_id,
         brand_id: form.brand_id,
-        order_id: form.order_id || null,
         shipped_on: form.shipped_on,
         amount_eur: form.amount_eur,
         weight_kg: form.weight_kg || null,
@@ -128,22 +108,7 @@ export default function ShipmentCreate() {
           required
         />
 
-        <label>
-          Заказ
-          <select
-            value={form.order_id}
-            onChange={(e) => set("order_id", e.target.value)}
-            disabled={!orders.length}
-          >
-            <option value="">Без привязки</option>
-            {orders.map((o) => (
-              <option key={o.id} value={o.id}>
-                {dateRu(o.ordered_on)} · {eur(o.amount_eur)} · осталось{" "}
-                {eur(o.balance_to_ship_eur)}
-              </option>
-            ))}
-          </select>
-        </label>
+        <PairOrderHint seasonId={form.season_id} brandId={form.brand_id} balance="ship" />
 
         <label>
           Дата поставки

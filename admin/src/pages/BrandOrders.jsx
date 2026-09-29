@@ -14,7 +14,6 @@ function today() {
 const EMPTY_FORM = {
   season_id: "",
   brand_id: "",
-  gender: "",
   ordered_on: today(),
   eur_rub_rate: "",
   amount_eur: "",
@@ -24,8 +23,19 @@ const EMPTY_FORM = {
   comment: "",
 };
 
+const LINE_GENDER_GROUPS = [
+  { gender: "men", label: "Мужская коллекция", unsplitLabel: "Муж — без разбивки" },
+  { gender: "women", label: "Женская коллекция", unsplitLabel: "Жен — без разбивки" },
+];
+
 function newLine() {
-  return { key: crypto.randomUUID(), category_id: "", amount_eur: "", comment: "" };
+  return { key: crypto.randomUUID(), choice: "", amount_eur: "", comment: "" };
+}
+
+/** Значение select строки: `<gender>|<category_id>`; пустой id — «без разбивки». */
+function lineChoicePayload(choice) {
+  const [gender, categoryId] = choice.split("|");
+  return { category_id: categoryId || null, gender };
 }
 
 export default function BrandOrders() {
@@ -68,12 +78,30 @@ export default function BrandOrders() {
       .catch((e) => setErr(e.message));
   }, []);
 
-  /** Категории под выбранный пол: свои + универсальные (аксессуары). */
-  const formCategories = useMemo(() => {
+  /** Категории по коллекциям: свои + универсальные (аксессуары). */
+  const categoryGroups = useMemo(() => {
     const all = refs?.categories || [];
-    if (!form.gender || form.gender === "mixed") return all;
-    return all.filter((c) => c.gender === form.gender || c.gender === "unisex");
-  }, [refs, form.gender]);
+    return LINE_GENDER_GROUPS.map((group) => ({
+      ...group,
+      items: all.filter((c) => c.gender === group.gender || c.gender === "unisex"),
+    }));
+  }, [refs]);
+
+  const [existingOrder, setExistingOrder] = useState(null);
+
+  useEffect(() => {
+    setExistingOrder(null);
+    if (!form.season_id || !form.brand_id) return;
+    let cancelled = false;
+    fetchBrandOrders({ season_id: form.season_id, brand_id: form.brand_id, limit: 1 })
+      .then((res) => {
+        if (!cancelled) setExistingOrder(res.items?.[0] || null);
+      })
+      .catch((e) => setErr(e.message));
+    return () => {
+      cancelled = true;
+    };
+  }, [form.season_id, form.brand_id]);
 
   const linesTotal = useMemo(
     () => lines.reduce((acc, ln) => acc + num(ln.amount_eur), 0),
@@ -98,7 +126,7 @@ export default function BrandOrders() {
     setLines([newLine()]);
   }
 
-  const filledLines = lines.filter((ln) => ln.category_id && num(ln.amount_eur) > 0);
+  const filledLines = lines.filter((ln) => ln.choice && num(ln.amount_eur) > 0);
   const orderAmount = filledLines.length > 0 ? linesTotal : num(form.amount_eur);
 
   async function onCreate(e) {
@@ -109,7 +137,6 @@ export default function BrandOrders() {
       const payload = {
         season_id: form.season_id,
         brand_id: form.brand_id,
-        gender: form.gender || null,
         ordered_on: form.ordered_on || null,
         eur_rub_rate: form.eur_rub_rate || null,
         has_prepayment: form.has_prepayment,
@@ -119,7 +146,7 @@ export default function BrandOrders() {
         prepayment_due_on: form.has_prepayment ? form.prepayment_due_on || null : null,
         comment: form.comment.trim() || null,
         lines: filledLines.map((ln) => ({
-          category_id: ln.category_id,
+          ...lineChoicePayload(ln.choice),
           amount_eur: ln.amount_eur,
           comment: ln.comment.trim() || null,
         })),
@@ -150,15 +177,19 @@ export default function BrandOrders() {
   }
 
   const canSubmit =
-    form.season_id && form.brand_id && (filledLines.length > 0 || num(form.amount_eur) > 0);
+    form.season_id &&
+    form.brand_id &&
+    !existingOrder &&
+    (filledLines.length > 0 || num(form.amount_eur) > 0);
 
   return (
     <div>
       <h2 style={{ marginTop: 0 }}>Заказы брендам</h2>
       <p style={{ color: "var(--muted)", maxWidth: 760 }}>
-        Сумма заказа считается как сумма строк по категориям. Можно сохранить и без
-        категорий — только общую сумму (архив / исключения). Предоплата здесь — план:
-        сколько и к какому сроку должны. Фактические платежи заводятся в разделе
+        Один заказ на бренд и сезон. Мужская и женская коллекции — строки внутри заказа:
+        категория или «без разбивки», сумма заказа равна сумме строк. Оплаты и поставки
+        считаются по бренду и сезону и сами привязываются к заказу. Предоплата здесь —
+        план: сколько и к какому сроку должны. Фактические платежи заводятся в разделе
         «Оплаты».
       </p>
 
@@ -253,17 +284,13 @@ export default function BrandOrders() {
                   ))}
                 </select>
               </label>
-              <label style={{ flex: "1 1 160px" }}>
-                Пол
-                <select value={form.gender} onChange={(e) => set("gender", e.target.value)}>
-                  <option value="">Не указан</option>
-                  <option value="men">Мужской</option>
-                  <option value="women">Женский</option>
-                  <option value="mixed">Смешанный</option>
-                </select>
-                <span className="field-hint">Фильтрует список категорий ниже.</span>
-              </label>
             </div>
+            {existingOrder ? (
+              <p className="error" style={{ margin: 0 }}>
+                Заказ этого бренда на сезон уже есть ({dateRu(existingOrder.ordered_on)} ·{" "}
+                {eur(existingOrder.amount_eur)}). Добавьте строки в него в приложении Work.
+              </p>
+            ) : null}
 
             <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
               <label style={{ flex: "1 1 160px" }}>
@@ -289,11 +316,11 @@ export default function BrandOrders() {
 
             <fieldset style={{ border: "1px solid var(--border, #333)", borderRadius: 8, padding: "0.75rem" }}>
               <legend style={{ padding: "0 0.4rem", fontSize: "0.85rem" }}>
-                Разбивка по категориям
+                Строки заказа
               </legend>
               {lines.length === 0 ? (
                 <p className="field-hint">
-                  Категории не выбраны — укажите общую сумму заказа ниже.
+                  Строк нет — укажите общую сумму заказа ниже.
                 </p>
               ) : null}
               {lines.map((ln) => (
@@ -310,14 +337,19 @@ export default function BrandOrders() {
                   <label style={{ flex: "2 1 220px" }}>
                     Категория
                     <select
-                      value={ln.category_id}
-                      onChange={(e) => setLine(ln.key, "category_id", e.target.value)}
+                      value={ln.choice}
+                      onChange={(e) => setLine(ln.key, "choice", e.target.value)}
                     >
                       <option value="">— выберите —</option>
-                      {formCategories.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name}
-                        </option>
+                      {categoryGroups.map((group) => (
+                        <optgroup key={group.gender} label={group.label}>
+                          <option value={`${group.gender}|`}>{group.unsplitLabel}</option>
+                          {group.items.map((c) => (
+                            <option key={c.id} value={`${group.gender}|${c.id}`}>
+                              {c.name}
+                            </option>
+                          ))}
+                        </optgroup>
                       ))}
                     </select>
                   </label>
@@ -355,7 +387,7 @@ export default function BrandOrders() {
                 className="secondary"
                 onClick={() => setLines((prev) => [...prev, newLine()])}
               >
-                + Категория
+                + Строка
               </button>
               {filledLines.length > 0 ? (
                 <p className="field-hint" style={{ marginBottom: 0 }}>
@@ -379,7 +411,7 @@ export default function BrandOrders() {
                   required
                 />
                 <span className="field-hint">
-                  Можно сохранить без категорий — только общую сумму (архив / исключения).
+                  Можно сохранить без строк — только общую сумму (архив / исключения).
                   {form.eur_rub_rate && num(form.amount_eur) > 0
                     ? ` ≈ ${rub(orderAmount * num(form.eur_rub_rate))}`
                     : ""}
@@ -433,9 +465,9 @@ export default function BrandOrders() {
             <button type="submit" disabled={busy || !canSubmit}>
               {busy ? "Создание…" : "Создать заказ"}
             </button>
-            {!canSubmit ? (
+            {!canSubmit && !existingOrder ? (
               <span className="field-hint">
-                Нужны сезон, бренд и либо категории с суммами, либо общая сумма заказа.
+                Нужны сезон, бренд и либо строки с суммами, либо общая сумма заказа.
               </span>
             ) : null}
           </form>
@@ -501,7 +533,7 @@ export default function BrandOrders() {
                         className="secondary"
                         onClick={() => setExpanded(expanded === row.id ? "" : row.id)}
                       >
-                        {expanded === row.id ? "Скрыть" : "Категории"}
+                        {expanded === row.id ? "Скрыть" : "Строки"}
                       </button>
                       <button
                         type="button"
@@ -517,28 +549,45 @@ export default function BrandOrders() {
                     <tr>
                       <td colSpan={10}>
                         <div style={{ padding: "0.5rem 0" }}>
-                          <strong>Разбивка по категориям</strong>
+                          <strong>Строки заказа</strong>
                           {!row.lines.length ? (
-                            <p style={{ color: "var(--muted)" }}>Категории не заданы.</p>
+                            <p style={{ color: "var(--muted)" }}>Строки не заданы.</p>
                           ) : (
                             <table>
                               <thead>
                                 <tr>
                                   <th>Категория</th>
-                                  <th>Пол</th>
                                   <th>Сумма</th>
                                   <th>Комментарий</th>
                                 </tr>
                               </thead>
                               <tbody>
-                                {row.lines.map((ln) => (
-                                  <tr key={ln.id}>
-                                    <td>{ln.category_name}</td>
-                                    <td>{genderLabel(ln.category_gender)}</td>
-                                    <td>{eur(ln.amount_eur)}</td>
-                                    <td>{ln.comment || "—"}</td>
-                                  </tr>
-                                ))}
+                                {LINE_GENDER_GROUPS.map((group) => {
+                                  const groupLines = row.lines.filter(
+                                    (ln) => ln.category_gender === group.gender,
+                                  );
+                                  if (!groupLines.length) return null;
+                                  const subtotal = groupLines.reduce(
+                                    (acc, ln) => acc + num(ln.amount_eur),
+                                    0,
+                                  );
+                                  return (
+                                    <Fragment key={group.gender}>
+                                      <tr>
+                                        <th>{group.label}</th>
+                                        <th>{eur(subtotal)}</th>
+                                        <th />
+                                      </tr>
+                                      {groupLines.map((ln) => (
+                                        <tr key={ln.id}>
+                                          <td>{ln.category_name}</td>
+                                          <td>{eur(ln.amount_eur)}</td>
+                                          <td>{ln.comment || "—"}</td>
+                                        </tr>
+                                      ))}
+                                    </Fragment>
+                                  );
+                                })}
                               </tbody>
                             </table>
                           )}

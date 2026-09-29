@@ -1,19 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { fetchBrandOrder, fetchProcurementRefs, updateBrandOrder } from "../api.js";
 import BrandSelect from "../components/BrandSelect.jsx";
-import CategoryInsightControl from "../components/CategoryInsightControl.jsx";
+import OrderLinesEditor, {
+  filledOrderLines,
+  newOrderLine,
+  orderLinesPayload,
+} from "../components/OrderLinesEditor.jsx";
 import { eur, num } from "../utils/money.js";
-import { getFormCategories, normalizeCategoryId } from "../utils/procurementCategories.js";
-
-function newLine(line, gender = "") {
-  return {
-    key: crypto.randomUUID(),
-    category_id: normalizeCategoryId(line?.category_id || "", gender),
-    amount_eur: line?.amount_eur || "",
-    comment: line?.comment || "",
-  };
-}
 
 export default function OrderEdit() {
   const { id } = useParams();
@@ -22,7 +16,6 @@ export default function OrderEdit() {
   const [form, setForm] = useState({
     season_id: "",
     brand_id: "",
-    gender: "",
     ordered_on: "",
     amount_eur: "",
     has_prepayment: false,
@@ -30,7 +23,7 @@ export default function OrderEdit() {
     prepayment_due_on: "",
     comment: "",
   });
-  const [lines, setLines] = useState([newLine()]);
+  const [lines, setLines] = useState([newOrderLine()]);
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -44,7 +37,6 @@ export default function OrderEdit() {
         setForm({
           season_id: row.season_id || "",
           brand_id: row.brand_id || "",
-          gender: row.gender || "",
           ordered_on: row.ordered_on || "",
           amount_eur: row.lines?.length ? "" : row.amount_eur || "",
           has_prepayment: Boolean(row.has_prepayment),
@@ -52,11 +44,7 @@ export default function OrderEdit() {
           prepayment_due_on: row.prepayment_due_on || "",
           comment: row.comment || "",
         });
-        setLines(
-          row.lines?.length
-            ? row.lines.map((ln) => newLine(ln, row.gender || ""))
-            : [],
-        );
+        setLines(row.lines?.length ? row.lines.map((ln) => newOrderLine(ln)) : []);
       })
       .catch((e) => setErr(e.message))
       .finally(() => setLoading(false));
@@ -65,24 +53,11 @@ export default function OrderEdit() {
     };
   }, [id]);
 
-  const formCategories = useMemo(() => {
-    return getFormCategories(refs?.categories || [], form.gender);
-  }, [refs, form.gender]);
-
-  const linesTotal = useMemo(
-    () => lines.reduce((acc, ln) => acc + num(ln.amount_eur), 0),
-    [lines],
-  );
-  const filledLines = lines.filter((ln) => ln.category_id && num(ln.amount_eur) > 0);
+  const filledLines = filledOrderLines(lines);
+  const linesTotal = filledLines.reduce((acc, ln) => acc + num(ln.amount_eur), 0);
 
   function set(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
-  }
-
-  function setLine(key, field, value) {
-    setLines((prev) =>
-      prev.map((ln) => (ln.key === key ? { ...ln, [field]: value } : ln)),
-    );
   }
 
   async function onSubmit(e) {
@@ -93,17 +68,12 @@ export default function OrderEdit() {
       const payload = {
         season_id: form.season_id,
         brand_id: form.brand_id,
-        gender: form.gender || null,
         ordered_on: form.ordered_on || null,
         has_prepayment: form.has_prepayment,
         prepayment_amount_eur: form.has_prepayment ? form.prepayment_amount_eur || null : null,
         prepayment_due_on: form.has_prepayment ? form.prepayment_due_on || null : null,
         comment: form.comment,
-        lines: filledLines.map((ln) => ({
-          category_id: normalizeCategoryId(ln.category_id, form.gender),
-          amount_eur: ln.amount_eur,
-          comment: ln.comment.trim() || null,
-        })),
+        lines: orderLinesPayload(lines),
       };
       if (!filledLines.length) {
         payload.amount_eur = form.amount_eur;
@@ -156,16 +126,6 @@ export default function OrderEdit() {
         />
 
         <label>
-          Пол
-          <select value={form.gender} onChange={(e) => set("gender", e.target.value)}>
-            <option value="">Не указан</option>
-            <option value="men">Мужской</option>
-            <option value="women">Женский</option>
-            <option value="mixed">Смешанный</option>
-          </select>
-        </label>
-
-        <label>
           Дата заказа
           <input
             type="date"
@@ -175,71 +135,19 @@ export default function OrderEdit() {
         </label>
 
         <p className="section-title" style={{ marginTop: 0 }}>
-          Категории
+          Строки заказа
         </p>
         {lines.length === 0 ? (
           <p className="field-hint">
-            Категории не выбраны — укажите общую сумму заказа ниже.
+            Строк нет — укажите общую сумму заказа ниже.
           </p>
         ) : null}
-        {lines.map((ln) => {
-          const selectedCat = formCategories.find((c) => String(c.id) === String(ln.category_id));
-          return (
-          <div key={ln.key} className="line-card">
-            <CategoryInsightControl
-              categoryId={ln.category_id}
-              seasonId={form.season_id}
-              categoryName={selectedCat?.name}
-            />
-            <label>
-              Категория
-              <select
-                value={ln.category_id}
-                onChange={(e) => setLine(ln.key, "category_id", e.target.value)}
-              >
-                <option value="">— выберите —</option>
-                {formCategories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Сумма, €
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                inputMode="decimal"
-                value={ln.amount_eur}
-                onChange={(e) => setLine(ln.key, "amount_eur", e.target.value)}
-              />
-            </label>
-            <label>
-              Комментарий
-              <input
-                value={ln.comment}
-                onChange={(e) => setLine(ln.key, "comment", e.target.value)}
-              />
-            </label>
-            <button
-              type="button"
-              className="secondary"
-              onClick={() => setLines((prev) => prev.filter((x) => x.key !== ln.key))}
-            >
-              Убрать
-            </button>
-          </div>
-          );
-        })}
-        <button
-          type="button"
-          className="secondary"
-          onClick={() => setLines((prev) => [...prev, newLine()])}
-        >
-          + Категория
-        </button>
+        <OrderLinesEditor
+          categories={refs?.categories || []}
+          seasonId={form.season_id}
+          lines={lines}
+          setLines={setLines}
+        />
         {filledLines.length > 0 ? (
           <p className="field-hint">
             Сумма заказа: <strong>{eur(linesTotal)}</strong>
@@ -257,7 +165,7 @@ export default function OrderEdit() {
               required
             />
             <span className="field-hint">
-              Можно сохранить без категорий — только общую сумму (архив / исключения).
+              Можно сохранить без строк — только общую сумму (архив / исключения).
             </span>
           </label>
         )}
@@ -306,7 +214,7 @@ export default function OrderEdit() {
         </button>
         {!canSubmit ? (
           <span className="field-hint">
-            Нужны сезон, бренд и либо категории с суммами, либо общая сумма заказа.
+            Нужны сезон, бренд и либо строки с суммами, либо общая сумма заказа.
           </span>
         ) : null}
       </form>

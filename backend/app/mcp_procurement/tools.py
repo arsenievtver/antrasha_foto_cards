@@ -60,7 +60,7 @@ def _detail(exc: HTTPException) -> str:
 
 def _body(model, data: dict):
     # null в аргументах — то же, что поле не передали: админка так и трактует
-    # отсутствие значения, а bool-флаги вроде clear_order null не принимают.
+    # отсутствие значения, а bool-флаги null не принимают.
     cleaned = {key: value for key, value in data.items() if value is not None}
     try:
         return model.model_validate(cleaned)
@@ -318,12 +318,32 @@ def get_brand_order(db: Session, _actor: McpActor, order_id: str):
     return _run(db, procurement.get_brand_order, _uuid(order_id, "order_id"))
 
 
+_ORDER_LINES = {
+    "type": "array",
+    "description": (
+        "Строки заказа: category_id (пол берётся из категории) или gender без "
+        "категории — сумма «без разбивки». Сумма заказа станет суммой строк."
+    ),
+    "items": {
+        "type": "object",
+        "properties": {
+            "category_id": _UUID,
+            "gender": {"type": "string", "enum": ["men", "women"]},
+            "amount_eur": _MONEY,
+            "comment": {"type": "string"},
+        },
+        "required": ["amount_eur"],
+    },
+}
+
+
 @tool(
     "create_brand_order",
-    "Создать заказ бренду на сезон. Либо amount_eur, либо lines с category_id — "
-    "если есть строки, сумма заказа считается по ним. Курс можно не передавать: "
-    "подставится справочник на ordered_on или на сегодня. "
-    "Предоплата здесь — план (has_prepayment, prepayment_amount_eur, "
+    "Создать заказ бренду на сезон. Заказ один на пару сезон + бренд: если он "
+    "уже есть, будет ошибка — добавьте строки через update_brand_order. "
+    "Либо amount_eur, либо lines — если есть строки, сумма заказа считается по "
+    "ним. Курс можно не передавать: подставится справочник на ordered_on или "
+    "на сегодня. Предоплата здесь — план (has_prepayment, prepayment_amount_eur, "
     "prepayment_due_on). Факт оплаты — отдельный инструмент create_payment "
     "с kind=prepayment. Удалить заказ нельзя.",
     {
@@ -331,7 +351,6 @@ def get_brand_order(db: Session, _actor: McpActor, order_id: str):
         "properties": {
             "season_id": _UUID,
             "brand_id": _UUID,
-            "gender": _GENDER,
             "ordered_on": _DATE,
             "amount_eur": _MONEY,
             "eur_rub_rate": {"type": "number", "description": "Если пусто — курс из справочника"},
@@ -339,19 +358,7 @@ def get_brand_order(db: Session, _actor: McpActor, order_id: str):
             "prepayment_amount_eur": _MONEY,
             "prepayment_due_on": _DATE,
             "comment": {"type": "string"},
-            "lines": {
-                "type": "array",
-                "description": "Строки по категориям. Сумма заказа станет их суммой.",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "category_id": _UUID,
-                        "amount_eur": _MONEY,
-                        "comment": {"type": "string"},
-                    },
-                    "required": ["category_id", "amount_eur"],
-                },
-            },
+            "lines": _ORDER_LINES,
         },
         "required": ["season_id", "brand_id"],
     },
@@ -372,7 +379,6 @@ def create_brand_order(db: Session, _actor: McpActor, **fields):
             "order_id": _UUID,
             "season_id": _UUID,
             "brand_id": _UUID,
-            "gender": _GENDER,
             "ordered_on": _DATE,
             "amount_eur": _MONEY,
             "eur_rub_rate": {"type": "number"},
@@ -380,18 +386,7 @@ def create_brand_order(db: Session, _actor: McpActor, **fields):
             "prepayment_amount_eur": _MONEY,
             "prepayment_due_on": _DATE,
             "comment": {"type": "string"},
-            "lines": {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "category_id": _UUID,
-                        "amount_eur": _MONEY,
-                        "comment": {"type": "string"},
-                    },
-                    "required": ["category_id", "amount_eur"],
-                },
-            },
+            "lines": _ORDER_LINES,
         },
         "required": ["order_id"],
     },
@@ -466,13 +461,11 @@ def get_payment(db: Session, _actor: McpActor, payment_id: str):
 @tool(
     "create_payment",
     "Записать оплату бренду. kind=prepayment — факт предоплаты, kind=main — "
-    "основная оплата. season_id и brand_id обязательны. Если указан order_id, "
-    "сезон и бренд должны совпасть с заказом. Курс можно не передавать. "
-    "Удалить оплату нельзя.",
+    "основная оплата. season_id и brand_id обязательны, заказ пары подставится "
+    "сам. Курс можно не передавать. Удалить оплату нельзя.",
     {
         "type": "object",
         "properties": {
-            "order_id": _UUID,
             "season_id": _UUID,
             "brand_id": _UUID,
             "paid_on": _DATE,
@@ -491,13 +484,13 @@ def create_payment(db: Session, _actor: McpActor, **fields):
 
 @tool(
     "update_payment",
-    "Изменить оплату. Передавайте только нужные поля. clear_order=true отвяжет "
-    "оплату от заказа. Рубли пересчитаются по текущим сумме и курсу. Удаления нет.",
+    "Изменить оплату. Передавайте только нужные поля. При смене сезона или "
+    "бренда оплата перейдёт к заказу новой пары. Рубли пересчитаются по текущим "
+    "сумме и курсу. Удаления нет.",
     {
         "type": "object",
         "properties": {
             "payment_id": _UUID,
-            "order_id": _UUID,
             "season_id": _UUID,
             "brand_id": _UUID,
             "paid_on": _DATE,
@@ -505,7 +498,6 @@ def create_payment(db: Session, _actor: McpActor, **fields):
             "amount_eur": _MONEY,
             "eur_rub_rate": {"type": "number"},
             "comment": {"type": "string"},
-            "clear_order": {"type": "boolean"},
         },
         "required": ["payment_id"],
     },
@@ -574,15 +566,14 @@ def get_shipment(db: Session, _actor: McpActor, shipment_id: str):
 
 @tool(
     "create_shipment",
-    "Создать поставку. season_id, brand_id, shipped_on и amount_eur обязательны. "
-    "order_id необязателен и должен совпасть по сезону и бренду. "
-    "is_delivered по умолчанию true. logistics_amount_rub и logistics_paid_on — "
-    "оплата логистики в рублях, отдельно от оплаты бренду. Курс можно не передавать. "
-    "Удалить поставку нельзя.",
+    "Создать поставку. season_id, brand_id, shipped_on и amount_eur обязательны, "
+    "заказ пары подставится сам. Одна отгрузка — одна поставка, даже если в ней "
+    "и муж, и жен. is_delivered по умолчанию true. logistics_amount_rub и "
+    "logistics_paid_on — оплата логистики в рублях, отдельно от оплаты бренду. "
+    "Курс можно не передавать. Удалить поставку нельзя.",
     {
         "type": "object",
         "properties": {
-            "order_id": _UUID,
             "season_id": _UUID,
             "brand_id": _UUID,
             "shipped_on": _DATE,
@@ -604,13 +595,13 @@ def create_shipment(db: Session, _actor: McpActor, **fields):
 
 @tool(
     "update_shipment",
-    "Изменить поставку. Передавайте только нужные поля. clear_order=true отвяжет "
-    "поставку от заказа. Рубли пересчитаются. Удаления нет.",
+    "Изменить поставку. Передавайте только нужные поля. При смене сезона или "
+    "бренда поставка перейдёт к заказу новой пары. Рубли пересчитаются. "
+    "Удаления нет.",
     {
         "type": "object",
         "properties": {
             "shipment_id": _UUID,
-            "order_id": _UUID,
             "season_id": _UUID,
             "brand_id": _UUID,
             "shipped_on": _DATE,
@@ -621,7 +612,6 @@ def create_shipment(db: Session, _actor: McpActor, **fields):
             "logistics_amount_rub": {"type": "number"},
             "logistics_paid_on": _DATE,
             "is_delivered": {"type": "boolean"},
-            "clear_order": {"type": "boolean"},
         },
         "required": ["shipment_id"],
     },

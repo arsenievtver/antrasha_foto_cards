@@ -1,24 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import {
-  fetchBrandOrders,
-  fetchProcurementRefs,
-  fetchShipment,
-  updateShipment,
-} from "../api.js";
+import { fetchProcurementRefs, fetchShipment, updateShipment } from "../api.js";
 import BrandSelect from "../components/BrandSelect.jsx";
+import PairOrderHint from "../components/PairOrderHint.jsx";
 import ShipmentLogisticsSection from "../components/ShipmentLogisticsSection.jsx";
-import { dateRu, eur, num, rub } from "../utils/money.js";
+import { num, rub } from "../utils/money.js";
 
 export default function ShipmentEdit() {
   const { id } = useParams();
   const nav = useNavigate();
   const [refs, setRefs] = useState(null);
-  const [orders, setOrders] = useState([]);
   const [form, setForm] = useState({
     season_id: "",
     brand_id: "",
-    order_id: "",
     shipped_on: "",
     amount_eur: "",
     weight_kg: "",
@@ -41,7 +35,6 @@ export default function ShipmentEdit() {
         setForm({
           season_id: row.season_id || "",
           brand_id: row.brand_id || "",
-          order_id: row.order_id || "",
           shipped_on: row.shipped_on || "",
           amount_eur: row.amount_eur || "",
           weight_kg: row.weight_kg || "",
@@ -60,27 +53,13 @@ export default function ShipmentEdit() {
     };
   }, [id]);
 
-  useEffect(() => {
-    if (!form.season_id || !form.brand_id) {
-      setOrders([]);
-      return;
-    }
-    fetchBrandOrders({ season_id: form.season_id, brand_id: form.brand_id, limit: 200 })
-      .then((res) => setOrders(res.items || []))
-      .catch((e) => setErr(e.message));
-  }, [form.season_id, form.brand_id]);
-
   const amountRub = useMemo(() => {
     if (!form.amount_eur || !form.eur_rub_rate) return null;
     return num(form.amount_eur) * num(form.eur_rub_rate);
   }, [form.amount_eur, form.eur_rub_rate]);
 
   function set(field, value) {
-    setForm((prev) => {
-      const next = { ...prev, [field]: value };
-      if (field === "season_id" || field === "brand_id") next.order_id = "";
-      return next;
-    });
+    setForm((prev) => ({ ...prev, [field]: value }));
   }
 
   async function onSubmit(e) {
@@ -91,8 +70,6 @@ export default function ShipmentEdit() {
       const row = await updateShipment(id, {
         season_id: form.season_id,
         brand_id: form.brand_id,
-        order_id: form.order_id || null,
-        clear_order: !form.order_id,
         shipped_on: form.shipped_on,
         amount_eur: form.amount_eur,
         weight_kg: form.weight_kg || null,
@@ -147,21 +124,7 @@ export default function ShipmentEdit() {
           required
         />
 
-        <label>
-          Заказ
-          <select
-            value={form.order_id}
-            onChange={(e) => set("order_id", e.target.value)}
-            disabled={!orders.length}
-          >
-            <option value="">Без привязки</option>
-            {orders.map((o) => (
-              <option key={o.id} value={o.id}>
-                {dateRu(o.ordered_on)} · {eur(o.amount_eur)} · осталось {eur(o.balance_to_ship_eur)}
-              </option>
-            ))}
-          </select>
-        </label>
+        <PairOrderHint seasonId={form.season_id} brandId={form.brand_id} balance="ship" />
 
         <label>
           Дата поставки

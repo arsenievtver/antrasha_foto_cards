@@ -7,9 +7,9 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-OrderGender = Literal["men", "women", "mixed"]
+LineGender = Literal["men", "women"]
 CategoryGender = Literal["men", "women", "unisex"]
 PaymentKind = Literal["prepayment", "main"]
 
@@ -118,14 +118,22 @@ class FxRateUpdateRequest(BaseModel):
 
 
 class OrderLineIn(BaseModel):
-    category_id: uuid.UUID
+    # Без категории — строка «без разбивки», тогда нужен gender.
+    category_id: uuid.UUID | None = None
+    gender: LineGender | None = None
     amount_eur: Decimal = Field(ge=0)
     comment: str | None = None
+
+    @model_validator(mode="after")
+    def _category_or_gender(self) -> "OrderLineIn":
+        if self.category_id is None and self.gender is None:
+            raise ValueError("В строке нужна категория или пол")
+        return self
 
 
 class OrderLineOut(BaseModel):
     id: uuid.UUID
-    category_id: uuid.UUID
+    category_id: uuid.UUID | None = None
     category_name: str
     category_gender: str
     amount_eur: Decimal
@@ -167,7 +175,6 @@ class OrderListResponse(BaseModel):
 class OrderCreateRequest(BaseModel):
     season_id: uuid.UUID
     brand_id: uuid.UUID
-    gender: OrderGender | None = None
     ordered_on: date | None = None
     # Игнорируется, если переданы строки: сумма считается как их сумма.
     amount_eur: Decimal | None = Field(default=None, ge=0)
@@ -182,7 +189,6 @@ class OrderCreateRequest(BaseModel):
 class OrderUpdateRequest(BaseModel):
     season_id: uuid.UUID | None = None
     brand_id: uuid.UUID | None = None
-    gender: OrderGender | None = None
     ordered_on: date | None = None
     amount_eur: Decimal | None = Field(default=None, ge=0)
     eur_rub_rate: Decimal | None = Field(default=None, gt=0)
@@ -219,7 +225,6 @@ class PaymentListResponse(BaseModel):
 
 
 class PaymentCreateRequest(BaseModel):
-    order_id: uuid.UUID | None = None
     season_id: uuid.UUID
     brand_id: uuid.UUID
     paid_on: date
@@ -230,7 +235,6 @@ class PaymentCreateRequest(BaseModel):
 
 
 class PaymentUpdateRequest(BaseModel):
-    order_id: uuid.UUID | None = None
     season_id: uuid.UUID | None = None
     brand_id: uuid.UUID | None = None
     paid_on: date | None = None
@@ -238,7 +242,6 @@ class PaymentUpdateRequest(BaseModel):
     amount_eur: Decimal | None = Field(default=None, gt=0)
     eur_rub_rate: Decimal | None = Field(default=None, gt=0)
     comment: str | None = None
-    clear_order: bool = False
 
 
 # --- Поставки -------------------------------------------------------------
@@ -269,7 +272,6 @@ class ShipmentListResponse(BaseModel):
 
 
 class ShipmentCreateRequest(BaseModel):
-    order_id: uuid.UUID | None = None
     season_id: uuid.UUID
     brand_id: uuid.UUID
     shipped_on: date
@@ -283,7 +285,6 @@ class ShipmentCreateRequest(BaseModel):
 
 
 class ShipmentUpdateRequest(BaseModel):
-    order_id: uuid.UUID | None = None
     season_id: uuid.UUID | None = None
     brand_id: uuid.UUID | None = None
     shipped_on: date | None = None
@@ -294,7 +295,6 @@ class ShipmentUpdateRequest(BaseModel):
     logistics_amount_rub: Decimal | None = Field(default=None, ge=0)
     logistics_paid_on: date | None = None
     is_delivered: bool | None = None
-    clear_order: bool = False
 
 
 # --- Статистика по бренду -------------------------------------------------

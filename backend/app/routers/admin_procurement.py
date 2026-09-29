@@ -32,6 +32,11 @@ from app.models import (
     Season,
     Shipment,
 )
+from app.models.brand_order import (
+    ORDER_GENDER_MEN,
+    ORDER_GENDER_MIXED,
+    ORDER_GENDER_WOMEN,
+)
 from app.models.payment import PAYMENT_KIND_PREPAYMENT
 from app.schemas.procurement import (
     BrandCategoryStatOut,
@@ -122,6 +127,7 @@ _CANONICAL_CATEGORY_DISPLAY = {
 }
 
 _ACCESSORIES_MS_ID = "82adf299-8e8b-11e9-9ff4-31500007fc47"
+_NO_CATEGORY_NAME = "Без разбивки"
 
 
 def _money(value: Decimal | int | float | None) -> Decimal:
@@ -290,11 +296,49 @@ def _get_order(db: Session, order_id: uuid.UUID) -> BrandOrder:
     return row
 
 
-def _assert_order_matches(order: BrandOrder, season_id: uuid.UUID, brand_id: uuid.UUID) -> None:
-    if order.season_id != season_id or order.brand_id != brand_id:
+def _order_id_for(
+    db: Session, season_id: uuid.UUID, brand_id: uuid.UUID
+) -> uuid.UUID | None:
+    return db.scalar(
+        select(BrandOrder.id).where(
+            BrandOrder.season_id == season_id, BrandOrder.brand_id == brand_id
+        )
+    )
+
+
+def _assert_single_order(
+    db: Session,
+    season_id: uuid.UUID,
+    brand_id: uuid.UUID,
+    *,
+    exclude_id: uuid.UUID | None = None,
+) -> None:
+    existing = _order_id_for(db, season_id, brand_id)
+    if existing is not None and existing != exclude_id:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Сезон и бренд документа должны совпадать с заказом",
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Заказ этого бренда на сезон уже есть — добавьте строки в него "
+                f"(id {existing})"
+            ),
+        )
+
+
+def _bind_documents(db: Session, order: BrandOrder) -> None:
+    """Оплаты и поставки пары сезон + бренд ссылаются на её заказ."""
+    for model in (Payment, Shipment):
+        db.execute(
+            update(model)
+            .where(
+                model.order_id == order.id,
+                (model.season_id != order.season_id) | (model.brand_id != order.brand_id),
+            )
+            .values(order_id=None)
+        )
+        db.execute(
+            update(model)
+            .where(model.season_id == order.season_id, model.brand_id == order.brand_id)
+            .values(order_id=order.id)
         )
 
 
@@ -583,9 +627,9 @@ def delete_fx_rate(
 
 
 def _load_categories(db: Session, lines: list[OrderLineIn]) -> dict[uuid.UUID, Category]:
-    if not lines:
+    ids = {ln.category_id for ln in lines if ln.category_id is not None}
+    if not ids:
         return {}
-    ids = {ln.category_id for ln in lines}
     rows = db.scalars(select(Category).where(Category.id.in_(ids))).all()
     found = {r.id: r for r in rows}
     missing = ids - set(found)
@@ -608,40 +652,102 @@ def _load_categories(db: Session, lines: list[OrderLineIn]) -> dict[uuid.UUID, C
     return normalized
 
 
-def _order_facts(
-    db: Session, order_ids: list[uuid.UUID]
-) -> tuple[dict[uuid.UUID, Decimal], dict[uuid.UUID, Decimal], dict[uuid.UUID, Decimal]]:
-    """Суммы оплат, предоплат и поставок по заказам."""
-    if not order_ids:
-        return {}, {}, {}
-    paid = {
-        oid: Decimal(total or 0)
-        for oid, total in db.execute(
-            select(Payment.order_id, func.sum(Payment.amount_eur))
-            .where(Payment.order_id.in_(order_ids))
-            .group_by(Payment.order_id)
-        ).all()
-    }
-    prepaid = {
-        oid: Decimal(total or 0)
-        for oid, total in db.execute(
-            select(Payment.order_id, func.sum(Payment.amount_eur))
-            .where(
-                Payment.order_id.in_(order_ids),
-                Payment.kind == PAYMENT_KIND_PREPAYMENT,
+def _build_lines(
+    db: Session, lines: list[OrderLineIn]
+) -> list[BrandOrderCategoryLine]:
+    categories = _load_categories(db, lines)
+    built: list[BrandOrderCategoryLine] = []
+    for ln in lines:
+        category = categories.get(ln.category_id) if ln.category_id else None
+        gender = _category_out(category).gender if category else ln.gender
+        if gender not in (ORDER_GENDER_MEN, ORDER_GENDER_WOMEN):
+            gender = ln.gender
+        if gender is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Укажите пол для категории «{category.name if category else ''}»",
             )
-            .group_by(Payment.order_id)
+        built.append(
+            BrandOrderCategoryLine(
+                category_id=category.id if category else None,
+                gender=gender,
+                amount_eur=_money(ln.amount_eur),
+                comment=ln.comment.strip() if ln.comment else None,
+            )
+        )
+    return built
+
+
+def _lines_gender(lines: list[BrandOrderCategoryLine]) -> str | None:
+    genders = {ln.gender for ln in lines}
+    if not genders:
+        return None
+    if len(genders) == 1:
+        return genders.pop()
+    return ORDER_GENDER_MIXED
+
+
+def _order_facts(
+    db: Session, orders: list[BrandOrder]
+) -> tuple[dict[uuid.UUID, Decimal], dict[uuid.UUID, Decimal], dict[uuid.UUID, Decimal]]:
+    """Суммы оплат, предоплат и поставок по заказам: всё по паре сезон + бренд."""
+    if not orders:
+        return {}, {}, {}
+    order_by_pair = {(o.season_id, o.brand_id): o.id for o in orders}
+    season_ids = {o.season_id for o in orders}
+    brand_ids = {o.brand_id for o in orders}
+
+    def by_order(model, column, *conditions) -> dict[uuid.UUID, Decimal]:
+        rows = db.execute(
+            select(model.season_id, model.brand_id, func.sum(column))
+            .where(
+                model.season_id.in_(season_ids),
+                model.brand_id.in_(brand_ids),
+                *conditions,
+            )
+            .group_by(model.season_id, model.brand_id)
         ).all()
-    }
-    shipped = {
-        oid: Decimal(total or 0)
-        for oid, total in db.execute(
-            select(Shipment.order_id, func.sum(Shipment.amount_eur))
-            .where(Shipment.order_id.in_(order_ids), _SHIPMENT_DELIVERED)
-            .group_by(Shipment.order_id)
-        ).all()
-    }
+        out: dict[uuid.UUID, Decimal] = {}
+        for season_id, brand_id, total in rows:
+            order_id = order_by_pair.get((season_id, brand_id))
+            if order_id is not None:
+                out[order_id] = Decimal(total or 0)
+        return out
+
+    paid = by_order(Payment, Payment.amount_eur)
+    prepaid = by_order(
+        Payment, Payment.amount_eur, Payment.kind == PAYMENT_KIND_PREPAYMENT
+    )
+    shipped = by_order(Shipment, Shipment.amount_eur, _SHIPMENT_DELIVERED)
     return paid, prepaid, shipped
+
+
+def _line_out(ln: BrandOrderCategoryLine) -> OrderLineOut:
+    if ln.category is None:
+        return OrderLineOut(
+            id=ln.id,
+            category_id=None,
+            category_name=_NO_CATEGORY_NAME,
+            category_gender=ln.gender,
+            amount_eur=_money(ln.amount_eur),
+            comment=ln.comment,
+        )
+    category_out = _category_out(ln.category)
+    return OrderLineOut(
+        id=ln.id,
+        category_id=ln.category.id,
+        category_name=category_out.name,
+        category_gender=ln.gender,
+        amount_eur=_money(ln.amount_eur),
+        comment=ln.comment,
+    )
+
+
+def _line_sort_key(ln: BrandOrderCategoryLine) -> tuple:
+    gender_rank = 0 if ln.gender == ORDER_GENDER_MEN else 1
+    if ln.category is None:
+        return (gender_rank, 1, 0)
+    return (gender_rank, 0, ln.category.sort_order or 0)
 
 
 def _order_out(
@@ -670,23 +776,7 @@ def _order_out(
         comment=order.comment,
         created_at=order.created_at,
         updated_at=order.updated_at,
-        lines=[
-            (
-                lambda category_out: OrderLineOut(
-                    id=ln.id,
-                    category_id=ln.category.id,
-                    category_name=category_out.name,
-                    category_gender=category_out.gender,
-                    amount_eur=_money(ln.amount_eur),
-                    comment=ln.comment,
-                )
-            )(_category_out(ln.category))
-            for ln in sorted(
-                order.lines,
-                key=lambda x: (x.category.sort_order if x.category else 0),
-            )
-            if ln.category
-        ],
+        lines=[_line_out(ln) for ln in sorted(order.lines, key=_line_sort_key)],
         paid_eur=_money(paid),
         prepaid_eur=_money(prepaid),
         shipped_eur=_money(shipped),
@@ -712,7 +802,16 @@ def list_brand_orders(
         filters.append(BrandOrder.season_id == season_id)
     if brand_id:
         filters.append(BrandOrder.brand_id == brand_id)
-    if gender:
+    if gender in (ORDER_GENDER_MEN, ORDER_GENDER_WOMEN):
+        filters.append(
+            BrandOrder.id.in_(
+                select(BrandOrderCategoryLine.order_id).where(
+                    BrandOrderCategoryLine.gender == gender
+                )
+            )
+            | (BrandOrder.gender == gender)
+        )
+    elif gender:
         filters.append(BrandOrder.gender == gender)
 
     count_q = select(func.count()).select_from(BrandOrder)
@@ -734,7 +833,7 @@ def list_brand_orders(
         .limit(limit)
     ).all()
 
-    paid, prepaid, shipped = _order_facts(db, [r.id for r in rows])
+    paid, prepaid, shipped = _order_facts(db, list(rows))
     return OrderListResponse(
         items=[
             _order_out(
@@ -769,7 +868,7 @@ def get_brand_order(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Заказ не найден"
         )
-    paid, prepaid, shipped = _order_facts(db, [row.id])
+    paid, prepaid, shipped = _order_facts(db, [row])
     return _order_out(
         row, paid.get(row.id, ZERO), prepaid.get(row.id, ZERO), shipped.get(row.id, ZERO)
     )
@@ -803,10 +902,11 @@ def create_brand_order(
     _ = _su
     _get_season(db, body.season_id)
     _get_brand(db, body.brand_id)
-    categories = _load_categories(db, body.lines)
+    _assert_single_order(db, body.season_id, body.brand_id)
+    lines = _build_lines(db, body.lines)
 
-    if body.lines:
-        amount = _money(sum((ln.amount_eur for ln in body.lines), ZERO))
+    if lines:
+        amount = _money(sum((ln.amount_eur for ln in lines), ZERO))
     else:
         amount = _money(body.amount_eur)
         if amount <= ZERO:
@@ -819,7 +919,7 @@ def create_brand_order(
     order = BrandOrder(
         season_id=body.season_id,
         brand_id=body.brand_id,
-        gender=body.gender,
+        gender=_lines_gender(lines),
         ordered_on=body.ordered_on,
         amount_eur=amount,
         eur_rub_rate=_resolve_rate(db, body.eur_rub_rate, body.ordered_on or date.today()),
@@ -828,15 +928,10 @@ def create_brand_order(
         prepayment_due_on=body.prepayment_due_on if body.has_prepayment else None,
         comment=body.comment.strip() if body.comment else None,
     )
-    for ln in body.lines:
-        order.lines.append(
-            BrandOrderCategoryLine(
-                category_id=categories[ln.category_id].id,
-                amount_eur=_money(ln.amount_eur),
-                comment=ln.comment.strip() if ln.comment else None,
-            )
-        )
+    order.lines.extend(lines)
     db.add(order)
+    db.flush()
+    _bind_documents(db, order)
     db.commit()
     log.info("brand order %s created", order.id)
     return get_brand_order(order.id, db=db, _su=_su)
@@ -858,8 +953,7 @@ def update_brand_order(
     if body.brand_id is not None:
         _get_brand(db, body.brand_id)
         order.brand_id = body.brand_id
-    if body.gender is not None:
-        order.gender = body.gender
+    _assert_single_order(db, order.season_id, order.brand_id, exclude_id=order.id)
     if body.ordered_on is not None:
         order.ordered_on = body.ordered_on
     if body.comment is not None:
@@ -868,19 +962,13 @@ def update_brand_order(
         order.eur_rub_rate = body.eur_rub_rate
 
     if body.lines is not None:
-        categories = _load_categories(db, body.lines)
+        lines = _build_lines(db, body.lines)
         order.lines.clear()
         db.flush()
-        for ln in body.lines:
-            order.lines.append(
-                BrandOrderCategoryLine(
-                    category_id=categories[ln.category_id].id,
-                    amount_eur=_money(ln.amount_eur),
-                    comment=ln.comment.strip() if ln.comment else None,
-                )
-            )
-        if body.lines:
-            order.amount_eur = _money(sum((ln.amount_eur for ln in body.lines), ZERO))
+        order.lines.extend(lines)
+        order.gender = _lines_gender(lines)
+        if lines:
+            order.amount_eur = _money(sum((ln.amount_eur for ln in lines), ZERO))
         else:
             # Пустые строки — заказ без категорий: сумма только из amount_eur.
             if body.amount_eur is None or _money(body.amount_eur) <= ZERO:
@@ -905,6 +993,8 @@ def update_brand_order(
     _validate_prepayment(
         order.has_prepayment, order.prepayment_amount_eur, _money(order.amount_eur)
     )
+    db.flush()
+    _bind_documents(db, order)
     db.commit()
     return get_brand_order(order.id, db=db, _su=_su)
 
@@ -1014,14 +1104,10 @@ def create_payment(
     _ = _su
     _get_season(db, body.season_id)
     _get_brand(db, body.brand_id)
-    if body.order_id:
-        _assert_order_matches(
-            _get_order(db, body.order_id), body.season_id, body.brand_id
-        )
 
     rate = _resolve_rate(db, body.eur_rub_rate, body.paid_on)
     row = Payment(
-        order_id=body.order_id,
+        order_id=_order_id_for(db, body.season_id, body.brand_id),
         season_id=body.season_id,
         brand_id=body.brand_id,
         paid_on=body.paid_on,
@@ -1056,11 +1142,6 @@ def update_payment(
     if body.brand_id is not None:
         _get_brand(db, body.brand_id)
         row.brand_id = body.brand_id
-    if body.clear_order:
-        row.order_id = None
-    elif body.order_id is not None:
-        _assert_order_matches(_get_order(db, body.order_id), row.season_id, row.brand_id)
-        row.order_id = body.order_id
     if body.paid_on is not None:
         row.paid_on = body.paid_on
     if body.kind is not None:
@@ -1072,8 +1153,7 @@ def update_payment(
     if body.comment is not None:
         row.comment = body.comment.strip() if body.comment else None
 
-    if row.order_id:
-        _assert_order_matches(_get_order(db, row.order_id), row.season_id, row.brand_id)
+    row.order_id = _order_id_for(db, row.season_id, row.brand_id)
     row.amount_rub = _to_rub(row.amount_eur, row.eur_rub_rate)
 
     db.commit()
@@ -1188,14 +1268,10 @@ def create_shipment(
     _ = _su
     _get_season(db, body.season_id)
     _get_brand(db, body.brand_id)
-    if body.order_id:
-        _assert_order_matches(
-            _get_order(db, body.order_id), body.season_id, body.brand_id
-        )
 
     rate = _resolve_rate(db, body.eur_rub_rate, body.shipped_on)
     row = Shipment(
-        order_id=body.order_id,
+        order_id=_order_id_for(db, body.season_id, body.brand_id),
         season_id=body.season_id,
         brand_id=body.brand_id,
         shipped_on=body.shipped_on,
@@ -1237,11 +1313,6 @@ def update_shipment(
     if body.brand_id is not None:
         _get_brand(db, body.brand_id)
         row.brand_id = body.brand_id
-    if body.clear_order:
-        row.order_id = None
-    elif body.order_id is not None:
-        _assert_order_matches(_get_order(db, body.order_id), row.season_id, row.brand_id)
-        row.order_id = body.order_id
     if body.shipped_on is not None:
         row.shipped_on = body.shipped_on
     if body.amount_eur is not None:
@@ -1259,8 +1330,7 @@ def update_shipment(
     if body.is_delivered is not None:
         row.is_delivered = body.is_delivered
 
-    if row.order_id:
-        _assert_order_matches(_get_order(db, row.order_id), row.season_id, row.brand_id)
+    row.order_id = _order_id_for(db, row.season_id, row.brand_id)
     row.amount_rub = _to_rub(row.amount_eur, row.eur_rub_rate)
 
     db.commit()
@@ -1496,20 +1566,33 @@ def _build_season_dashboard(db: Session, season: Season) -> SeasonDashboardOut:
         )
     )
 
-    gender_rows = db.execute(
-        select(BrandOrder.gender, func.count(), func.sum(BrandOrder.amount_eur))
+    line_rows = db.execute(
+        select(
+            BrandOrderCategoryLine.gender,
+            func.count(func.distinct(BrandOrderCategoryLine.order_id)),
+            func.sum(BrandOrderCategoryLine.amount_eur),
+        )
+        .join(BrandOrder, BrandOrder.id == BrandOrderCategoryLine.order_id)
         .where(BrandOrder.season_id == season.id)
+        .group_by(BrandOrderCategoryLine.gender)
+    ).all()
+    orders_without_lines = db.execute(
+        select(BrandOrder.gender, func.count(), func.sum(BrandOrder.amount_eur))
+        .where(
+            BrandOrder.season_id == season.id,
+            ~BrandOrder.lines.any(),
+        )
         .group_by(BrandOrder.gender)
     ).all()
-    by_gender: list[SeasonGenderStatOut] = []
-    for g, cnt, total in gender_rows:
-        by_gender.append(
-            SeasonGenderStatOut(
-                gender=g or "unknown",
-                orders_count=int(cnt or 0),
-                orders_eur=_money(total),
-            )
-        )
+    gender_totals: dict[str, list] = {}
+    for g, cnt, total in [*line_rows, *orders_without_lines]:
+        entry = gender_totals.setdefault(g or "unknown", [0, ZERO])
+        entry[0] += int(cnt or 0)
+        entry[1] += Decimal(total or 0)
+    by_gender = [
+        SeasonGenderStatOut(gender=g, orders_count=cnt, orders_eur=_money(total))
+        for g, (cnt, total) in gender_totals.items()
+    ]
     by_gender.sort(
         key=lambda x: {"men": 0, "women": 1, "mixed": 2}.get(x.gender, 3),
     )
@@ -1619,7 +1702,7 @@ def _build_prepayment_season(
             .order_by(BrandOrder.prepayment_due_on.asc().nulls_last(), BrandOrder.created_at.desc())
         ).all()
     )
-    _, prepaid_by_order, _ = _order_facts(db, [o.id for o in orders])
+    _, prepaid_by_order, _ = _order_facts(db, orders)
 
     items: list[PrepaymentItemOut] = []
     totals = _empty_prepayment_totals()
@@ -1955,18 +2038,7 @@ def get_brand_procurement_stats(
         )
     ]
 
-    prepaid_by_order = {
-        oid: Decimal(total or 0)
-        for oid, total in db.execute(
-            select(Payment.order_id, func.sum(Payment.amount_eur))
-            .where(
-                Payment.brand_id == brand_id,
-                Payment.kind == PAYMENT_KIND_PREPAYMENT,
-                Payment.order_id.isnot(None),
-            )
-            .group_by(Payment.order_id)
-        ).all()
-    }
+    _, prepaid_by_order, _ = _order_facts(db, list(orders))
     prepayment_due = ZERO
     due_dates: list[date] = []
     for order in orders:

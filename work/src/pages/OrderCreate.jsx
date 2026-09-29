@@ -1,15 +1,17 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { createBrandOrder, fetchProcurementRefs } from "../api.js";
+import { createBrandOrder, fetchBrandOrders, fetchProcurementRefs } from "../api.js";
 import BrandSelect from "../components/BrandSelect.jsx";
-import CategoryInsightControl from "../components/CategoryInsightControl.jsx";
+import OrderLinesEditor, {
+  filledOrderLines,
+  newOrderLine,
+  orderLinesPayload,
+} from "../components/OrderLinesEditor.jsx";
 import { eur, num, today } from "../utils/money.js";
-import { getFormCategories, normalizeCategoryId } from "../utils/procurementCategories.js";
 
 const EMPTY = {
   season_id: "",
   brand_id: "",
-  gender: "",
   ordered_on: today(),
   amount_eur: "",
   has_prepayment: false,
@@ -18,15 +20,12 @@ const EMPTY = {
   comment: "",
 };
 
-function newLine() {
-  return { key: crypto.randomUUID(), category_id: "", amount_eur: "", comment: "" };
-}
-
 export default function OrderCreate() {
   const nav = useNavigate();
   const [refs, setRefs] = useState(null);
   const [form, setForm] = useState(EMPTY);
-  const [lines, setLines] = useState([newLine()]);
+  const [lines, setLines] = useState([newOrderLine()]);
+  const [existingOrder, setExistingOrder] = useState(null);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -36,26 +35,26 @@ export default function OrderCreate() {
       .catch((e) => setErr(e.message));
   }, []);
 
-  const formCategories = useMemo(() => {
-    return getFormCategories(refs?.categories || [], form.gender);
-  }, [refs, form.gender]);
+  useEffect(() => {
+    if (!form.season_id || !form.brand_id) {
+      setExistingOrder(null);
+      return;
+    }
+    let active = true;
+    fetchBrandOrders({ season_id: form.season_id, brand_id: form.brand_id, limit: 1 })
+      .then((res) => active && setExistingOrder(res.items?.[0] || null))
+      .catch((e) => active && setErr(e.message));
+    return () => {
+      active = false;
+    };
+  }, [form.season_id, form.brand_id]);
 
-  const linesTotal = useMemo(
-    () => lines.reduce((acc, ln) => acc + num(ln.amount_eur), 0),
-    [lines],
-  );
+  const filledLines = filledOrderLines(lines);
+  const linesTotal = filledLines.reduce((acc, ln) => acc + num(ln.amount_eur), 0);
 
   function set(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
   }
-
-  function setLine(key, field, value) {
-    setLines((prev) =>
-      prev.map((ln) => (ln.key === key ? { ...ln, [field]: value } : ln)),
-    );
-  }
-
-  const filledLines = lines.filter((ln) => ln.category_id && num(ln.amount_eur) > 0);
 
   async function onSubmit(e) {
     e.preventDefault();
@@ -65,7 +64,6 @@ export default function OrderCreate() {
       const payload = {
         season_id: form.season_id,
         brand_id: form.brand_id,
-        gender: form.gender || null,
         ordered_on: form.ordered_on || null,
         has_prepayment: form.has_prepayment,
         prepayment_amount_eur: form.has_prepayment
@@ -73,11 +71,7 @@ export default function OrderCreate() {
           : null,
         prepayment_due_on: form.has_prepayment ? form.prepayment_due_on || null : null,
         comment: form.comment.trim() || null,
-        lines: filledLines.map((ln) => ({
-          category_id: normalizeCategoryId(ln.category_id, form.gender),
-          amount_eur: ln.amount_eur,
-          comment: ln.comment.trim() || null,
-        })),
+        lines: orderLinesPayload(lines),
       };
       if (!filledLines.length) {
         payload.amount_eur = form.amount_eur;
@@ -92,7 +86,10 @@ export default function OrderCreate() {
   }
 
   const canSubmit =
-    form.season_id && form.brand_id && (filledLines.length > 0 || num(form.amount_eur) > 0);
+    !existingOrder &&
+    form.season_id &&
+    form.brand_id &&
+    (filledLines.length > 0 || num(form.amount_eur) > 0);
   const brands = refs?.brands || [];
 
   return (
@@ -128,16 +125,13 @@ export default function OrderCreate() {
           required
         />
 
-        <label>
-          Пол
-          <select value={form.gender} onChange={(e) => set("gender", e.target.value)}>
-            <option value="">Не указан</option>
-            <option value="men">Мужской</option>
-            <option value="women">Женский</option>
-            <option value="mixed">Смешанный</option>
-          </select>
-          <span className="field-hint">Фильтрует список категорий ниже</span>
-        </label>
+        {existingOrder ? (
+          <p className="field-hint">
+            Заказ этого бренда на сезон уже есть ({eur(existingOrder.amount_eur)}).
+            Мужское и женское — строки одного заказа:{" "}
+            <Link to={`/orders/${existingOrder.id}/edit`}>дополнить заказ</Link>
+          </p>
+        ) : null}
 
         <label>
           Дата заказа
@@ -149,71 +143,19 @@ export default function OrderCreate() {
         </label>
 
         <p className="section-title" style={{ marginTop: 0 }}>
-          Категории
+          Строки заказа
         </p>
         {lines.length === 0 ? (
           <p className="field-hint">
-            Категории не выбраны — укажите общую сумму заказа ниже.
+            Строк нет — укажите общую сумму заказа ниже.
           </p>
         ) : null}
-        {lines.map((ln) => {
-          const selectedCat = formCategories.find((c) => String(c.id) === String(ln.category_id));
-          return (
-          <div key={ln.key} className="line-card">
-            <CategoryInsightControl
-              categoryId={ln.category_id}
-              seasonId={form.season_id}
-              categoryName={selectedCat?.name}
-            />
-            <label>
-              Категория
-              <select
-                value={ln.category_id}
-                onChange={(e) => setLine(ln.key, "category_id", e.target.value)}
-              >
-                <option value="">— выберите —</option>
-                {formCategories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Сумма, €
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                inputMode="decimal"
-                value={ln.amount_eur}
-                onChange={(e) => setLine(ln.key, "amount_eur", e.target.value)}
-              />
-            </label>
-            <label>
-              Комментарий
-              <input
-                value={ln.comment}
-                onChange={(e) => setLine(ln.key, "comment", e.target.value)}
-              />
-            </label>
-            <button
-              type="button"
-              className="secondary"
-              onClick={() => setLines((prev) => prev.filter((x) => x.key !== ln.key))}
-            >
-              Убрать
-            </button>
-          </div>
-          );
-        })}
-        <button
-          type="button"
-          className="secondary"
-          onClick={() => setLines((prev) => [...prev, newLine()])}
-        >
-          + Категория
-        </button>
+        <OrderLinesEditor
+          categories={refs?.categories || []}
+          seasonId={form.season_id}
+          lines={lines}
+          setLines={setLines}
+        />
         {filledLines.length > 0 ? (
           <p className="field-hint">
             Сумма заказа: <strong>{eur(linesTotal)}</strong>
@@ -231,7 +173,7 @@ export default function OrderCreate() {
               required
             />
             <span className="field-hint">
-              Можно сохранить без категорий — только общую сумму (архив / исключения).
+              Можно сохранить без строк — только общую сумму (архив / исключения).
             </span>
           </label>
         )}
@@ -282,9 +224,9 @@ export default function OrderCreate() {
         <button type="submit" disabled={busy || !canSubmit}>
           {busy ? "Создание…" : "Создать заказ"}
         </button>
-        {!canSubmit ? (
+        {!canSubmit && !existingOrder ? (
           <span className="field-hint">
-            Нужны сезон, бренд и либо категории с суммами, либо общая сумма заказа.
+            Нужны сезон, бренд и либо строки с суммами, либо общая сумма заказа.
           </span>
         ) : null}
       </form>

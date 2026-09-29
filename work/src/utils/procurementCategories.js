@@ -128,16 +128,36 @@ const CATEGORY_RULES = {
   ],
 };
 
-function findCanonical(defs, categoryId) {
-  if (!categoryId) return null;
-  return defs.find((def) => def.ids.includes(categoryId)) || null;
+const UNSPLIT_PREFIX = "none:";
+
+export const LINE_GENDER_GROUPS = [
+  { gender: "men", label: "Мужская коллекция", unsplitLabel: "Муж — без разбивки" },
+  { gender: "women", label: "Женская коллекция", unsplitLabel: "Жен — без разбивки" },
+];
+
+export function getGroupedFormCategories(allCategories) {
+  return LINE_GENDER_GROUPS.map((group) => ({
+    ...group,
+    items: getFormCategories(allCategories, group.gender),
+  }));
 }
 
-export function normalizeCategoryId(categoryId, gender) {
-  if (!categoryId || !gender || !CATEGORY_RULES[gender]) return categoryId;
-  const canonical = findCanonical(CATEGORY_RULES[gender], categoryId);
-  if (!canonical || !canonical.ids[0]) return categoryId;
-  return canonical.ids[0];
+/** Значение select строки заказа: id категории или `none:<gender>` для «без разбивки». */
+export function lineChoiceFromOrderLine(line) {
+  if (line?.category_id) return String(line.category_id);
+  if (line?.category_gender) return `${UNSPLIT_PREFIX}${line.category_gender}`;
+  return "";
+}
+
+export function lineChoiceToPayload(choice) {
+  if (choice.startsWith(UNSPLIT_PREFIX)) {
+    return { category_id: null, gender: choice.slice(UNSPLIT_PREFIX.length) };
+  }
+  return { category_id: choice, gender: null };
+}
+
+export function lineChoiceCategoryId(choice) {
+  return choice && !choice.startsWith(UNSPLIT_PREFIX) ? choice : "";
 }
 
 export function getFormCategories(allCategories, gender) {

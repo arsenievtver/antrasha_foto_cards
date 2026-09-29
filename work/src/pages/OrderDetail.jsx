@@ -6,9 +6,11 @@ import {
   dateRu,
   eur,
   genderLabel,
+  num,
   rate as fmtRate,
   rub,
 } from "../utils/money.js";
+import { LINE_GENDER_GROUPS } from "../utils/procurementCategories.js";
 
 export default function OrderDetail() {
   const { id } = useParams();
@@ -112,28 +114,39 @@ export default function OrderDetail() {
         </div>
       </div>
 
-      <p className="section-title">Категории</p>
       {!row.lines?.length ? (
-        <p className="empty" style={{ padding: "1rem 0" }}>
-          Категории не заданы
-        </p>
+        <>
+          <p className="section-title">Строки заказа</p>
+          <p className="empty" style={{ padding: "1rem 0" }}>
+            Строки не заданы
+          </p>
+        </>
       ) : (
-        <div className="entity-list">
-          {row.lines.map((ln) => (
-            <div key={ln.id} className="entity-row" style={{ cursor: "default" }}>
-              <div className="entity-row__body">
-                <div className="entity-row__title">{ln.category_name}</div>
-                <div className="entity-row__sub">
-                  {genderLabel(ln.category_gender)}
-                  {ln.comment ? ` · ${ln.comment}` : ""}
-                </div>
-              </div>
-              <div className="entity-row__right">
-                <div className="entity-row__metric">{eur(ln.amount_eur)}</div>
+        LINE_GENDER_GROUPS.map((group) => {
+          const groupLines = row.lines.filter((ln) => ln.category_gender === group.gender);
+          if (!groupLines.length) return null;
+          const total = groupLines.reduce((acc, ln) => acc + num(ln.amount_eur), 0);
+          return (
+            <div key={group.gender}>
+              <p className="section-title">
+                {group.label} · {eur(total)}
+              </p>
+              <div className="entity-list">
+                {groupLines.map((ln) => (
+                  <div key={ln.id} className="entity-row" style={{ cursor: "default" }}>
+                    <div className="entity-row__body">
+                      <div className="entity-row__title">{ln.category_name}</div>
+                      {ln.comment ? <div className="entity-row__sub">{ln.comment}</div> : null}
+                    </div>
+                    <div className="entity-row__right">
+                      <div className="entity-row__metric">{eur(ln.amount_eur)}</div>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
-          ))}
-        </div>
+          );
+        })
       )}
     </div>
   );

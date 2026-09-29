@@ -7,6 +7,7 @@ import {
   fetchShipments,
   updateShipment,
 } from "../api.js";
+import PairOrderHint from "../components/PairOrderHint.jsx";
 import {
   dateRu,
   eur,
@@ -23,7 +24,6 @@ function today() {
 const EMPTY_FORM = {
   season_id: "",
   brand_id: "",
-  order_id: "",
   shipped_on: today(),
   amount_eur: "",
   weight_kg: "",
@@ -43,7 +43,7 @@ function CellStack({ primary, secondary }) {
   );
 }
 
-function ShipmentFields({ form, setField, orders, amountRub, refs }) {
+function ShipmentFields({ form, setField, amountRub, refs }) {
   return (
     <>
       <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
@@ -77,23 +77,8 @@ function ShipmentFields({ form, setField, orders, amountRub, refs }) {
             ))}
           </select>
         </label>
-        <label style={{ flex: "1 1 220px" }}>
-          Заказ
-          <select
-            value={form.order_id}
-            onChange={(e) => setField("order_id", e.target.value)}
-            disabled={!orders.length}
-          >
-            <option value="">Без привязки</option>
-            {orders.map((o) => (
-              <option key={o.id} value={o.id}>
-                {dateRu(o.ordered_on)} · {eur(o.amount_eur)} · осталось{" "}
-                {eur(o.balance_to_ship_eur)}
-              </option>
-            ))}
-          </select>
-        </label>
       </div>
+      <PairOrderHint seasonId={form.season_id} brandId={form.brand_id} balance="ship" />
 
       <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
         <label style={{ flex: "1 1 150px" }}>
@@ -203,7 +188,6 @@ function formFromRow(row) {
   return {
     season_id: row.season_id,
     brand_id: row.brand_id,
-    order_id: row.order_id || "",
     shipped_on: row.shipped_on,
     amount_eur: row.amount_eur != null ? String(row.amount_eur) : "",
     weight_kg: row.weight_kg != null ? String(row.weight_kg) : "",
@@ -220,7 +204,6 @@ function payloadFromForm(form) {
   return {
     season_id: form.season_id,
     brand_id: form.brand_id,
-    order_id: form.order_id || null,
     shipped_on: form.shipped_on,
     amount_eur: form.amount_eur,
     weight_kg: form.weight_kg || null,
@@ -234,7 +217,6 @@ function payloadFromForm(form) {
 
 export default function Shipments() {
   const [refs, setRefs] = useState(null);
-  const [orders, setOrders] = useState([]);
   const [data, setData] = useState({ items: [], total: 0 });
   const [filters, setFilters] = useState({ season_id: "", brand_id: "" });
   const [form, setForm] = useState(EMPTY_FORM);
@@ -244,7 +226,6 @@ export default function Shipments() {
   const [toggleId, setToggleId] = useState(null);
   const [editRow, setEditRow] = useState(null);
   const [editForm, setEditForm] = useState(null);
-  const [editOrders, setEditOrders] = useState([]);
   const [editBusy, setEditBusy] = useState(false);
   const [infoRow, setInfoRow] = useState(null);
   const [infoOrder, setInfoOrder] = useState(null);
@@ -278,30 +259,6 @@ export default function Shipments() {
       .catch((e) => setErr(e.message));
   }, []);
 
-  useEffect(() => {
-    if (!form.season_id || !form.brand_id) {
-      setOrders([]);
-      return;
-    }
-    fetchBrandOrders({ season_id: form.season_id, brand_id: form.brand_id, limit: 200 })
-      .then((res) => setOrders(res.items || []))
-      .catch((e) => setErr(e.message));
-  }, [form.season_id, form.brand_id]);
-
-  useEffect(() => {
-    if (!editForm?.season_id || !editForm?.brand_id) {
-      setEditOrders([]);
-      return;
-    }
-    fetchBrandOrders({
-      season_id: editForm.season_id,
-      brand_id: editForm.brand_id,
-      limit: 200,
-    })
-      .then((res) => setEditOrders(res.items || []))
-      .catch((e) => setErr(e.message));
-  }, [editForm?.season_id, editForm?.brand_id]);
-
   const amountRub = useMemo(() => {
     if (!form.amount_eur || !form.eur_rub_rate) return null;
     return num(form.amount_eur) * num(form.eur_rub_rate);
@@ -313,20 +270,11 @@ export default function Shipments() {
   }, [editForm?.amount_eur, editForm?.eur_rub_rate]);
 
   function set(field, value) {
-    setForm((prev) => {
-      const next = { ...prev, [field]: value };
-      if (field === "season_id" || field === "brand_id") next.order_id = "";
-      return next;
-    });
+    setForm((prev) => ({ ...prev, [field]: value }));
   }
 
   function setEditField(field, value) {
-    setEditForm((prev) => {
-      if (!prev) return prev;
-      const next = { ...prev, [field]: value };
-      if (field === "season_id" || field === "brand_id") next.order_id = "";
-      return next;
-    });
+    setEditForm((prev) => (prev ? { ...prev, [field]: value } : prev));
   }
 
   async function onCreate(e) {
@@ -357,7 +305,6 @@ export default function Shipments() {
   function closeEdit() {
     setEditRow(null);
     setEditForm(null);
-    setEditOrders([]);
   }
 
   async function onSaveEdit(e) {
@@ -366,10 +313,7 @@ export default function Shipments() {
     setEditBusy(true);
     setErr("");
     try {
-      await updateShipment(editRow.id, {
-        ...payloadFromForm(editForm),
-        clear_order: !editForm.order_id,
-      });
+      await updateShipment(editRow.id, payloadFromForm(editForm));
       closeEdit();
       await reload();
     } catch (e) {
@@ -442,7 +386,8 @@ export default function Shipments() {
       <h2 style={{ marginTop: 0 }}>Поставки</h2>
       <p style={{ color: "var(--muted)", maxWidth: 760 }}>
         Что и когда бренд отгрузил: сумма в евро и вес. Логистика (рубли и дата оплаты) хранится
-        здесь отдельно от оплат бренду. Пока поставка «в пути», она не уменьшает «осталось
+        здесь отдельно от оплат бренду. Поставка ведётся по бренду и сезону и сама
+        привязывается к заказу этой пары. Пока поставка «в пути», она не уменьшает «осталось
         поставить» по заказу.
       </p>
 
@@ -454,7 +399,6 @@ export default function Shipments() {
           <ShipmentFields
             form={form}
             setField={set}
-            orders={orders}
             amountRub={amountRub}
             refs={refs}
           />
@@ -602,7 +546,6 @@ export default function Shipments() {
               <ShipmentFields
                 form={editForm}
                 setField={setEditField}
-                orders={editOrders}
                 amountRub={editAmountRub}
                 refs={refs}
               />
@@ -645,7 +588,7 @@ export default function Shipments() {
                     "Привязан (заказ не найден в списке)"
                   )
                 ) : (
-                  "Без привязки"
+                  "Заказа на этот бренд и сезон нет"
                 )}
               </dd>
               <dt style={{ color: "var(--muted)", fontSize: "0.85rem" }}>Комментарий</dt>

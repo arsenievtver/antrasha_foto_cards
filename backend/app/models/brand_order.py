@@ -10,6 +10,7 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    UniqueConstraint,
     func,
 )
 from sqlalchemy.dialects.postgresql import UUID
@@ -24,14 +25,18 @@ ORDER_GENDERS = (ORDER_GENDER_MEN, ORDER_GENDER_WOMEN, ORDER_GENDER_MIXED)
 
 
 class BrandOrder(Base):
-    """Заказ у иностранного бренда на сезон.
+    """Заказ у иностранного бренда на сезон: один на пару сезон + бренд.
 
     `amount_eur` — сумма заказа; при переданных строках пересчитывается как сумма
-    строк по категориям. Предоплата здесь — план (сумма и срок), факт оплаты
-    живёт в `payments` с kind=prepayment.
+    строк. Пол и категории живут в строках, `gender` заказа выводится из них.
+    Предоплата здесь — план (сумма и срок), факт оплаты живёт в `payments`
+    с kind=prepayment.
     """
 
     __tablename__ = "brand_orders"
+    __table_args__ = (
+        UniqueConstraint("season_id", "brand_id", name="uq_brand_orders_season_brand"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
@@ -77,7 +82,10 @@ class BrandOrder(Base):
 
 
 class BrandOrderCategoryLine(Base):
-    """Разбивка заказа по закупочным категориям."""
+    """Разбивка заказа по полу и закупочным категориям.
+
+    Без категории строка — сумма «без разбивки» по полу.
+    """
 
     __tablename__ = "brand_order_category_lines"
 
@@ -90,12 +98,13 @@ class BrandOrderCategoryLine(Base):
         nullable=False,
         index=True,
     )
-    category_id: Mapped[uuid.UUID] = mapped_column(
+    category_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("categories.id", ondelete="RESTRICT"),
-        nullable=False,
+        nullable=True,
         index=True,
     )
+    gender: Mapped[str] = mapped_column(String(16), nullable=False)
     amount_eur: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False, default=0)
     comment: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
