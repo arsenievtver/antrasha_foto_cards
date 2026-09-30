@@ -3,6 +3,12 @@ import { createSeason, deleteSeason, fetchSeasons, updateSeason } from "../api.j
 
 const EMPTY = { name: "", code: "", sort_order: 0 };
 
+const VISIBILITY = [
+  { key: "previous", label: "Предыдущий", title: "Предыдущий сезон в списках work" },
+  { key: "current", label: "Текущий", title: "Текущий сезон: списки work и дашборд" },
+  { key: "next", label: "Следующий", title: "Следующий сезон: списки work и дашборд" },
+];
+
 export default function Seasons() {
   const [items, setItems] = useState([]);
   const [form, setForm] = useState(EMPTY);
@@ -105,13 +111,18 @@ export default function Seasons() {
     }
   }
 
-  async function onTogglePwa(row) {
+  async function onSetVisibility(row, slot) {
     setErr("");
+    setBusy(true);
     try {
-      await updateSeason(row.id, { is_primary: !row.is_primary });
+      await updateSeason(row.id, {
+        visibility: row.visibility === slot ? null : slot,
+      });
       await reload();
     } catch (e) {
       setErr(e.message);
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -143,11 +154,11 @@ export default function Seasons() {
       <h2 style={{ marginTop: 0 }}>Сезоны</h2>
       <p style={{ color: "var(--muted)", maxWidth: 720 }}>
         Сезон закупки — ярлык, к которому привязываются заказы, оплаты и поставки.
-        Код нужен для коротких подписей в отчётах, например <code>ВЛ2027</code>.
-        В колонке PWA отмечайте сезоны для дашборда в work PWA — можно несколько
-        (обычно текущий и следующий). Порядок на дашборде совпадает с «Порядком
-        сортировки»: чем больше число, тем выше сезон. Колонка «План» — один сезон
-        для раздела «Для заказа» и планов категорий на дашборде.
+        Код нужен для коротких подписей, например <code>ВЛ2027</code>.
+        Отметьте три видимых сезона: предыдущий, текущий и следующий. Каждая роль
+        только у одного сезона — новая галочка снимает её с другого. В work эти три
+        кода фильтруют заказы, оплаты и поставки. Дашборд показывает текущий и
+        следующий. Колонка «План» — один сезон раздела «Для заказа».
       </p>
 
       {err ? <p className="error">{err}</p> : null}
@@ -181,8 +192,7 @@ export default function Seasons() {
               onChange={(e) => set("sort_order", e.target.value)}
             />
             <span className="field-hint">
-              Чем больше число, тем выше сезон в списках, выпадающих полях и на
-              дашборде PWA.
+              Чем больше число, тем выше сезон в списках и выпадающих полях.
             </span>
           </label>
           <button type="submit" disabled={busy || !form.name.trim() || !form.code.trim()}>
@@ -201,7 +211,9 @@ export default function Seasons() {
           <table>
             <thead>
               <tr>
-                <th>PWA</th>
+                {VISIBILITY.map((slot) => (
+                  <th key={slot.key}>{slot.label}</th>
+                ))}
                 <th>План</th>
                 <th>Название</th>
                 <th>Код</th>
@@ -215,26 +227,25 @@ export default function Seasons() {
                 const isEditing = editingId === row.id;
                 return (
                   <tr key={row.id}>
-                    <td>
-                      <label
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: "0.35rem",
-                          cursor: "pointer",
-                          whiteSpace: "nowrap",
-                        }}
-                        title="Показывать на дашборде work PWA"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={Boolean(row.is_primary)}
-                          onChange={() => onTogglePwa(row)}
-                          disabled={busy}
-                        />
-                        {row.is_primary ? "Да" : ""}
-                      </label>
-                    </td>
+                    {VISIBILITY.map((slot) => (
+                      <td key={slot.key}>
+                        <label
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            cursor: "pointer",
+                          }}
+                          title={slot.title}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={row.visibility === slot.key}
+                            onChange={() => onSetVisibility(row, slot.key)}
+                            disabled={busy}
+                          />
+                        </label>
+                      </td>
+                    ))}
                     <td>
                       <label
                         style={{

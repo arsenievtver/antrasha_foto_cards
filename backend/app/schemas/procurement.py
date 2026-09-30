@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 LineGender = Literal["men", "women"]
 CategoryGender = Literal["men", "women", "unisex"]
 PaymentKind = Literal["prepayment", "main"]
+SeasonVisibility = Literal["previous", "current", "next"]
 
 _ORM = {"from_attributes": True}
 
@@ -26,6 +27,7 @@ class SeasonOut(BaseModel):
     is_active: bool
     is_primary: bool = False
     is_order_plan: bool = False
+    visibility: SeasonVisibility | None = None
     sort_order: int
     created_at: datetime
 
@@ -42,6 +44,7 @@ class SeasonCreateRequest(BaseModel):
     is_active: bool = True
     is_primary: bool = False
     is_order_plan: bool = False
+    visibility: SeasonVisibility | None = None
     sort_order: int = 0
 
 
@@ -51,6 +54,7 @@ class SeasonUpdateRequest(BaseModel):
     is_active: bool | None = None
     is_primary: bool | None = None
     is_order_plan: bool | None = None
+    visibility: SeasonVisibility | None = None
     sort_order: int | None = None
 
 
@@ -382,6 +386,7 @@ class SeasonDashboardOut(BaseModel):
     season_code: str
     is_primary: bool
     is_order_plan: bool = False
+    visibility: SeasonVisibility | None = None
     sort_order: int = 0
     totals: SeasonDashboardTotalsOut
     by_gender: list[SeasonGenderStatOut] = Field(default_factory=list)
@@ -432,6 +437,7 @@ class PrepaymentSeasonOut(BaseModel):
     season_name: str
     season_code: str
     is_primary: bool
+    visibility: SeasonVisibility | None = None
     sort_order: int = 0
     totals: PrepaymentSeasonTotalsOut
     items: list[PrepaymentItemOut] = Field(default_factory=list)

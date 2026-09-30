@@ -274,6 +274,85 @@
   margin-bottom: 0.75rem;
 }
 
+.season-bar {
+  margin-bottom: 1rem;
+}
+
+.season-slots {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+
+.season-slots__btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.12rem;
+  min-height: 3.1rem;
+  padding: 0.45rem 0.35rem;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.season-slots__btn.is-active {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  background: color-mix(in srgb, var(--accent) 18%, var(--surface));
+}
+
+.season-slots__code {
+  font-size: 0.92rem;
+  font-weight: 700;
+  line-height: 1.15;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.season-slots__role {
+  font-size: 0.68rem;
+  color: var(--muted);
+  line-height: 1.15;
+}
+
+.season-slots__btn.is-active .season-slots__role {
+  color: var(--text);
+}
+
+.season-sums {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.45rem;
+  margin-top: 0.75rem;
+}
+
+.season-sums__label {
+  font-size: 0.68rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 0.12rem;
+}
+
+.season-sums__value {
+  font-size: 0.95rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.season-sums__hint {
+  margin: 0.4rem 0 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
 /* —— Forms —— */
 .form-row {
   display: grid;

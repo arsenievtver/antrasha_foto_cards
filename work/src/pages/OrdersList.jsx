@@ -1,37 +1,31 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { fetchBrandOrders, fetchProcurementRefs } from "../api.js";
+import { fetchBrandOrders } from "../api.js";
 import EntityRow from "../components/EntityRow.jsx";
+import SeasonSlotBar, { useVisibleSeasons } from "../components/SeasonSlotBar.jsx";
 import { balanceStyle, dateRu, eur, genderLabel, num } from "../utils/money.js";
 
 export default function OrdersList() {
-  const [refs, setRefs] = useState(null);
+  const slots = useVisibleSeasons();
   const [data, setData] = useState({ items: [], total: 0 });
-  const [filters, setFilters] = useState({ season_id: "", brand_id: "", gender: "" });
-  const [showFilters, setShowFilters] = useState(false);
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(true);
 
   const reload = useCallback(async () => {
+    if (!slots.ready) return;
     setLoading(true);
     setErr("");
     try {
-      setData(await fetchBrandOrders({ ...filters, limit: 100 }));
+      setData(await fetchBrandOrders({ season_id: slots.seasonId, limit: 200 }));
     } catch (e) {
       setErr(e.message);
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, [slots.ready, slots.seasonId]);
 
   useEffect(() => {
     reload();
   }, [reload]);
-
-  useEffect(() => {
-    fetchProcurementRefs()
-      .then(setRefs)
-      .catch((e) => setErr(e.message));
-  }, []);
 
   const sortedItems = useMemo(
     () => [...data.items].sort((a, b) => num(b.balance_to_pay_eur) - num(a.balance_to_pay_eur)),
@@ -40,62 +34,14 @@ export default function OrdersList() {
 
   return (
     <div>
-      <p className="sub" style={{ margin: "0 0 1rem" }}>
-        {data.total ? `${data.total} записей` : " "}
-      </p>
+      <SeasonSlotBar
+        seasons={slots.seasons}
+        seasonId={slots.seasonId}
+        onChange={slots.setSeasonId}
+        ready={slots.ready}
+      />
 
-      <button
-        type="button"
-        className="secondary filter-toggle"
-        onClick={() => setShowFilters((v) => !v)}
-      >
-        {showFilters ? "Скрыть фильтры" : "Фильтры"}
-      </button>
-
-      <div className={`filters${showFilters ? "" : " collapsed"}`}>
-        <label>
-          Сезон
-          <select
-            value={filters.season_id}
-            onChange={(e) => setFilters((p) => ({ ...p, season_id: e.target.value }))}
-          >
-            <option value="">Все</option>
-            {(refs?.seasons || []).map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Бренд
-          <select
-            value={filters.brand_id}
-            onChange={(e) => setFilters((p) => ({ ...p, brand_id: e.target.value }))}
-          >
-            <option value="">Все</option>
-            {(refs?.brands || []).map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Пол
-          <select
-            value={filters.gender}
-            onChange={(e) => setFilters((p) => ({ ...p, gender: e.target.value }))}
-          >
-            <option value="">Все</option>
-            <option value="men">Мужской</option>
-            <option value="women">Женский</option>
-            <option value="mixed">Смешанный</option>
-          </select>
-        </label>
-      </div>
-
-      {err ? <p className="error">{err}</p> : null}
+      {slots.err || err ? <p className="error">{slots.err || err}</p> : null}
 
       {loading ? (
         <p className="loading">Загрузка…</p>

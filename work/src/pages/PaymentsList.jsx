@@ -1,95 +1,42 @@
 import { useCallback, useEffect, useState } from "react";
-import { fetchPayments, fetchProcurementRefs } from "../api.js";
+import { fetchPayments } from "../api.js";
 import EntityRow from "../components/EntityRow.jsx";
+import SeasonSlotBar, { useVisibleSeasons } from "../components/SeasonSlotBar.jsx";
 import { dateRu, eur, paymentKindLabel } from "../utils/money.js";
 
 export default function PaymentsList() {
-  const [refs, setRefs] = useState(null);
+  const slots = useVisibleSeasons();
   const [data, setData] = useState({ items: [], total: 0 });
-  const [filters, setFilters] = useState({ season_id: "", brand_id: "", kind: "" });
-  const [showFilters, setShowFilters] = useState(false);
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(true);
 
   const reload = useCallback(async () => {
+    if (!slots.ready) return;
     setLoading(true);
     setErr("");
     try {
-      setData(await fetchPayments({ ...filters, limit: 100 }));
+      setData(await fetchPayments({ season_id: slots.seasonId, limit: 200 }));
     } catch (e) {
       setErr(e.message);
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, [slots.ready, slots.seasonId]);
 
   useEffect(() => {
     reload();
   }, [reload]);
 
-  useEffect(() => {
-    fetchProcurementRefs()
-      .then(setRefs)
-      .catch((e) => setErr(e.message));
-  }, []);
-
   return (
     <div>
-      <p className="sub" style={{ margin: "0 0 1rem" }}>
-        {data.total ? `${data.total} записей` : " "}
-      </p>
+      <SeasonSlotBar
+        seasons={slots.seasons}
+        seasonId={slots.seasonId}
+        onChange={slots.setSeasonId}
+        ready={slots.ready}
+      />
 
-      <button
-        type="button"
-        className="secondary filter-toggle"
-        onClick={() => setShowFilters((v) => !v)}
-      >
-        {showFilters ? "Скрыть фильтры" : "Фильтры"}
-      </button>
-
-      <div className={`filters${showFilters ? "" : " collapsed"}`}>
-        <label>
-          Сезон
-          <select
-            value={filters.season_id}
-            onChange={(e) => setFilters((p) => ({ ...p, season_id: e.target.value }))}
-          >
-            <option value="">Все</option>
-            {(refs?.seasons || []).map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Бренд
-          <select
-            value={filters.brand_id}
-            onChange={(e) => setFilters((p) => ({ ...p, brand_id: e.target.value }))}
-          >
-            <option value="">Все</option>
-            {(refs?.brands || []).map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Категория
-          <select
-            value={filters.kind}
-            onChange={(e) => setFilters((p) => ({ ...p, kind: e.target.value }))}
-          >
-            <option value="">Все</option>
-            <option value="main">Основная</option>
-            <option value="prepayment">Предоплата</option>
-          </select>
-        </label>
-      </div>
-
-      {err ? <p className="error">{err}</p> : null}
+      {slots.err || err ? <p className="error">{slots.err || err}</p> : null}
 
       {loading ? (
         <p className="loading">Загрузка…</p>

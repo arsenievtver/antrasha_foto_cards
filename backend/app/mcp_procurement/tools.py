@@ -106,8 +106,9 @@ def _skip(skip: int) -> int:
 
 @tool(
     "list_seasons",
-    "Все сезоны закупок: название, код, активность, показ на PWA (is_primary), "
-    "сезон «Для заказа» (is_order_plan) и sort_order. Список полный.",
+    "Все сезоны закупок: название, код, активность, visibility "
+    "(previous / current / next), сезон «Для заказа» (is_order_plan) и sort_order. "
+    "Список полный. is_primary устарел.",
     {"type": "object", "properties": {}, "required": []},
 )
 def list_seasons(db: Session, _actor: McpActor):
@@ -117,7 +118,8 @@ def list_seasons(db: Session, _actor: McpActor):
 @tool(
     "create_season",
     "Создать сезон. name и code уникальны. is_order_plan=true снимет этот флаг "
-    "с другого сезона: такой сезон может быть только один. Удалить сезон этим "
+    "с другого сезона: такой сезон может быть только один. visibility "
+    "(previous, current, next) тоже единственная на роль. Удалить сезон этим "
     "инструментом нельзя.",
     {
         "type": "object",
@@ -127,11 +129,16 @@ def list_seasons(db: Session, _actor: McpActor):
             "is_active": {"type": "boolean"},
             "is_primary": {
                 "type": "boolean",
-                "description": "Показывать на дашборде PWA",
+                "description": "Устарело, дашборд не читает. Используйте visibility.",
             },
             "is_order_plan": {
                 "type": "boolean",
                 "description": "Сезон раздела «Для заказа». Только один.",
+            },
+            "visibility": {
+                "type": "string",
+                "enum": ["previous", "current", "next"],
+                "description": "Предыдущий, текущий или следующий. Одна роль — один сезон.",
             },
             "sort_order": {"type": "integer", "description": "Больше — выше в списках"},
         },
@@ -146,7 +153,8 @@ def create_season(db: Session, _actor: McpActor, **fields):
 @tool(
     "update_season",
     "Изменить сезон. Передавайте только поля, которые нужно поменять. "
-    "is_order_plan=true перенесёт флаг с прежнего сезона. Удаления нет.",
+    "is_order_plan=true перенесёт флаг с прежнего сезона. visibility переносит "
+    "роль с другого сезона; пустая строка снимает роль. Удаления нет.",
     {
         "type": "object",
         "properties": {
@@ -154,8 +162,15 @@ def create_season(db: Session, _actor: McpActor, **fields):
             "name": {"type": "string"},
             "code": {"type": "string"},
             "is_active": {"type": "boolean"},
-            "is_primary": {"type": "boolean"},
+            "is_primary": {
+                "type": "boolean",
+                "description": "Устарело, дашборд не читает.",
+            },
             "is_order_plan": {"type": "boolean"},
+            "visibility": {
+                "type": "string",
+                "description": "previous, current, next или пустая строка, чтобы снять роль",
+            },
             "sort_order": {"type": "integer"},
         },
         "required": ["season_id"],
@@ -163,11 +178,19 @@ def create_season(db: Session, _actor: McpActor, **fields):
     scope=SCOPE_WRITE,
 )
 def update_season(db: Session, _actor: McpActor, season_id: str, **fields):
+    # _body выбрасывает null, поэтому снятие роли — пустая строка.
+    clear_visibility = "visibility" in fields and fields.get("visibility") in (None, "")
+    if clear_visibility:
+        fields = {key: value for key, value in fields.items() if key != "visibility"}
+    body = _body(SeasonUpdateRequest, fields)
+    if clear_visibility:
+        body.visibility = None
+        body.model_fields_set.add("visibility")
     return _run(
         db,
         procurement.update_season,
         _uuid(season_id, "season_id"),
-        _body(SeasonUpdateRequest, fields),
+        body,
     )
 
 
@@ -710,8 +733,9 @@ def get_procurement_refs(db: Session, _actor: McpActor):
 
 @tool(
     "get_season_dashboard",
-    "Сводка сезонов, отмеченных для PWA: заказы, оплаты, поставки, остатки, "
-    "разбивка по брендам и категориям. Без season_id — все сезоны дашборда.",
+    "Сводка текущего и следующего сезонов: заказы, оплаты, поставки, остатки, "
+    "разбивка по брендам и категориям. Без season_id — оба. С season_id — один, "
+    "в том числе предыдущий.",
     {
         "type": "object",
         "properties": {"season_id": _UUID},
@@ -728,7 +752,7 @@ def get_season_dashboard(db: Session, _actor: McpActor, season_id: str | None = 
 
 @tool(
     "get_prepayment_overview",
-    "Предоплаты сезонов дашборда: план, факт, остаток, просрочка. "
+    "Предоплаты текущего и следующего сезонов: план, факт, остаток, просрочка. "
     "due_soon_days — за сколько дней до срока считать «скоро» (1–90, по умолчанию 14).",
     {
         "type": "object",

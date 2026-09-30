@@ -281,7 +281,9 @@ export default function Prepayments() {
 
   if (loading) return <p className="loading">Загрузка…</p>;
   if (err) return <p className="error">{err}</p>;
-  if (!data?.items?.length) return <p className="empty">Нет сезонов на дашборде</p>;
+  if (!data?.items?.length) {
+    return <p className="empty">Отметьте текущий и следующий сезоны в админке</p>;
+  }
 
   const totals = data.totals;
 
@@ -290,7 +292,7 @@ export default function Prepayments() {
       <AlertBanner totals={totals} dueSoonDays={data.due_soon_days} />
 
       <div className="dash-card">
-        <h3 className="dash-card__title">Итого по сезонам PWA</h3>
+        <h3 className="dash-card__title">Итого по сезонам</h3>
         <KpiStrip totals={totals} />
       </div>
 

@@ -345,6 +345,38 @@ def _bind_documents(db: Session, order: BrandOrder) -> None:
 # --- Сезоны ---------------------------------------------------------------
 
 
+_VISIBILITY_SLOTS = ("previous", "current", "next")
+_DASHBOARD_SLOTS = ("current", "next")
+
+
+def _clear_visibility_slot(
+    db: Session, slot: str, keep_id: uuid.UUID | None = None
+) -> None:
+    stmt = update(Season).where(Season.visibility == slot).values(visibility=None)
+    if keep_id is not None:
+        stmt = stmt.where(Season.id != keep_id)
+    db.execute(stmt)
+    db.flush()
+
+
+def _season_conflict_detail(exc: IntegrityError) -> str:
+    if "uq_seasons_visibility" in str(getattr(exc, "orig", exc)):
+        return "Эта роль сезона уже занята"
+    return "Сезон с таким названием или кодом уже есть"
+
+
+def _apply_visibility(db: Session, row: Season, slot: str | None) -> None:
+    """Одна роль — один сезон. Новая отметка снимает её с прежнего."""
+    if slot is not None:
+        if slot not in _VISIBILITY_SLOTS:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Роль сезона: previous, current или next",
+            )
+        _clear_visibility_slot(db, slot, keep_id=row.id)
+    row.visibility = slot
+
+
 def _clear_other_order_plan_seasons(db: Session, keep_id: uuid.UUID | None = None) -> None:
     stmt = update(Season).where(Season.is_order_plan.is_(True)).values(is_order_plan=False)
     if keep_id is not None:
@@ -358,34 +390,24 @@ def _order_plan_season(db: Session) -> Season | None:
     ).first()
 
 
+def _seasons_by_visibility(db: Session, slots: tuple[str, ...]) -> list[Season]:
+    rows = {
+        row.visibility: row
+        for row in db.scalars(
+            select(Season).where(Season.visibility.in_(slots))
+        ).all()
+        if row.visibility
+    }
+    return [rows[slot] for slot in slots if slot in rows]
+
+
 def _list_dashboard_seasons(
     db: Session, season_id: uuid.UUID | None
 ) -> list[Season]:
-    """Сезоны для PWA-дашборда: один по id или все с is_primary по sort_order."""
+    """Сезоны дашборда: один по id или текущий и следующий."""
     if season_id is not None:
         return [_get_season(db, season_id)]
-    rows = list(
-        db.scalars(
-            select(Season)
-            .where(Season.is_primary.is_(True))
-            .order_by(Season.sort_order.desc(), Season.created_at.desc())
-        ).all()
-    )
-    if rows:
-        return rows
-    # Совместимость: если никто не отмечен — один активный с наибольшим sort_order.
-    fallback = db.scalars(
-        select(Season)
-        .where(Season.is_active.is_(True))
-        .order_by(Season.sort_order.desc(), Season.created_at.desc())
-        .limit(1)
-    ).first()
-    if fallback:
-        return [fallback]
-    raise HTTPException(
-        status_code=status.HTTP_404_NOT_FOUND,
-        detail="Нет сезонов для дашборда — создайте сезон и отметьте его в колонке PWA",
-    )
+    return _seasons_by_visibility(db, _DASHBOARD_SLOTS)
 
 
 @router.get("/seasons", response_model=SeasonListResponse)
@@ -409,12 +431,15 @@ def create_season(
     _ = _su
     if body.is_order_plan:
         _clear_other_order_plan_seasons(db)
+    if body.visibility:
+        _clear_visibility_slot(db, body.visibility)
     row = Season(
         name=body.name.strip(),
         code=body.code.strip(),
         is_active=body.is_active,
         is_primary=body.is_primary,
         is_order_plan=body.is_order_plan,
+        visibility=body.visibility,
         sort_order=body.sort_order,
     )
     db.add(row)
@@ -424,7 +449,7 @@ def create_season(
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Сезон с таким названием или кодом уже есть",
+            detail=_season_conflict_detail(e),
         ) from e
     db.refresh(row)
     return SeasonOut.model_validate(row)
@@ -455,13 +480,15 @@ def update_season(
             row.is_order_plan = True
         else:
             row.is_order_plan = False
+    if "visibility" in body.model_fields_set:
+        _apply_visibility(db, row, body.visibility)
     try:
         db.commit()
     except IntegrityError as e:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Сезон с таким названием или кодом уже есть",
+            detail=_season_conflict_detail(e),
         ) from e
     db.refresh(row)
     return SeasonOut.model_validate(row)
@@ -1608,6 +1635,7 @@ def _build_season_dashboard(db: Session, season: Season) -> SeasonDashboardOut:
         season_code=season.code,
         is_primary=bool(season.is_primary),
         is_order_plan=with_plan,
+        visibility=season.visibility,
         sort_order=int(season.sort_order or 0),
         totals=SeasonDashboardTotalsOut(
             orders_count=orders_count,
@@ -1634,7 +1662,7 @@ def get_season_dashboard(
     db: Session = Depends(get_db),
     _su: AdminPrincipal = Depends(require_permission("product")),
 ) -> SeasonDashboardListResponse:
-    """Сводки сезонов для PWA: отмеченные в PWA, по sort_order (убыв.)."""
+    """Сводка для дашборда: текущий и следующий сезон. С season_id — один сезон."""
     _ = _su
     seasons = _list_dashboard_seasons(db, season_id)
     return SeasonDashboardListResponse(
@@ -1774,6 +1802,7 @@ def _build_prepayment_season(
         season_name=season.name,
         season_code=season.code,
         is_primary=bool(season.is_primary),
+        visibility=season.visibility,
         sort_order=int(season.sort_order or 0),
         totals=totals,
         items=items,
@@ -1811,7 +1840,7 @@ def get_prepayment_overview(
     db: Session = Depends(get_db),
     _su: AdminPrincipal = Depends(require_permission("product")),
 ) -> PrepaymentOverviewOut:
-    """Картина предоплат по сезонам дашборда (PWA): сроки, просрочки, итоги."""
+    """Предоплаты текущего и следующего сезонов: сроки, просрочки, итоги."""
     _ = _su
     as_of = date.today()
     seasons = _list_dashboard_seasons(db, season_id)

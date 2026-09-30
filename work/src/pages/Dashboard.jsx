@@ -365,7 +365,9 @@ export default function Dashboard() {
 
   if (loading) return <p className="loading">Загрузка…</p>;
   if (err) return <p className="error">{err}</p>;
-  if (!items.length) return <p className="empty">Нет сезонов на дашборде</p>;
+  if (!items.length) {
+    return <p className="empty">Отметьте текущий и следующий сезоны в админке</p>;
+  }
 
   return (
     <div className="dash">
