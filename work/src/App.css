@@ -2094,6 +2094,37 @@ button.switch-toggle:disabled {
   line-height: 1.45;
 }
 
+.feedback__thread {
+  max-height: min(56dvh, 520px);
+}
+
+.feedback__msg--editing {
+  outline: 1px solid var(--accent, #5b8cff);
+}
+
+.feedback__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.feedback__edit {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: inherit;
+  text-decoration: underline;
+  min-height: 0;
+}
+
+.feedback__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
 .pai-chart {
   margin: 0.65rem 0;
   padding: 0.75rem 0.8rem;

@@ -121,6 +121,7 @@ export default function Shell() {
 function getPageMeta(pathname) {
   if (pathname === "/dashboard") return { title: "Дашборд" };
   if (pathname === "/menu") return { title: "Меню" };
+  if (pathname === "/demand") return { title: "Спрос" };
   if (pathname === "/outlet") return { title: "Аутлет: фото" };
   if (pathname === "/outlet-transfer") return { title: "Аутлет: перенос" };
   if (pathname === "/ai-assistant") return { title: "AI помощник" };

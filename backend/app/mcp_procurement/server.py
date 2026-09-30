@@ -22,6 +22,7 @@ from app.mcp_procurement.registry import (
 from app.services.mcp_keys import McpActor
 
 import app.mcp_procurement.ranking_eval_tools  # noqa: F401,E402
+import app.mcp_procurement.staff_feedback_tools  # noqa: F401,E402
 import app.mcp_procurement.tools  # noqa: F401,E402
 
 logger = logging.getLogger("app.mcp_procurement")
@@ -57,7 +58,11 @@ SERVER_INSTRUCTIONS = (
     "get_ranking_eval_submission. Это сравнение порядка человека с порядком модели "
     "на эталонном наборе. В деталях — оба ранга, url фото, снимок настроек ленты, "
     "разброс эмбеддингов набора и вектор вкуса (swipe_updates и like/dislike по полу). "
-    "Сырые векторы не отдаются."
+    "Сырые векторы не отдаются. "
+    "Спрос от продавцов — только чтение и только по ключу суперпользователя: "
+    "list_staff_feedback (тексты: что спрашивали и чего нет, размеры, бренды) и "
+    "get_staff_feedback_stats (активность по сотрудникам). Текст свободный; сверяйте "
+    "его со справочниками и закупками, а остатки и продажи смотрите в MCP МойСклад."
 )
 
 PARSE_ERROR = -32700

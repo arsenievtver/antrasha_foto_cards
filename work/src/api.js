@@ -118,14 +118,10 @@ export function hasAiAssistantAccess() {
   return hasPermission("ai_assistant");
 }
 
-/** Вход в work PWA: закупки, аутлет, перенос и/или AI. */
+/** Вход в work PWA — любой сотрудник: раздел «Спрос» есть у всех. */
 export function hasWorkAccess() {
-  return (
-    hasProductAccess() ||
-    hasOutletAccess() ||
-    hasOutletTransferAccess() ||
-    hasAiAssistantAccess()
-  );
+  const role = getRole();
+  return role === "worker" || role === "superuser";
 }
 
 export function workHomePath() {
@@ -133,6 +129,7 @@ export function workHomePath() {
   if (hasOutletAccess() || hasOutletTransferAccess() || hasAiAssistantAccess()) {
     return "/menu";
   }
+  if (hasWorkAccess()) return "/demand";
   return "/login";
 }
 
@@ -176,18 +173,6 @@ export async function loginWorker(phone, pin) {
   if (data.role !== "worker" && data.role !== "superuser") {
     throw new Error("Нет доступа: только сотрудники.");
   }
-  const perms = Array.isArray(data.permissions) ? data.permissions.map(String) : [];
-  if (
-    data.role === "worker" &&
-    !perms.includes("product") &&
-    !perms.includes("outlet") &&
-    !perms.includes("outlet_transfer") &&
-    !perms.includes("ai_assistant")
-  ) {
-    throw new Error(
-      "Нет доступа: включите нужное право сотрудника в админке (Товар / Аутлет / AI помощник).",
-    );
-  }
   return data;
 }
 
@@ -211,6 +196,21 @@ async function request(path, { method = "GET", body, query } = {}) {
   const data = await parseResponseJson(res);
   if (!res.ok) throw new Error(detail(data, res.statusText));
   return data;
+}
+
+export function fetchMyFeedback() {
+  return request("/admin/staff-feedback/mine");
+}
+
+export function createMyFeedback(text) {
+  return request("/admin/staff-feedback/mine", { method: "POST", body: { text } });
+}
+
+export function updateMyFeedback(feedbackId, text) {
+  return request(`/admin/staff-feedback/mine/${feedbackId}`, {
+    method: "PATCH",
+    body: { text },
+  });
 }
 
 export function fetchProcurementRefs() {

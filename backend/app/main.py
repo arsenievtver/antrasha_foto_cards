@@ -24,6 +24,7 @@ from app.routers import (
     admin_promo_banners,
     admin_push,
     admin_ranking_eval,
+    admin_staff_feedback,
     admin_warehouse_ai,
     auth,
     brands,
@@ -136,6 +137,7 @@ app.include_router(admin_outlet_photo.router)
 app.include_router(admin_procurement.router)
 app.include_router(admin_procurement_ai.router)
 app.include_router(admin_mcp_keys.router)
+app.include_router(admin_staff_feedback.router)
 app.add_api_route("/mcp", mcp_post, methods=["POST"], include_in_schema=False)
 app.add_api_route(
     "/mcp",

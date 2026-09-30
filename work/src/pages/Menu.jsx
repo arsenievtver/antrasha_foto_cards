@@ -10,6 +10,10 @@ export default function Menu() {
   return (
     <div className="menu-page">
       <nav className="menu-list" aria-label="Дополнительно">
+        <Link to="/demand" className="menu-list__item">
+          <span className="menu-list__title">Спрос</span>
+          <span className="menu-list__hint">Что спрашивали, а нет; размеры, бренды</span>
+        </Link>
         {hasProductAccess() ? (
           <>
             <Link to="/prepayments" className="menu-list__item">

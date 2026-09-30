@@ -953,6 +953,14 @@ async function procurementRequest(path, { method = "GET", body, query } = {}) {
   return data;
 }
 
+export function fetchStaffFeedback(query) {
+  return procurementRequest("/admin/staff-feedback", { query });
+}
+
+export function fetchStaffFeedbackStats(query) {
+  return procurementRequest("/admin/staff-feedback/stats", { query });
+}
+
 export function fetchProcurementRefs() {
   return procurementRequest("/admin/procurement/refs");
 }

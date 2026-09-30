@@ -33,6 +33,7 @@ from app.models.user_taste_vector import UserTasteVector
 from app.models.season import Season
 from app.models.session import UserSession
 from app.models.shipment import Shipment
+from app.models.staff_feedback import StaffFeedback
 from app.models.gift_certificate import GiftCertificate, GiftCertificateTransaction
 from app.models.user import User, UserRole
 from app.models.user_tag_pair_weight import UserTagPairWeight
@@ -49,6 +50,7 @@ __all__ = [
     "Payment",
     "PAYMENT_KINDS",
     "Shipment",
+    "StaffFeedback",
     "FxRate",
     "AiIngestJob",
     "OutletPhotoUpload",

@@ -29,6 +29,7 @@ import Shipments from "./pages/Shipments.jsx";
 import FxRates from "./pages/FxRates.jsx";
 import McpKey from "./pages/McpKey.jsx";
 import ProcurementAi from "./pages/ProcurementAi.jsx";
+import StaffFeedback from "./pages/StaffFeedback.jsx";
 import { getPermissions, getRole, hasPermission, hasValidSession } from "./api.js";
 
 function RequireAuth({ children }) {
@@ -272,6 +273,14 @@ export default function App() {
               <PermissionRoute permission="product">
                 <ProcurementAi />
               </PermissionRoute>
+            }
+          />
+          <Route
+            path="/staff-feedback"
+            element={
+              <RoleRoute roles={["superuser"]}>
+                <StaffFeedback />
+              </RoleRoute>
             }
           />
           <Route
