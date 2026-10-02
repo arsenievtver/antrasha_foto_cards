@@ -21,6 +21,7 @@ from app.mcp_procurement.registry import (
 )
 from app.services.mcp_keys import McpActor
 
+import app.mcp_procurement.gift_certificate_tools  # noqa: F401,E402
 import app.mcp_procurement.ranking_eval_tools  # noqa: F401,E402
 import app.mcp_procurement.staff_feedback_tools  # noqa: F401,E402
 import app.mcp_procurement.tools  # noqa: F401,E402
@@ -66,7 +67,13 @@ SERVER_INSTRUCTIONS = (
     "Спрос от продавцов — только чтение и только по ключу суперпользователя: "
     "list_staff_feedback (тексты: что спрашивали и чего нет, размеры, бренды) и "
     "get_staff_feedback_stats (активность по сотрудникам). Текст свободный; сверяйте "
-    "его со справочниками и закупками, а остатки и продажи смотрите в MCP МойСклад."
+    "его со справочниками и закупками, а остатки и продажи смотрите в MCP МойСклад. "
+    "Подарочные сертификаты — list_gift_certificates, get_gift_certificate (чтение); "
+    "create_gift_certificate, create_gift_certificates_batch, update_gift_certificate, "
+    "send_gift_certificate_share_sms (запись). Логика та же, что REST /gift-certificates. "
+    "Срок: period_days (например 30) → не бессрочный; nominal в рублях. "
+    "Массовая выдача VIP: recipients [{phone, name?, last_name?}], nominal=5000, "
+    "period_days=30, send_share_sms по желанию."
 )
 
 PARSE_ERROR = -32700

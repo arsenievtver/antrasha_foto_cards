@@ -36,7 +36,11 @@ class ProcurementMcpProtocolTests(unittest.TestCase):
         self.assertIn("list_seasons", names)
         self.assertIn("list_brand_orders", names)
         self.assertIn("list_fx_rates", names)
+        self.assertIn("list_gift_certificates", names)
+        self.assertIn("get_gift_certificate", names)
         self.assertNotIn("create_season", names)
+        self.assertNotIn("create_gift_certificate", names)
+        self.assertNotIn("create_gift_certificates_batch", names)
         self.assertNotIn("update_payment", names)
         self.assertFalse(any("delete" in name for name in names))
 
@@ -55,6 +59,9 @@ class ProcurementMcpProtocolTests(unittest.TestCase):
             "update_shipment",
             "create_fx_rate",
             "update_fx_rate",
+            "create_gift_certificate",
+            "create_gift_certificates_batch",
+            "send_gift_certificate_share_sms",
         ):
             self.assertIn(required, names)
         self.assertFalse(any("delete" in name for name in names))

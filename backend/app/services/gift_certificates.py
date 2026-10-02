@@ -7,6 +7,7 @@ import os
 import secrets
 import time
 import uuid
+from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 
 import requests
