@@ -38,6 +38,13 @@ class ProcurementMcpProtocolTests(unittest.TestCase):
         self.assertIn("list_fx_rates", names)
         self.assertIn("list_gift_certificates", names)
         self.assertIn("get_gift_certificate", names)
+        for user_tool in (
+            "list_app_users",
+            "get_app_user",
+            "lookup_app_users_by_phones",
+            "list_fitting_requests",
+        ):
+            self.assertIn(user_tool, names)
         self.assertNotIn("create_season", names)
         self.assertNotIn("create_gift_certificate", names)
         self.assertNotIn("create_gift_certificates_batch", names)

@@ -25,6 +25,7 @@ import app.mcp_procurement.gift_certificate_tools  # noqa: F401,E402
 import app.mcp_procurement.ranking_eval_tools  # noqa: F401,E402
 import app.mcp_procurement.staff_feedback_tools  # noqa: F401,E402
 import app.mcp_procurement.tools  # noqa: F401,E402
+import app.mcp_procurement.user_tools  # noqa: F401,E402
 
 logger = logging.getLogger("app.mcp_procurement")
 
@@ -73,7 +74,11 @@ SERVER_INSTRUCTIONS = (
     "send_gift_certificate_share_sms (запись). Логика та же, что REST /gift-certificates. "
     "Срок: period_days (например 30) → не бессрочный; nominal в рублях. "
     "Массовая выдача VIP: recipients [{phone, name?, last_name?}], nominal=5000, "
-    "period_days=30, send_share_sms по желанию."
+    "period_days=30, send_share_sms по желанию. "
+    "Пользователи приложения (только ключ суперпользователя, без создания/редактирования): "
+    "list_app_users (неактивные, по телефону, по имени), get_app_user (свайпы, вкус, push, "
+    "ближайшие фото коллекции, сертификаты, заявки), lookup_app_users_by_phones, "
+    "list_fitting_requests."
 )
 
 PARSE_ERROR = -32700

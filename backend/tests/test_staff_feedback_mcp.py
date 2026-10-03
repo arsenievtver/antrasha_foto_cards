@@ -41,6 +41,7 @@ class StaffFeedbackMcpTests(unittest.TestCase):
             _actor(),
         )
         self.assertIn("list_staff_feedback", response["result"]["instructions"])
+        self.assertIn("list_app_users", response["result"]["instructions"])
 
     def test_bad_date_rejected(self):
         tool = get_tool("get_staff_feedback_stats")

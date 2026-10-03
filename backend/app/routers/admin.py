@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.exc import IntegrityError, ProgrammingError, SQLAlchemyError
-from sqlalchemy.orm import Session, aliased, selectinload
+from sqlalchemy.orm import Session, selectinload
 from starlette.responses import Response
 
 from app.config import settings
@@ -28,8 +28,6 @@ from app.models import (
     User,
     UserRole,
     UserSession,
-    UserTagPairWeight,
-    UserTagWeight,
     XfashionLandingVisit,
 )
 from app.models.marketing_campaign import normalize_campaign_slug
@@ -75,12 +73,8 @@ from app.schemas.admin import (
     AdminTagUpdateRequest,
     AdminUserCreateRequest,
     AdminUserDetailOut,
-    AdminUserTasteGenderPreview,
-    AdminUserTastePhotoOut,
     AdminUserListResponse,
     AdminUserOut,
-    AdminUserTagPairWeightStat,
-    AdminUserTagWeightStat,
     AdminUserUpdateRequest,
     AdminWorkerTagCreateBody,
     assert_pin_for_role,
@@ -93,8 +87,7 @@ from app.services.campaign_stats import (
     fetch_campaign_dashboard_rows,
 )
 from app.services.tagging_validation import validate_catalog_tag_selection
-from app.services.taste_nearest_photos import taste_previews_for_user
-from app.services.web_push import push_account_status_for_user
+from app.services.app_user_intel import AppUserNotFoundError, build_admin_user_detail
 from app.services.photo_embedding import (
     count_catalog_photos_needing_embedding,
     embed_catalog_backfill_batch,
@@ -1452,190 +1445,10 @@ def get_user_detail(
     _su: AdminPrincipal = Depends(require_superuser),
 ) -> AdminUserDetailOut:
     _ = _su
-    u = db.get(User, user_id)
-    if not u:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-
-    uid = user_id
-    interactions_total = (
-        db.scalar(
-            select(func.count()).select_from(Interaction).where(Interaction.user_id == uid),
-        )
-        or 0
-    )
-    likes = (
-        db.scalar(
-            select(func.count()).select_from(Interaction).where(
-                Interaction.user_id == uid,
-                Interaction.action == "like",
-            ),
-        )
-        or 0
-    )
-    dislikes = (
-        db.scalar(
-            select(func.count()).select_from(Interaction).where(
-                Interaction.user_id == uid,
-                Interaction.action == "dislike",
-            ),
-        )
-        or 0
-    )
-
-    interactions_male = (
-        db.scalar(
-            select(func.count())
-            .select_from(Interaction)
-            .join(Photo, Photo.id == Interaction.photo_id)
-            .where(Interaction.user_id == uid, Photo.gender == "male"),
-        )
-        or 0
-    )
-    interactions_female = (
-        db.scalar(
-            select(func.count())
-            .select_from(Interaction)
-            .join(Photo, Photo.id == Interaction.photo_id)
-            .where(Interaction.user_id == uid, Photo.gender == "female"),
-        )
-        or 0
-    )
-
-    likes_male = (
-        db.scalar(
-            select(func.count())
-            .select_from(Interaction)
-            .join(Photo, Photo.id == Interaction.photo_id)
-            .where(
-                Interaction.user_id == uid,
-                Interaction.action == "like",
-                Photo.gender == "male",
-            ),
-        )
-        or 0
-    )
-    likes_female = (
-        db.scalar(
-            select(func.count())
-            .select_from(Interaction)
-            .join(Photo, Photo.id == Interaction.photo_id)
-            .where(
-                Interaction.user_id == uid,
-                Interaction.action == "like",
-                Photo.gender == "female",
-            ),
-        )
-        or 0
-    )
-
-    avg_raw = db.scalar(
-        select(func.avg(Interaction.view_time_ms)).where(
-            Interaction.user_id == uid,
-            Interaction.view_time_ms.isnot(None),
-        ),
-    )
-    avg_view_time_ms = float(avg_raw) if avg_raw is not None else None
-
-    tw_rows = db.execute(
-        select(Tag.id, Tag.name, Tag.type, UserTagWeight.weight)
-        .join(UserTagWeight, UserTagWeight.tag_id == Tag.id)
-        .where(
-            UserTagWeight.user_id == uid,
-            UserTagWeight.session_id.is_(None),
-        ),
-    ).all()
-    tw_sorted = sorted(tw_rows, key=lambda r: -abs(float(r[3])))
-
-    tag_weights = [
-        AdminUserTagWeightStat(
-            tag_id=row[0],
-            tag_name=row[1],
-            tag_type=row[2],
-            weight=float(row[3]),
-        )
-        for row in tw_sorted
-    ]
-
-    Tlo = aliased(Tag)
-    Thi = aliased(Tag)
-    tp_rows = db.execute(
-        select(
-            UserTagPairWeight.tag_id_lo,
-            UserTagPairWeight.tag_id_hi,
-            Tlo.name,
-            Thi.name,
-            UserTagPairWeight.weight,
-        )
-        .join(Tlo, Tlo.id == UserTagPairWeight.tag_id_lo)
-        .join(Thi, Thi.id == UserTagPairWeight.tag_id_hi)
-        .where(
-            UserTagPairWeight.user_id == uid,
-            UserTagPairWeight.session_id.is_(None),
-        ),
-    ).all()
-    tp_sorted = sorted(tp_rows, key=lambda r: -abs(float(r[4])))
-
-    tag_pair_weights = [
-        AdminUserTagPairWeightStat(
-            tag_a_id=row[0],
-            tag_b_id=row[1],
-            tag_a_name=row[2],
-            tag_b_name=row[3],
-            weight=float(row[4]),
-        )
-        for row in tp_sorted
-    ]
-
-    push_active, push_scope = push_account_status_for_user(db, uid)
-
-    taste_previews: list[AdminUserTasteGenderPreview] = []
-    taste_updates_total = 0
-    any_taste_ready = False
-    taste_nearest_legacy: list[AdminUserTastePhotoOut] = []
-    for catalog_g, taste_emb, updates, nearest in taste_previews_for_user(db, uid, k=4):
-        taste_updates_total += updates
-        ready = taste_emb is not None
-        any_taste_ready = any_taste_ready or ready
-        photos_out = [
-            AdminUserTastePhotoOut(
-                photo_id=photo.id,
-                url=photo.url,
-                gender=photo.gender,
-                brand=photo.brand,
-                cosine=float(cos),
-            )
-            for photo, cos in nearest
-        ]
-        if catalog_g == "female" and not taste_nearest_legacy:
-            taste_nearest_legacy = photos_out
-        taste_previews.append(
-            AdminUserTasteGenderPreview(
-                collection_gender=catalog_g,
-                taste_vector_ready=ready,
-                taste_swipe_updates=updates,
-                nearest_photos=photos_out,
-            )
-        )
-
-    return AdminUserDetailOut(
-        user=_admin_user_out(u),
-        interactions_total=interactions_total,
-        likes=likes,
-        dislikes=dislikes,
-        interactions_male=interactions_male,
-        interactions_female=interactions_female,
-        likes_male=likes_male,
-        likes_female=likes_female,
-        avg_view_time_ms=avg_view_time_ms,
-        tag_weights=tag_weights,
-        tag_pair_weights=tag_pair_weights,
-        taste_vector_ready=any_taste_ready,
-        taste_swipe_updates=taste_updates_total,
-        taste_nearest_photos=taste_nearest_legacy,
-        taste_previews=taste_previews,
-        push_subscribed=push_active,
-        push_gender_scope=push_scope,
-    )
+    try:
+        return build_admin_user_detail(db, user_id)
+    except AppUserNotFoundError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found") from None
 
 
 @router.patch("/users/{user_id}", response_model=AdminUserOut)

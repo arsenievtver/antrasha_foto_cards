@@ -18,6 +18,7 @@ from app.mcp_procurement.registry import (
 from app.models.gift_certificate import GiftCertificate
 from app.routers import gift_certificates as gift_router
 from app.schemas.gift_certificates import GiftCertificateCreate, GiftCertificateUpdate
+from app.services.app_user_intel import resolve_user_by_phone
 from app.services.gift_certificates import certificate_link, phone_lookup_values, set_actual_status
 from app.services.mcp_keys import McpActor
 
@@ -217,6 +218,8 @@ def get_gift_certificate_tool(db: Session, actor: McpActor, certificate_id: str)
             "last_name": {"type": "string"},
             "description": {"type": "string", "description": "Комментарий / кампания, например «VIP потеряшки SMS»"},
             "employee": {"type": "string", "description": "Кто оформил; по умолчанию «MCP»"},
+            "giver_name": {"type": "string", "description": "От кого подарок, например ANTRASHA"},
+            "giver_phone": {"type": "string"},
             "created_at": {"type": "string", "format": "date", "description": "YYYY-MM-DD, по умолчанию сегодня"},
             "send_share_sms": {
                 "type": "boolean",
@@ -238,6 +241,8 @@ def create_gift_certificate_tool(
     last_name: str | None = None,
     description: str | None = None,
     employee: str | None = None,
+    giver_name: str | None = None,
+    giver_phone: str | None = None,
     created_at: str | None = None,
     send_share_sms: bool | None = None,
 ) -> dict:
@@ -258,6 +263,8 @@ def create_gift_certificate_tool(
         last_name=last_name,
         description=description or "",
         employee=(employee or "MCP").strip(),
+        giver_name=(giver_name or "").strip() or None,
+        giver_phone=(giver_phone or "").strip() or None,
         indefinite=ind,
         period=period,
         created_at=created,
@@ -294,6 +301,8 @@ def create_gift_certificate_tool(
             "indefinite": {"type": "boolean"},
             "description": {"type": "string"},
             "employee": {"type": "string"},
+            "giver_name": {"type": "string", "description": "От кого подарок для всех, например ANTRASHA"},
+            "giver_phone": {"type": "string"},
             "send_share_sms": {
                 "type": "boolean",
                 "description": "SMS со ссылкой каждому после успешного создания",
@@ -312,6 +321,8 @@ def create_gift_certificates_batch_tool(
     indefinite: bool | None = None,
     description: str | None = None,
     employee: str | None = None,
+    giver_name: str | None = None,
+    giver_phone: str | None = None,
     send_share_sms: bool | None = None,
 ) -> dict:
     del actor
@@ -323,6 +334,8 @@ def create_gift_certificates_batch_tool(
         raise ToolArgumentError("nominal не может быть отрицательным")
     ind, period = _resolve_indefinite(indefinite, period_days)
     emp = (employee or "MCP").strip()
+    giver = (giver_name or "").strip() or None
+    giver_ph = (giver_phone or "").strip() or None
     base_desc = description or ""
     created_items: list[dict] = []
     errors: list[dict] = []
@@ -346,6 +359,8 @@ def create_gift_certificates_batch_tool(
             last_name=last_name,
             description=desc,
             employee=emp,
+            giver_name=giver,
+            giver_phone=giver_ph,
             indefinite=ind,
             period=period,
             status="ACTIVE",
@@ -355,9 +370,13 @@ def create_gift_certificates_batch_tool(
         except ToolArgumentError as exc:
             errors.append({"index": idx, "phone": phone, "error": str(exc)})
             continue
+        reg = resolve_user_by_phone(db, phone)
         item = {
             "index": idx,
             "phone": phone,
+            "app_registered": reg is not None,
+            "app_user_id": str(reg.id) if reg else None,
+            "app_display_name": reg.display_name if reg else None,
             "certificate": out,
             "public_url": certificate_link(out["public_slug"]),
         }
@@ -389,6 +408,8 @@ def create_gift_certificates_batch_tool(
             "description": {"type": "string"},
             "indefinite": {"type": "boolean"},
             "period": {"type": "integer", "description": "Дней действия, если не бессрочный"},
+            "giver_name": {"type": "string"},
+            "giver_phone": {"type": "string"},
         },
         "required": ["certificate_id"],
     },
@@ -405,6 +426,8 @@ def update_gift_certificate_tool(
     description: str | None = None,
     indefinite: bool | None = None,
     period: int | None = None,
+    giver_name: str | None = None,
+    giver_phone: str | None = None,
 ) -> dict:
     del actor
     cid = (certificate_id or "").strip()
@@ -418,6 +441,8 @@ def update_gift_certificate_tool(
         description=description,
         indefinite=indefinite,
         period=period,
+        giver_name=giver_name,
+        giver_phone=giver_phone,
     )
     return _run(db, gift_router.update_certificate, cert_id=cid, body=patch)
 
