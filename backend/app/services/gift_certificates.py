@@ -321,6 +321,17 @@ def send_share_sms(cert: GiftCertificate) -> list[dict]:
     return sent
 
 
+def send_text_sms(phone: str, text: str) -> dict:
+    """Одно SMS через МТС (тот же канал, что share/confirm)."""
+    sms_id, sms_sent, sms_error = _post_mts_sms(phone, text)
+    return {
+        "phone": phone,
+        "sms_id": sms_id,
+        "sent": sms_sent,
+        "error": sms_error,
+    }
+
+
 def send_telegram(chat_id: int, text: str, image_url: str | None) -> None:
     token = (settings.telegram_token or "").strip()
     if not token:

@@ -82,3 +82,21 @@ class GiftCertificateUpdate(BaseModel):
 class TelegramSendBody(BaseModel):
     chat_id: int
     image_url: str | None = None
+
+
+class MarketingSmsBatchRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=1000)
+    phones: list[str] = Field(min_length=1, max_length=150)
+    pause_seconds: float = Field(default=8, ge=0, le=60)
+    dry_run: bool = False
+
+
+class MarketingSmsBatchResponse(BaseModel):
+    dry_run: bool
+    text_length: int
+    pause_seconds: float
+    total: int
+    sent_count: int
+    error_count: int
+    items: list[dict]
+    errors: list[dict]

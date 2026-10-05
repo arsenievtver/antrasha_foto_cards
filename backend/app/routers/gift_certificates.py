@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.deps import AdminPrincipal, _bearer, get_admin_principal, require_permission
+from app.deps import AdminPrincipal, _bearer, get_admin_principal, require_permission, require_superuser
 from app.models.gift_certificate import (
     GiftCertificate,
     GiftCertificateStatus,
@@ -20,6 +20,8 @@ from app.schemas.gift_certificates import (
     GiftCertificatePublicOut,
     GiftCertificateUpdate,
     GiftTransactionOut,
+    MarketingSmsBatchRequest,
+    MarketingSmsBatchResponse,
     TelegramSendBody,
 )
 from app.services.gift_certificates import (
@@ -39,6 +41,7 @@ from app.services.gift_certificates import (
     telegram_text,
 )
 from app.config import settings
+from app.services.marketing_sms import deliver_marketing_sms_batch
 
 log = logging.getLogger("app.gift_certificates")
 
@@ -144,6 +147,25 @@ def list_certificates(
     if changed:
         db.commit()
     return [_out(cert) for cert in certs]
+
+
+@router.post("/marketing-sms/batch", response_model=MarketingSmsBatchResponse)
+def send_marketing_sms_batch(
+    body: MarketingSmsBatchRequest,
+    _su: AdminPrincipal = Depends(require_superuser),
+) -> MarketingSmsBatchResponse:
+    """Произвольный текст на список телефонов (МТС). Только суперпользователь. Между SMS — pause_seconds."""
+    _ = _su
+    try:
+        payload = deliver_marketing_sms_batch(
+            phones=body.phones,
+            text=body.text,
+            pause_seconds=body.pause_seconds,
+            dry_run=body.dry_run,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return MarketingSmsBatchResponse(**payload)
 
 
 @router.get("/{cert_id}", response_model=GiftCertificatePublicOut)

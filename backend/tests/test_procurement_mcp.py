@@ -69,6 +69,7 @@ class ProcurementMcpProtocolTests(unittest.TestCase):
             "create_gift_certificate",
             "create_gift_certificates_batch",
             "send_gift_certificate_share_sms",
+            "send_marketing_sms_batch",
         ):
             self.assertIn(required, names)
         self.assertFalse(any("delete" in name for name in names))

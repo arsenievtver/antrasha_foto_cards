@@ -12,14 +12,17 @@ from app.deps import AdminPrincipal
 from app.mcp_procurement.registry import (
     SCOPE_WRITE,
     ToolArgumentError,
+    ToolPermissionError,
     check_limit,
     tool,
 )
 from app.models.gift_certificate import GiftCertificate
+from app.models.mcp_api_key import OWNER_SUPERUSER
 from app.routers import gift_certificates as gift_router
 from app.schemas.gift_certificates import GiftCertificateCreate, GiftCertificateUpdate
 from app.services.app_user_intel import resolve_user_by_phone
 from app.services.gift_certificates import certificate_link, phone_lookup_values, set_actual_status
+from app.services.marketing_sms import MAX_PHONES, deliver_marketing_sms_batch
 from app.services.mcp_keys import McpActor
 
 _MAX_LIST = 200
@@ -105,6 +108,13 @@ def _resolve_indefinite(indefinite: bool | None, period_days: int | None) -> tup
     if indefinite is False:
         raise ToolArgumentError("Укажите period_days, если indefinite=false")
     return True, None
+
+
+def _require_superuser_key(actor: McpActor) -> None:
+    if actor.owner_role != OWNER_SUPERUSER:
+        raise ToolPermissionError(
+            "Маркетинговые SMS доступны только по ключу суперпользователя."
+        )
 
 
 def _split_name(full: str | None) -> tuple[str | None, str | None]:
@@ -445,6 +455,60 @@ def update_gift_certificate_tool(
         giver_phone=giver_phone,
     )
     return _run(db, gift_router.update_certificate, cert_id=cid, body=patch)
+
+
+@tool(
+    "send_marketing_sms_batch",
+    "Отправить один и тот же текст SMS на список телефонов (МТС, отправитель ANTRASHA). "
+    "Только ключ суперпользователя и право записи. Между отправками — pause_seconds (по умолчанию 8). "
+    "dry_run=true — только проверка номеров без отправки. До 150 номеров. "
+    "Тот же REST: POST /gift-certificates/marketing-sms/batch.",
+    {
+        "type": "object",
+        "properties": {
+            "text": {"type": "string", "description": "Текст SMS, до 1000 символов"},
+            "phones": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Список телефонов РФ",
+            },
+            "pause_seconds": {
+                "type": "number",
+                "description": "Пауза между SMS, 0–60 сек. По умолчанию 8",
+            },
+            "dry_run": {
+                "type": "boolean",
+                "description": "true — не отправлять, только нормализовать номера",
+            },
+        },
+        "required": ["text", "phones"],
+    },
+    scope=SCOPE_WRITE,
+)
+def send_marketing_sms_batch_tool(
+    db: Session,
+    actor: McpActor,
+    text: str,
+    phones: list,
+    pause_seconds: float | None = None,
+    dry_run: bool | None = None,
+) -> dict:
+    del db
+    _require_superuser_key(actor)
+    if not isinstance(phones, list) or not phones:
+        raise ToolArgumentError("phones — непустой массив")
+    if len(phones) > MAX_PHONES:
+        raise ToolArgumentError(f"Не больше {MAX_PHONES} номеров за один вызов")
+    pause = 8.0 if pause_seconds is None else float(pause_seconds)
+    try:
+        return deliver_marketing_sms_batch(
+            phones=[str(p) for p in phones],
+            text=text,
+            pause_seconds=pause,
+            dry_run=bool(dry_run),
+        )
+    except ValueError as exc:
+        raise ToolArgumentError(str(exc)) from exc
 
 
 @tool(
