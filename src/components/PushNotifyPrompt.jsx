@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useAuth } from "../context/AuthContext.jsx";
 import {
 	isPushAvailableOnServer,
 	isPushPromptDismissed,
@@ -20,6 +21,7 @@ function defaultScopeFromGender(gender) {
 }
 
 export default function PushNotifyPrompt({ visible, gender }) {
+	const { refreshProfile } = useAuth();
 	const [show, setShow] = useState(false);
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState(null);
@@ -62,7 +64,8 @@ export default function PushNotifyPrompt({ visible, gender }) {
 		setBusy(true);
 		setError(null);
 		try {
-			await subscribeToNewPhotosPush(genderScope);
+			const result = await subscribeToNewPhotosPush(genderScope);
+			if (result?.welcomeGift) refreshProfile();
 			setShow(false);
 		} catch (e) {
 			setError(e.message || "Не удалось включить уведомления");

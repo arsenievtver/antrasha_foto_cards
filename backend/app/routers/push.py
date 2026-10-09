@@ -14,13 +14,20 @@ from app.schemas.push import (
     PushSubscribeResponse,
     PushUnsubscribeRequest,
     PushVapidPublicKeyResponse,
+    WelcomeGiftIssued,
 )
+from app.schemas.welcome_gift import WelcomeGiftClaimRequest, WelcomeGiftClaimResponse
 from app.services.web_push import (
     deactivate_all_push_subscriptions_for_user,
     deactivate_push_subscription,
     push_account_status_for_user,
     upsert_push_subscription,
     web_push_configured,
+)
+from app.services.welcome_gift import (
+    issued_out,
+    maybe_issue_welcome_gift,
+    notify_welcome_gift,
 )
 
 log = logging.getLogger("app.api.push")
@@ -62,14 +69,43 @@ def subscribe_push(
         user_id=uid,
         gender_scope=body.gender_scope,
     )
+    gift = maybe_issue_welcome_gift(db, user, pwa_standalone=body.pwa_standalone)
+    gift_payload = issued_out(gift) if gift is not None else None
     db.commit()
+    if gift is not None:
+        try:
+            notify_welcome_gift(db, gift)
+        except Exception:
+            log.exception("welcome gift push failed for %s", gift.id)
     log.info(
-        "POST /push/subscribe session=%s user=%s gender_scope=%s",
+        "POST /push/subscribe session=%s user=%s gender_scope=%s pwa=%s gift=%s",
         session_id,
         uid,
         body.gender_scope,
+        body.pwa_standalone,
+        gift_payload["code"] if gift_payload else None,
     )
-    return PushSubscribeResponse()
+    return PushSubscribeResponse(
+        welcome_gift=WelcomeGiftIssued(**gift_payload) if gift_payload else None,
+    )
+
+
+@router.post("/welcome-gift", response_model=WelcomeGiftClaimResponse)
+def claim_welcome_gift(
+    body: WelcomeGiftClaimRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_user),
+) -> WelcomeGiftClaimResponse:
+    """Повторная проверка: пуш уже был, а PWA поставили позже — или регистрация после пуша."""
+    gift = maybe_issue_welcome_gift(db, user, pwa_standalone=body.pwa_standalone)
+    gift_payload = issued_out(gift) if gift is not None else None
+    db.commit()
+    if gift is not None:
+        try:
+            notify_welcome_gift(db, gift)
+        except Exception:
+            log.exception("welcome gift push failed for %s", gift.id)
+    return WelcomeGiftClaimResponse(welcome_gift=gift_payload)
 
 
 @router.get("/account-status", response_model=PushAccountStatusResponse)

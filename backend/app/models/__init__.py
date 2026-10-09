@@ -36,6 +36,7 @@ from app.models.shipment import Shipment
 from app.models.staff_feedback import StaffFeedback
 from app.models.gift_certificate import GiftCertificate, GiftCertificateTransaction
 from app.models.user import User, UserRole
+from app.models.welcome_gift_settings import WelcomeGiftSettings
 from app.models.user_tag_pair_weight import UserTagPairWeight
 from app.models.user_tag_weight import UserTagWeight
 
@@ -87,4 +88,5 @@ __all__ = [
     "Interaction",
     "UserTagWeight",
     "UserTagPairWeight",
+    "WelcomeGiftSettings",
 ]

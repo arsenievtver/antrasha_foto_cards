@@ -14,6 +14,7 @@ class PushSubscribeRequest(BaseModel):
     endpoint: str = Field(min_length=1)
     keys: PushKeysIn
     gender_scope: PushGenderScope = "both"
+    pwa_standalone: bool = False
 
 
 class PushUnsubscribeRequest(BaseModel):
@@ -24,8 +25,15 @@ class PushVapidPublicKeyResponse(BaseModel):
     public_key: str
 
 
+class WelcomeGiftIssued(BaseModel):
+    code: str
+    amount: float
+    url: str
+
+
 class PushSubscribeResponse(BaseModel):
     ok: bool = True
+    welcome_gift: WelcomeGiftIssued | None = None
 
 
 class PushAccountStatusResponse(BaseModel):

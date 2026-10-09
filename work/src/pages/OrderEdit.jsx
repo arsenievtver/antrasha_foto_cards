@@ -170,14 +170,21 @@ export default function OrderEdit() {
           </label>
         )}
 
-        <label className="check-row">
-          <input
-            type="checkbox"
-            checked={form.has_prepayment}
-            onChange={(e) => set("has_prepayment", e.target.checked)}
-          />
-          Нужна предоплата
-        </label>
+        <div className="form-switch-row">
+          <div className="form-switch-row__text">
+            <div className="form-switch-row__label">Нужна предоплата</div>
+          </div>
+          <button
+            type="button"
+            className="switch-toggle"
+            role="switch"
+            aria-checked={form.has_prepayment}
+            aria-label="Нужна предоплата"
+            onClick={() => set("has_prepayment", !form.has_prepayment)}
+          >
+            <span className="switch-thumb" aria-hidden />
+          </button>
+        </div>
 
         {form.has_prepayment ? (
           <>

@@ -20,6 +20,7 @@ import HeroBanners from "./pages/HeroBanners.jsx";
 import HomeV2GenderCards from "./pages/HomeV2GenderCards.jsx";
 import ModalVideos from "./pages/ModalVideos.jsx";
 import PushNotifications from "./pages/PushNotifications.jsx";
+import WelcomeGift from "./pages/WelcomeGift.jsx";
 import WarehouseAi from "./pages/WarehouseAi.jsx";
 import Seasons from "./pages/Seasons.jsx";
 import Brands from "./pages/Brands.jsx";
@@ -216,6 +217,14 @@ export default function App() {
             element={
               <PermissionRoute permission="ads">
                 <PushNotifications />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/welcome-gift"
+            element={
+              <PermissionRoute permission="ads">
+                <WelcomeGift />
               </PermissionRoute>
             }
           />

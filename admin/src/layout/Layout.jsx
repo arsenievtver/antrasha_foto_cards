@@ -104,6 +104,7 @@ export default function Layout() {
             {can("ads") && <NavItem to="/videos">Видео в модалке</NavItem>}
             {can("ads") && <NavItem to="/home-v2-gender-cards">MEN / WOMEN (/v2)</NavItem>}
             {can("ads") && <NavItem to="/push">Push-уведомления</NavItem>}
+            {can("ads") && <NavItem to="/welcome-gift">Сертификат за приложение</NavItem>}
           </NavGroup>
 
           <NavGroup title="Товар">

@@ -250,6 +250,24 @@ export async function createCampaign({ name, slug, path, product = "antrasha" })
   return data;
 }
 
+export async function fetchWelcomeGiftSettings() {
+  const res = await fetch(apiUrl("/admin/welcome-gift"), { headers: headersJson() });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
+export async function saveWelcomeGiftSettings(body) {
+  const res = await fetch(apiUrl("/admin/welcome-gift"), {
+    method: "PUT",
+    headers: headersJson(),
+    body: JSON.stringify(body),
+  });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
 export async function fetchFeedSettings() {
   const res = await fetch(apiUrl("/admin/feed-settings"), { headers: headersJson() });
   const data = await parseResponseJson(res);

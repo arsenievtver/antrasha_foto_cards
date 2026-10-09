@@ -193,11 +193,36 @@ async function postPushSubscription(subscription, genderScope) {
 			endpoint: json.endpoint,
 			keys: json.keys,
 			gender_scope: genderScope,
+			pwa_standalone: isStandaloneDisplayMode(),
 		}),
 	});
 	if (!res.ok) {
 		const text = await res.text();
 		throw new Error(text || `subscribe ${res.status}`);
+	}
+	try {
+		return await res.json();
+	} catch {
+		return {};
+	}
+}
+
+/** Пуш уже включён, PWA открыли позже или регистрация была после подписки. */
+export async function claimWelcomeGiftIfReady() {
+	if (!getAuthToken() || !isStandaloneDisplayMode()) return false;
+	const sub = await getBrowserPushSubscription();
+	if (!sub && !isPushSubscribedLocally()) return false;
+	const res = await fetch(apiUrl("/push/welcome-gift"), {
+		method: "POST",
+		headers: await pushAuthHeaders(),
+		body: JSON.stringify({ pwa_standalone: true }),
+	});
+	if (!res.ok) return false;
+	try {
+		const data = await res.json();
+		return Boolean(data.welcome_gift);
+	} catch {
+		return false;
 	}
 }
 
@@ -236,10 +261,10 @@ export async function subscribeToNewPhotosPush(genderScope = "both") {
 		applicationServerKey: urlBase64ToUint8Array(publicKey),
 	});
 
-	await postPushSubscription(subscription, scope);
+	const data = await postPushSubscription(subscription, scope);
 	markPushSubscribedLocally();
 	markPushPromptDismissed();
-	return subscription;
+	return { subscription, welcomeGift: data?.welcome_gift || null };
 }
 
 export async function unsubscribeFromNewPhotosPush() {

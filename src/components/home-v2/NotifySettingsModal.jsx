@@ -20,7 +20,7 @@ const GENDER_OPTIONS = [
 ];
 
 export default function NotifySettingsPanel({ active = true, onPushStateChange }) {
-	const { isAuthenticated } = useAuth();
+	const { isAuthenticated, refreshProfile } = useAuth();
 	const [genderScope, setGenderScope] = useState("both");
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState("");
@@ -77,7 +77,8 @@ export default function NotifySettingsPanel({ active = true, onPushStateChange }
 		setBusy(true);
 		setError("");
 		try {
-			await subscribeToNewPhotosPush(genderScope);
+			const result = await subscribeToNewPhotosPush(genderScope);
+			if (result?.welcomeGift) refreshProfile();
 			setDeviceActive(true);
 			setAccountActive(isAuthenticated);
 			setAccountScope(genderScope);

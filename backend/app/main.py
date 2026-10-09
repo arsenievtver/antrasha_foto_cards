@@ -26,6 +26,7 @@ from app.routers import (
     admin_ranking_eval,
     admin_staff_feedback,
     admin_warehouse_ai,
+    admin_welcome_gift,
     auth,
     brands,
     feed,
@@ -146,6 +147,7 @@ app.add_api_route(
     include_in_schema=False,
 )
 app.include_router(admin_push.router)
+app.include_router(admin_welcome_gift.router)
 app.include_router(admin_warehouse_ai.router)
 app.include_router(promo_banners.router)
 app.include_router(hero_banners.router)

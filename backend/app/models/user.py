@@ -45,6 +45,13 @@ class User(Base):
     ranking_eval_enabled: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default="false"
     )
+    # Сертификат акции «регистрация + PWA + push». Один на аккаунт.
+    welcome_gift_cert_id: Mapped[str | None] = mapped_column(
+        String(26),
+        ForeignKey("gift_certificates.id", ondelete="SET NULL"),
+        nullable=True,
+        unique=True,
+    )
 
     interactions = relationship("Interaction", back_populates="user")
     signup_campaign = relationship("MarketingCampaign", foreign_keys=[signup_campaign_id])
