@@ -14,6 +14,18 @@ cd "$REPO_ROOT"
 if [[ "${SKIP_GIT_PULL:-0}" == "1" ]]; then
   echo "[step] skip git pull (SKIP_GIT_PULL=1)"
 else
+  dirty_tracked="$(git diff --name-only HEAD 2>/dev/null || true)"
+  if [[ -n "$dirty_tracked" ]]; then
+    echo "[error] на сервере изменены файлы из git — pull не выполняется:"
+    printf '  %s\n' $dirty_tracked
+    echo ""
+    echo "Прод должен совпадать с GitHub. Откатите правки и снова запустите deploy:"
+    echo "  git restore --source=HEAD -- $(printf '%s' "$dirty_tracked" | tr '\n' ' ')"
+    echo "  bash deploy/scripts/server-pull-deploy.sh"
+    echo ""
+    echo "Если правка нужна постоянно — закоммитьте её в репозиторий с dev-машины, не правьте Dockerfile на VM."
+    exit 1
+  fi
   echo "[step] git pull --ff-only"
   git pull --ff-only
 fi
