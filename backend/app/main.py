@@ -196,5 +196,8 @@ app.mount(
 
 
 @app.get("/health")
-def health() -> dict[str, str]:
-    return {"status": "ok"}
+def health() -> dict[str, str | bool]:
+    return {
+        "status": "ok",
+        "max_notify_configured": settings.max_notify_configured,
+    }

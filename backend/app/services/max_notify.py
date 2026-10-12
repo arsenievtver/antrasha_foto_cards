@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import socket
 import threading
 import uuid
@@ -16,12 +17,21 @@ from app.config import settings
 
 log = logging.getLogger("app.max")
 
-# Актуальный хост API (platform-api.max.ru устаревает, см. dev.max.ru)
-MAX_MESSAGES_URL = "https://platform-api2.max.ru/messages"
+# dev.max.ru: основной хост api2; legacy — запасной при сетевых сбоях на новом VPS
+MAX_MESSAGES_URLS = (
+    "https://platform-api2.max.ru/messages",
+    "https://platform-api.max.ru/messages",
+)
+MAX_ME_URLS = (
+    "https://platform-api2.max.ru/me",
+    "https://platform-api.max.ru/me",
+)
 MAX_PHOTO_URLS_IN_MESSAGE = 8
-# (connect, read) — handshake до *.max.ru из Docker иногда долгий
+MAX_MESSAGE_TEXT_LEN = 4000
+# (connect, read)
 MAX_HTTP_TIMEOUT = (25.0, 60.0)
 _max_ipv4_lock = threading.Lock()
+_max_session: requests.Session | None = None
 
 
 @contextmanager
@@ -40,12 +50,103 @@ def _force_ipv4_dns():
             urllib3_connection.allowed_gai_family = orig
 
 
+def _max_http_session() -> requests.Session:
+    global _max_session
+    if _max_session is None:
+        _max_session = requests.Session()
+    return _max_session
+
+
+def _ssl_verify() -> bool | str:
+    bundle = os.environ.get("REQUESTS_CA_BUNDLE") or os.environ.get("SSL_CERT_FILE")
+    if bundle and os.path.isfile(bundle):
+        return bundle
+    default = "/etc/ssl/certs/ca-certificates.crt"
+    if os.path.isfile(default):
+        return default
+    return True
+
+
+def _authorization_header(raw_token: str) -> str:
+    token = raw_token.strip().strip('"').strip("'")
+    if token.lower().startswith("bearer "):
+        return token
+    return token
+
+
 def max_notify_configured() -> bool:
     return bool(
         settings.max_bot_token
         and str(settings.max_bot_token).strip()
         and settings.max_notify_user_id is not None
     )
+
+
+def _truncate_message_text(text: str) -> str:
+    if len(text) <= MAX_MESSAGE_TEXT_LEN:
+        return text
+    suffix = "\n… (сообщение обрезано)"
+    keep = MAX_MESSAGE_TEXT_LEN - len(suffix)
+    return text[:keep] + suffix
+
+
+def _post_with_fallback(
+    *,
+    urls: tuple[str, ...],
+    params: dict[str, int],
+    token: str,
+    json_body: dict,
+) -> requests.Response:
+    last_exc: requests.RequestException | None = None
+    session = _max_http_session()
+    headers = {
+        "Authorization": _authorization_header(token),
+        "Content-Type": "application/json",
+    }
+    verify = _ssl_verify()
+
+    with _force_ipv4_dns():
+        for url in urls:
+            try:
+                return session.post(
+                    url,
+                    params=params,
+                    headers=headers,
+                    json=json_body,
+                    timeout=MAX_HTTP_TIMEOUT,
+                    verify=verify,
+                )
+            except requests.RequestException as e:
+                last_exc = e
+                log.warning("MAX API POST failed url=%s: %s", url, e)
+        if last_exc is not None:
+            raise last_exc
+    raise RuntimeError("MAX API: no URLs configured")
+
+
+def probe_max_bot_api() -> tuple[bool, str]:
+    """
+    Проверка токена и сети (GET /me). Для диагностики на сервере, не в hot path.
+    """
+    if not max_notify_configured():
+        return False, "MAX_BOT_TOKEN или MAX_NOTIFY_USER_ID не заданы"
+    token = str(settings.max_bot_token).strip()
+    session = _max_http_session()
+    headers = {"Authorization": _authorization_header(token)}
+    verify = _ssl_verify()
+
+    with _force_ipv4_dns():
+        for url in MAX_ME_URLS:
+            try:
+                r = session.get(url, headers=headers, timeout=MAX_HTTP_TIMEOUT, verify=verify)
+                if r.status_code == 200:
+                    return True, "GET /me ok"
+                if r.status_code == 401:
+                    return False, "401: неверный MAX_BOT_TOKEN"
+                return False, f"GET /me status={r.status_code} body={(r.text or '')[:200]}"
+            except requests.RequestException as e:
+                last = str(e)
+        return False, f"сеть/ssl: {last}"
 
 
 def _format_fitting_request_text(
@@ -96,7 +197,7 @@ def _format_fitting_request_text(
         if rest > 0:
             lines.append(f"… и ещё {rest}")
 
-    return "\n".join(lines)
+    return _truncate_message_text("\n".join(lines))
 
 
 def send_fitting_request_notification(
@@ -114,6 +215,7 @@ def send_fitting_request_notification(
     heading: str = "Новая заявка на примерку",
 ) -> None:
     if not max_notify_configured():
+        log.warning("MAX notify skipped request_id=%s: bot not configured", request_id)
         return
 
     text = _format_fitting_request_text(
@@ -133,26 +235,26 @@ def send_fitting_request_notification(
     user_id = int(settings.max_notify_user_id)  # type: ignore[arg-type]
 
     try:
-        with _force_ipv4_dns():
-            r = requests.post(
-                MAX_MESSAGES_URL,
-                params={"user_id": user_id},
-                headers={
-                    "Authorization": token,
-                    "Content-Type": "application/json",
-                },
-                json={"text": text, "notify": True},
-                timeout=MAX_HTTP_TIMEOUT,
-                verify="/etc/ssl/certs/ca-certificates.crt",
-            )
+        r = _post_with_fallback(
+            urls=MAX_MESSAGES_URLS,
+            params={"user_id": user_id},
+            token=token,
+            json_body={"text": text, "notify": True},
+        )
         if r.status_code >= 400:
             log.warning(
-                "MAX notify failed request_id=%s status=%s body=%s",
+                "MAX notify failed request_id=%s user_id=%s status=%s body=%s",
                 request_id,
+                user_id,
                 r.status_code,
                 (r.text or "")[:500],
             )
             return
         log.info("MAX notify sent request_id=%s user_id=%s", request_id, user_id)
     except requests.RequestException as e:
-        log.warning("MAX notify error request_id=%s: %s", request_id, e)
+        log.warning(
+            "MAX notify error request_id=%s user_id=%s: %s",
+            request_id,
+            user_id,
+            e,
+        )
