@@ -3,17 +3,41 @@
 from __future__ import annotations
 
 import logging
+import socket
+import threading
 import uuid
+from contextlib import contextmanager
 from datetime import datetime
 
 import requests
+import urllib3.util.connection as urllib3_connection
 
 from app.config import settings
 
 log = logging.getLogger("app.max")
 
-MAX_MESSAGES_URL = "https://platform-api.max.ru/messages"
+# Актуальный хост API (platform-api.max.ru устаревает, см. dev.max.ru)
+MAX_MESSAGES_URL = "https://platform-api2.max.ru/messages"
 MAX_PHOTO_URLS_IN_MESSAGE = 8
+# (connect, read) — handshake до *.max.ru из Docker иногда долгий
+MAX_HTTP_TIMEOUT = (25.0, 60.0)
+_max_ipv4_lock = threading.Lock()
+
+
+@contextmanager
+def _force_ipv4_dns():
+    """В bridge-сети Docker AAAA часто «чёрная дыра» → timeout на TLS handshake."""
+    with _max_ipv4_lock:
+        orig = urllib3_connection.allowed_gai_family
+
+        def _ipv4_only() -> int:
+            return socket.AF_INET
+
+        urllib3_connection.allowed_gai_family = _ipv4_only
+        try:
+            yield
+        finally:
+            urllib3_connection.allowed_gai_family = orig
 
 
 def max_notify_configured() -> bool:
@@ -109,16 +133,18 @@ def send_fitting_request_notification(
     user_id = int(settings.max_notify_user_id)  # type: ignore[arg-type]
 
     try:
-        r = requests.post(
-            MAX_MESSAGES_URL,
-            params={"user_id": user_id},
-            headers={
-                "Authorization": token,
-                "Content-Type": "application/json",
-            },
-            json={"text": text, "notify": True},
-            timeout=(5.0, 15.0),
-        )
+        with _force_ipv4_dns():
+            r = requests.post(
+                MAX_MESSAGES_URL,
+                params={"user_id": user_id},
+                headers={
+                    "Authorization": token,
+                    "Content-Type": "application/json",
+                },
+                json={"text": text, "notify": True},
+                timeout=MAX_HTTP_TIMEOUT,
+                verify="/etc/ssl/certs/ca-certificates.crt",
+            )
         if r.status_code >= 400:
             log.warning(
                 "MAX notify failed request_id=%s status=%s body=%s",
