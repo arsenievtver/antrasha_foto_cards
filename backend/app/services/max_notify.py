@@ -145,11 +145,13 @@ def _max_post_messages_via_relay(
     secret = (settings.max_relay_secret or "").strip()
     if not relay or not secret:
         raise RuntimeError("MAX_NOTIFY_RELAY_URL / MAX_RELAY_SECRET не заданы")
+    # До relay на хосте — короткий connect; MAX API делает curl внутри relay
+    relay_timeout = (8.0, 120.0)
     r = requests.post(
         f"{relay}/send",
         headers={"X-Max-Relay-Secret": secret, "Content-Type": "application/json"},
         json={"user_id": user_id, **json_body},
-        timeout=MAX_HTTP_TIMEOUT,
+        timeout=relay_timeout,
     )
     if r.status_code != 200:
         return _MaxHttpResult(status_code=r.status_code, body=(r.text or "")[:500])

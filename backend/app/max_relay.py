@@ -83,7 +83,7 @@ class _RelayHandler(BaseHTTPRequestHandler):
 
 
 def _parse_bind() -> tuple[str, int]:
-    raw = (os.environ.get("MAX_RELAY_BIND") or "127.0.0.1:18080").strip()
+    raw = (os.environ.get("MAX_RELAY_BIND") or "0.0.0.0:18080").strip()
     host, _, port_s = raw.partition(":")
     port = int(port_s or "18080")
     return host, port

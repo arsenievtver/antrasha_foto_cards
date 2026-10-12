@@ -27,7 +27,8 @@ services:
     environment:
       REQUESTS_CA_BUNDLE: /etc/ssl/certs/ca-certificates.crt
       SSL_CERT_FILE: /etc/ssl/certs/ca-certificates.crt
-      MAX_RELAY_BIND: 127.0.0.1:18080
+      # 127.0.0.1 недоступен из bridge; слушаем все интерфейсы хоста (секрет в X-Max-Relay-Secret)
+      MAX_RELAY_BIND: 0.0.0.0:18080
 
   backend:
     build:
