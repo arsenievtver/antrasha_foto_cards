@@ -17,21 +17,15 @@ from app.config import settings
 
 log = logging.getLogger("app.max")
 
-# dev.max.ru: основной хост api2; legacy — запасной при сетевых сбоях на новом VPS
-MAX_MESSAGES_URLS = (
-    "https://platform-api2.max.ru/messages",
-    "https://platform-api.max.ru/messages",
-)
-MAX_ME_URLS = (
-    "https://platform-api2.max.ru/me",
-    "https://platform-api.max.ru/me",
-)
+MAX_API_BASE = "https://platform-api2.max.ru"
+MAX_MESSAGES_URL = f"{MAX_API_BASE}/messages"
+MAX_ME_URL = f"{MAX_API_BASE}/me"
+MAX_UPDATES_URL = f"{MAX_API_BASE}/updates"
 MAX_PHOTO_URLS_IN_MESSAGE = 8
 MAX_MESSAGE_TEXT_LEN = 4000
 # (connect, read)
 MAX_HTTP_TIMEOUT = (25.0, 60.0)
 _max_ipv4_lock = threading.Lock()
-_max_session: requests.Session | None = None
 
 
 @contextmanager
@@ -48,13 +42,6 @@ def _force_ipv4_dns():
             yield
         finally:
             urllib3_connection.allowed_gai_family = orig
-
-
-def _max_http_session() -> requests.Session:
-    global _max_session
-    if _max_session is None:
-        _max_session = requests.Session()
-    return _max_session
 
 
 def _ssl_verify() -> bool | str:
@@ -90,63 +77,87 @@ def _truncate_message_text(text: str) -> str:
     return text[:keep] + suffix
 
 
-def _post_with_fallback(
+def _max_get(*, token: str, url: str, params: dict | None = None) -> requests.Response:
+    headers = {"Authorization": _authorization_header(token)}
+    verify = _ssl_verify()
+    with _force_ipv4_dns():
+        return requests.get(
+            url,
+            params=params,
+            headers=headers,
+            timeout=MAX_HTTP_TIMEOUT,
+            verify=verify,
+        )
+
+
+def _max_post(
     *,
-    urls: tuple[str, ...],
-    params: dict[str, int],
     token: str,
-    json_body: dict,
+    url: str,
+    params: dict[str, int] | None = None,
+    json_body: dict | None = None,
 ) -> requests.Response:
-    last_exc: requests.RequestException | None = None
-    session = _max_http_session()
     headers = {
         "Authorization": _authorization_header(token),
         "Content-Type": "application/json",
     }
     verify = _ssl_verify()
-
     with _force_ipv4_dns():
-        for url in urls:
-            try:
-                return session.post(
-                    url,
-                    params=params,
-                    headers=headers,
-                    json=json_body,
-                    timeout=MAX_HTTP_TIMEOUT,
-                    verify=verify,
-                )
-            except requests.RequestException as e:
-                last_exc = e
-                log.warning("MAX API POST failed url=%s: %s", url, e)
-        if last_exc is not None:
-            raise last_exc
-    raise RuntimeError("MAX API: no URLs configured")
+        return requests.post(
+            url,
+            params=params,
+            headers=headers,
+            json=json_body,
+            timeout=MAX_HTTP_TIMEOUT,
+            verify=verify,
+        )
 
 
 def probe_max_bot_api() -> tuple[bool, str]:
-    """
-    Проверка токена и сети (GET /me). Для диагностики на сервере, не в hot path.
-    """
-    if not max_notify_configured():
-        return False, "MAX_BOT_TOKEN или MAX_NOTIFY_USER_ID не заданы"
+    """Проверка токена и сети (GET /me)."""
+    if not settings.max_bot_token or not str(settings.max_bot_token).strip():
+        return False, "MAX_BOT_TOKEN не задан"
     token = str(settings.max_bot_token).strip()
-    session = _max_http_session()
-    headers = {"Authorization": _authorization_header(token)}
-    verify = _ssl_verify()
+    try:
+        r = _max_get(token=token, url=MAX_ME_URL)
+    except requests.RequestException as e:
+        return False, f"сеть/ssl (api2): {e}"
+    if r.status_code == 200:
+        return True, "GET /me ok"
+    if r.status_code == 401:
+        return False, "401: неверный MAX_BOT_TOKEN"
+    return False, f"GET /me status={r.status_code} body={(r.text or '')[:200]}"
 
-    with _force_ipv4_dns():
-        for url in MAX_ME_URLS:
-            try:
-                r = session.get(url, headers=headers, timeout=MAX_HTTP_TIMEOUT, verify=verify)
-                if r.status_code == 200:
-                    return True, "GET /me ok"
-                if r.status_code == 401:
-                    return False, "401: неверный MAX_BOT_TOKEN"
-                return False, f"GET /me status={r.status_code} body={(r.text or '')[:200]}"
-            except requests.RequestException as e:
-                last = str(e)
-        return False, f"сеть/ssl: {last}"
+
+def _collect_human_user_ids(payload: object, out: set[int]) -> None:
+    if isinstance(payload, dict):
+        uid = payload.get("user_id")
+        if isinstance(uid, int) and not payload.get("is_bot"):
+            out.add(uid)
+        for v in payload.values():
+            _collect_human_user_ids(v, out)
+    elif isinstance(payload, list):
+        for item in payload:
+            _collect_human_user_ids(item, out)
+
+
+def list_recent_max_sender_user_ids(*, limit: int = 20) -> tuple[int, set[int], int | None]:
+    """
+    GET /updates — user_id людей, писавших боту (для MAX_NOTIFY_USER_ID).
+    Возвращает (http_status, user_ids, marker).
+    """
+    if not settings.max_bot_token or not str(settings.max_bot_token).strip():
+        return 0, set(), None
+    token = str(settings.max_bot_token).strip()
+    r = _max_get(token=token, url=MAX_UPDATES_URL, params={"limit": limit})
+    if r.status_code != 200:
+        return r.status_code, set(), None
+    data = r.json()
+    ids: set[int] = set()
+    _collect_human_user_ids(data, ids)
+    marker = data.get("marker") if isinstance(data, dict) else None
+    m = int(marker) if isinstance(marker, int) else None
+    return 200, ids, m
 
 
 def _format_fitting_request_text(
@@ -235,10 +246,10 @@ def send_fitting_request_notification(
     user_id = int(settings.max_notify_user_id)  # type: ignore[arg-type]
 
     try:
-        r = _post_with_fallback(
-            urls=MAX_MESSAGES_URLS,
-            params={"user_id": user_id},
+        r = _max_post(
             token=token,
+            url=MAX_MESSAGES_URL,
+            params={"user_id": user_id},
             json_body={"text": text, "notify": True},
         )
         if r.status_code >= 400:
