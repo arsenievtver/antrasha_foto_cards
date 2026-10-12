@@ -6,9 +6,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 COPY docker/install-russian-trusted-ca.sh /tmp/install-russian-trusted-ca.sh
-RUN bash /tmp/install-russian-trusted-ca.sh \
- && apt-get update && apt-get install -y --no-install-recommends ffmpeg \
- && rm -rf /var/lib/apt/lists/* /tmp/install-russian-trusted-ca.sh
+RUN bash /tmp/install-russian-trusted-ca.sh && rm -f /tmp/install-russian-trusted-ca.sh
 
 ENV REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt \
     SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
