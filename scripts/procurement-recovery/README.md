@@ -30,12 +30,20 @@ python3 scripts/procurement-recovery/merge_sources.py
 MCP `create_*` **не задаёт старые UUID** — оплаты и строки заказов развалятся. Нужен скрипт с сохранением id:
 
 ```bash
-# на сервере, после git pull и копирования merged/
-docker compose -f deploy/docker-compose.prod.yml --project-directory deploy exec -T backend \
-  python scripts/import_procurement_merged.py scripts/procurement-recovery/merged --dry-run
+# на сервере (merged только на хосте — сначала docker cp, см. ниже)
+docker cp scripts/procurement-recovery/merged "$(docker compose -f deploy/docker-compose.prod.yml --project-directory deploy ps -q backend | head -1)":/tmp/procurement-merged
 
 docker compose -f deploy/docker-compose.prod.yml --project-directory deploy exec -T backend \
-  python scripts/import_procurement_merged.py scripts/procurement-recovery/merged
+  sh -c 'cd /app && PYTHONPATH=/app python scripts/import_procurement_merged.py /tmp/procurement-merged --dry-run'
+
+docker compose -f deploy/docker-compose.prod.yml --project-directory deploy exec -T backend \
+  sh -c 'cd /app && PYTHONPATH=/app python scripts/import_procurement_merged.py /tmp/procurement-merged'
+
+docker compose -f deploy/docker-compose.prod.yml --project-directory deploy exec -T backend \
+  sh -c 'cd /app && PYTHONPATH=/app python scripts/patch_procurement_line_categories.py /tmp/procurement-merged --dry-run'
+
+docker compose -f deploy/docker-compose.prod.yml --project-directory deploy exec -T backend \
+  sh -c 'cd /app && PYTHONPATH=/app python scripts/patch_procurement_line_categories.py /tmp/procurement-merged'
 ```
 
 Строки заказов: `category_id` маппится по **имени + полу** на категории текущей БД (uuid после миграции другие).

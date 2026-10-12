@@ -6,11 +6,16 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from pathlib import Path
+
+# docker: cwd /app, script at scripts/import_procurement_merged.py
+if __name__ == "__main__" and not __package__:
+    _root = Path(__file__).resolve().parents[1]
+    if str(_root) not in sys.path:
+        sys.path.insert(0, str(_root))
 import uuid
 from datetime import date, datetime, timezone
 from decimal import Decimal
-from pathlib import Path
-
 from sqlalchemy import select, update
 
 from app.database import SessionLocal
@@ -51,20 +56,33 @@ def load(path: Path, name: str) -> list[dict]:
 
 def build_category_map(
     db, recovery_categories: list[dict]
-) -> tuple[dict[tuple[str, str], uuid.UUID], dict[str, dict]]:
+) -> tuple[
+    dict[tuple[str, str], uuid.UUID],
+    dict[str, dict],
+    dict[str, uuid.UUID],
+]:
     live: dict[tuple[str, str], uuid.UUID] = {}
+    by_ms: dict[str, uuid.UUID] = {}
     for c in db.scalars(select(Category)).all():
         live[(c.name.strip().lower(), c.gender)] = c.id
+        if c.moy_sklad_id:
+            by_ms[str(c.moy_sklad_id)] = c.id
     rec_by_id = {c["id"]: c for c in recovery_categories}
-    return live, rec_by_id
+    return live, rec_by_id, by_ms
+
+
+_NO_CATEGORY = "без разбивки"
 
 
 def resolve_category_id(
     live: dict[tuple[str, str], uuid.UUID],
     rec_by_id: dict[str, dict],
+    by_ms: dict[str, uuid.UUID],
     line: dict,
 ) -> uuid.UUID | None:
     name = (line.get("category_name") or "").strip().lower()
+    if name == _NO_CATEGORY:
+        return None
     gender = line.get("category_gender") or line.get("gender")
     if name and gender:
         cid = live.get((name, gender))
@@ -73,6 +91,9 @@ def resolve_category_id(
     rid = line.get("category_id")
     if rid and rid in rec_by_id:
         rec = rec_by_id[rid]
+        ms = rec.get("moy_sklad_id")
+        if ms and ms in by_ms:
+            return by_ms[ms]
         return live.get((rec["name"].strip().lower(), rec["gender"]))
     return None
 
@@ -163,6 +184,7 @@ def import_orders(
     items: list[dict],
     live_cat: dict[tuple[str, str], uuid.UUID],
     rec_by_id: dict[str, dict],
+    by_ms: dict[str, uuid.UUID],
     dry_run: bool,
 ) -> tuple[int, list[str]]:
     n = 0
@@ -192,8 +214,8 @@ def import_orders(
         db.add(order)
         db.flush()
         for ln in raw.get("lines") or []:
-            cid = resolve_category_id(live_cat, rec_by_id, ln)
-            if cid is None:
+            cid = resolve_category_id(live_cat, rec_by_id, by_ms, ln)
+            if cid is None and (ln.get("category_name") or "").strip().lower() != _NO_CATEGORY:
                 warnings.append(
                     f"order {oid}: category not mapped: {ln.get('category_name')}"
                 )
@@ -289,14 +311,14 @@ def main() -> int:
 
     db = SessionLocal()
     try:
-        live_cat, rec_by_id = build_category_map(db, load(d, "categories.json"))
+        live_cat, rec_by_id, by_ms = build_category_map(db, load(d, "categories.json"))
         stats = {
             "seasons": import_seasons(db, load(d, "seasons.json"), args.dry_run),
             "brands": import_brands(db, load(d, "brands.json"), args.dry_run),
             "fx_rates": import_fx(db, load(d, "fx_rates.json"), args.dry_run),
         }
         on, warns = import_orders(
-            db, load(d, "orders.json"), live_cat, rec_by_id, args.dry_run
+            db, load(d, "orders.json"), live_cat, rec_by_id, by_ms, args.dry_run
         )
         stats["orders"] = on
         stats["payments"] = import_payments(db, load(d, "payments.json"), args.dry_run)
