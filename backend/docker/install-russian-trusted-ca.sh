@@ -23,10 +23,13 @@ use_yandex_debian_mirror
 apt-get update
 apt-get install -y --no-install-recommends ca-certificates curl ffmpeg
 
-curl -fsSL https://gu-st.ru/content/lrv/russian_trusted_root_ca_pem.crt \
+# Пути на gu-st.ru менялись: /content/lrv/… → 404, актуально /content/lending/… (gosuslugi.ru/crt)
+curl -fsSL https://gu-st.ru/content/lending/russian_trusted_root_ca_pem.crt \
   -o /usr/local/share/ca-certificates/russian_trusted_root_ca.crt
-curl -fsSL https://gu-st.ru/content/lrv/russian_trusted_sub_ca_pem.crt \
+curl -fsSL https://gu-st.ru/content/lending/russian_trusted_sub_ca_pem.crt \
   -o /usr/local/share/ca-certificates/russian_trusted_sub_ca.crt
+curl -fsSL https://gu-st.ru/content/lending/russian_trusted_sub_ca_2024_pem.crt \
+  -o /usr/local/share/ca-certificates/russian_trusted_sub_ca_2024.crt
 update-ca-certificates
 
 rm -rf /var/lib/apt/lists/*
