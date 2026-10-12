@@ -1,3 +1,6 @@
+# Local procurement recovery exports (business data)
+scripts/procurement-recovery/merged/
+
 # Logs
 logs
 *.log

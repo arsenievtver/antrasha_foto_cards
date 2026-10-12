@@ -102,15 +102,26 @@ done
 code="$(curl -sS -o /dev/null -w "%{http_code}" \
   "http://${DOMAIN}/.well-known/acme-challenge/ping-test" || echo fail)"
 echo "  HTTP ${code} for http://${DOMAIN}/.well-known/… (404 ок, refused — DNS/nginx)"
+if [[ "$code" == "000fail" || "$code" == "000" ]]; then
+  echo "[error] http://${DOMAIN} не отвечает, ACME не запускаем"
+  exit 1
+fi
 
-remove_placeholder_cert
+if ! live_cert_is_letsencrypt; then
+  remove_placeholder_cert
+fi
 
 echo "[step] issue Let's Encrypt for ${DOMAIN}"
-compose run --rm certbot certonly \
+if ! compose run --rm certbot certonly \
   --webroot -w /var/www/certbot \
   -d "$DOMAIN" \
   --email "$LETSENCRYPT_EMAIL" \
-  --agree-tos --no-eff-email --non-interactive
+  --agree-tos --no-eff-email --non-interactive; then
+  echo "[error] certbot не выпустил сертификат — возвращаем placeholder, чтобы nginx снова стартовал"
+  write_placeholder_cert
+  compose up -d --force-recreate nginx
+  exit 1
+fi
 
 compose up -d --force-recreate nginx
 echo "[ok] https://${DOMAIN}"

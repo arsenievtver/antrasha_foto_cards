@@ -68,12 +68,37 @@ async function tryBindRefToExistingSession(sessionId) {
 	}
 }
 
+/** После смены БД/сервера в localStorage может остаться чужой session_id → /feed 404. */
+async function isSessionKnownToServer(sessionId) {
+	try {
+		const res = await fetch(apiUrl(`/sessions/${sessionId}/attribution`), {
+			method: "PATCH",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ ref: "probe" }),
+		});
+		if (res.status === 404) return false;
+		return res.ok;
+	} catch {
+		return true;
+	}
+}
+
+function clearStoredSessionId() {
+	localStorage.removeItem(SESSION_KEY);
+	localStorage.removeItem(REF_BOUND_SESSION_KEY);
+}
+
 /** Создаёт сессию один раз и кеширует ID в localStorage */
 export async function ensureSessionId() {
 	let id = localStorage.getItem(SESSION_KEY);
 	if (id) {
-		await tryBindRefToExistingSession(id);
-		return id;
+		if (!(await isSessionKnownToServer(id))) {
+			clearStoredSessionId();
+			id = null;
+		} else {
+			await tryBindRefToExistingSession(id);
+			return id;
+		}
 	}
 	const ref = getStoredRef();
 	const res = await postSession();
@@ -249,15 +274,30 @@ export async function loadFeed(
 	gender,
 	{ limit = 30, includeSeen = false, excludePhotoIds = [] } = {},
 ) {
-	const headers = await sessionAuthHeaders();
 	const q = new URLSearchParams({ gender, limit: String(limit) });
 	if (includeSeen) q.set("include_seen", "true");
 	for (const id of excludePhotoIds) {
 		if (id) q.append("exclude_photo_id", String(id));
 	}
-	const res = await fetch(`${apiUrl("/feed")}?${q}`, { headers });
+	const feedUrl = `${apiUrl("/feed")}?${q}`;
+
+	async function fetchFeedOnce() {
+		const headers = await sessionAuthHeaders();
+		return fetch(feedUrl, { headers });
+	}
+
+	let res = await fetchFeedOnce();
 	if (!res.ok) {
 		const text = await res.text();
+		if (res.status === 404 && text.includes("Session not found")) {
+			await createFreshSessionId();
+			res = await fetchFeedOnce();
+			if (!res.ok) {
+				const retryText = await res.text();
+				throw new Error(retryText || `Feed ${res.status}`);
+			}
+			return res.json();
+		}
 		throw new Error(text || `Feed ${res.status}`);
 	}
 	return res.json();
