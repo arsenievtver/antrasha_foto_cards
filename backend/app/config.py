@@ -88,6 +88,15 @@ class Settings(BaseSettings):
         default=None,
         validation_alias=AliasChoices("MAX_NOTIFY_USER_ID", "max_notify_user_id"),
     )
+    # Если задан — POST /send на relay (network_mode: host), см. max-relay в docker-compose.prod
+    max_notify_relay_url: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("MAX_NOTIFY_RELAY_URL", "max_notify_relay_url"),
+    )
+    max_relay_secret: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("MAX_RELAY_SECRET", "max_relay_secret"),
+    )
 
     # Web Push (PWA): VAPID-ключи — scripts/generate_vapid_keys.py
     vapid_public_key: str | None = Field(

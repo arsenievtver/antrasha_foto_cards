@@ -15,15 +15,32 @@ services:
     networks:
       - antrasha_net
 
+  max-relay:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    network_mode: host
+    command: ["python", "-m", "app.max_relay"]
+    env_file:
+      - ./env/.env.backend.prod
+    environment:
+      REQUESTS_CA_BUNDLE: /etc/ssl/certs/ca-certificates.crt
+      SSL_CERT_FILE: /etc/ssl/certs/ca-certificates.crt
+      MAX_RELAY_BIND: 127.0.0.1:18080
+
   backend:
     build:
       context: ../backend
       dockerfile: Dockerfile
     restart: unless-stopped
     command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       REQUESTS_CA_BUNDLE: /etc/ssl/certs/ca-certificates.crt
       SSL_CERT_FILE: /etc/ssl/certs/ca-certificates.crt
+      MAX_NOTIFY_RELAY_URL: http://host.docker.internal:18080
     env_file:
       - ./env/.env.backend.prod
       - ./env/.env.postgres.prod
@@ -35,6 +52,8 @@ services:
       - antrasha_ai_ingest_tmp:/app/var/ai_ingest_tmp
       - antrasha_try_on_tmp:/app/var/try_on_tmp
     depends_on:
+      max-relay:
+        condition: service_started
       postgres:
         condition: service_healthy
     # Только localhost — удобная проверка API до поднятия nginx: curl http://127.0.0.1:8000/health

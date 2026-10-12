@@ -128,7 +128,36 @@ def _max_post_messages_via_curl(
         code = int(code_str.strip())
     except ValueError as e:
         raise RuntimeError(f"curl: bad http code {code_str!r}") from e
+    if code <= 0:
+        err = (proc.stderr or b"").decode("utf-8", errors="replace").strip()
+        raise RuntimeError(
+            f"curl: no HTTP response (code={code_str!r}, exit={proc.returncode}): {err[:500]}"
+        )
     return _MaxHttpResult(status_code=code, body=body.strip())
+
+
+def _max_post_messages_via_relay(
+    *,
+    user_id: int,
+    json_body: dict,
+) -> _MaxHttpResult:
+    relay = (settings.max_notify_relay_url or "").strip().rstrip("/")
+    secret = (settings.max_relay_secret or "").strip()
+    if not relay or not secret:
+        raise RuntimeError("MAX_NOTIFY_RELAY_URL / MAX_RELAY_SECRET не заданы")
+    r = requests.post(
+        f"{relay}/send",
+        headers={"X-Max-Relay-Secret": secret, "Content-Type": "application/json"},
+        json={"user_id": user_id, **json_body},
+        timeout=MAX_HTTP_TIMEOUT,
+    )
+    if r.status_code != 200:
+        return _MaxHttpResult(status_code=r.status_code, body=(r.text or "")[:500])
+    data = r.json()
+    return _MaxHttpResult(
+        status_code=int(data.get("status_code") or 0),
+        body=str(data.get("body") or ""),
+    )
 
 
 def _authorization_header(raw_token: str) -> str:
@@ -331,15 +360,22 @@ def send_fitting_request_notification(
 
     status_code = 0
     resp_body = ""
+    use_relay = bool(
+        (settings.max_notify_relay_url or "").strip()
+        and (settings.max_relay_secret or "").strip()
+    )
     try:
-        curl_res = _max_post_messages_via_curl(
-            token=token,
-            user_id=user_id,
-            json_body=msg_body,
-        )
-        status_code = curl_res.status_code
-        resp_body = curl_res.body
-    except (OSError, RuntimeError, subprocess.TimeoutExpired) as curl_err:
+        if use_relay:
+            sent = _max_post_messages_via_relay(user_id=user_id, json_body=msg_body)
+        else:
+            sent = _max_post_messages_via_curl(
+                token=token,
+                user_id=user_id,
+                json_body=msg_body,
+            )
+        status_code = sent.status_code
+        resp_body = sent.body
+    except (OSError, RuntimeError, subprocess.TimeoutExpired, requests.RequestException) as curl_err:
         log.warning(
             "MAX notify curl failed request_id=%s: %s; fallback requests",
             request_id,
