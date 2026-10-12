@@ -3,11 +3,20 @@
 
 from __future__ import annotations
 
+import requests
+
 from app.services.max_notify import list_recent_max_sender_user_ids
 
 
 def main() -> None:
-    status, ids, marker = list_recent_max_sender_user_ids(limit=50)
+    try:
+        status, ids, marker = list_recent_max_sender_user_ids(limit=50)
+    except requests.RequestException as e:
+        print("MAX API недоступен (таймаут/ssl). Повторите через минуту или:")
+        print("  docker compose … exec backend curl -4 -sS --cacert /etc/ssl/certs/ca-certificates.crt \\")
+        print('    -H "Authorization: <MAX_BOT_TOKEN>" "https://platform-api2.max.ru/updates?limit=20"')
+        print("error:", e)
+        raise SystemExit(1) from e
     print("updates_http_status=", status)
     print("marker=", marker)
     if status != 200:

@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import socket
-import threading
+import subprocess
+import time
 import uuid
-from contextlib import contextmanager
+from dataclasses import dataclass
 from datetime import datetime
+from typing import Callable, TypeVar
 
 import requests
 import urllib3.util.connection as urllib3_connection
@@ -17,41 +20,115 @@ from app.config import settings
 
 log = logging.getLogger("app.max")
 
+# Docker bridge: AAAA до *.max.ru часто не ходит; патч на весь процесс (как в рабочем one-liner на сервере).
+urllib3_connection.allowed_gai_family = lambda: socket.AF_INET
+
 MAX_API_BASE = "https://platform-api2.max.ru"
 MAX_MESSAGES_URL = f"{MAX_API_BASE}/messages"
 MAX_ME_URL = f"{MAX_API_BASE}/me"
 MAX_UPDATES_URL = f"{MAX_API_BASE}/updates"
 MAX_PHOTO_URLS_IN_MESSAGE = 8
 MAX_MESSAGE_TEXT_LEN = 4000
-# (connect, read)
-MAX_HTTP_TIMEOUT = (25.0, 60.0)
-_max_ipv4_lock = threading.Lock()
+# (connect, read) — handshake до max.ru с VPS иногда долгий
+MAX_HTTP_TIMEOUT = (45.0, 90.0)
+_MAX_HTTP_RETRIES = 3
+
+_T = TypeVar("_T")
 
 
-@contextmanager
-def _force_ipv4_dns():
-    """В bridge-сети Docker AAAA часто «чёрная дыра» → timeout на TLS handshake."""
-    with _max_ipv4_lock:
-        orig = urllib3_connection.allowed_gai_family
-
-        def _ipv4_only() -> int:
-            return socket.AF_INET
-
-        urllib3_connection.allowed_gai_family = _ipv4_only
+def _retry_on_timeout(call: Callable[[], _T]) -> _T:
+    last: requests.RequestException | None = None
+    for attempt in range(_MAX_HTTP_RETRIES):
         try:
-            yield
-        finally:
-            urllib3_connection.allowed_gai_family = orig
+            return call()
+        except requests.RequestException as e:
+            last = e
+            if attempt + 1 >= _MAX_HTTP_RETRIES:
+                break
+            wait = 2.0 * (attempt + 1)
+            log.warning("MAX API request retry %s/%s: %s", attempt + 1, _MAX_HTTP_RETRIES, e)
+            time.sleep(wait)
+    assert last is not None
+    raise last
 
 
-def _ssl_verify() -> bool | str:
+def _ca_bundle_path() -> str | None:
     bundle = os.environ.get("REQUESTS_CA_BUNDLE") or os.environ.get("SSL_CERT_FILE")
     if bundle and os.path.isfile(bundle):
         return bundle
     default = "/etc/ssl/certs/ca-certificates.crt"
     if os.path.isfile(default):
         return default
-    return True
+    return None
+
+
+def _ssl_verify() -> bool | str:
+    return _ca_bundle_path() or True
+
+
+@dataclass(frozen=True)
+class _MaxHttpResult:
+    status_code: int
+    body: str
+
+
+_CURL_CODE_SUFFIX = "\n__CURL_HTTP_CODE__="
+
+
+def _max_post_messages_via_curl(
+    *,
+    token: str,
+    user_id: int,
+    json_body: dict,
+) -> _MaxHttpResult:
+    """На части VPS Python/urllib3 до *.max.ru нестабилен; curl -4 — рабочий путь."""
+    ca = _ca_bundle_path()
+    cmd: list[str] = [
+        "curl",
+        "-4",
+        "-sS",
+        "--connect-timeout",
+        "45",
+        "--max-time",
+        "90",
+    ]
+    if ca:
+        cmd.extend(["--cacert", ca])
+    cmd.extend(
+        [
+            "-X",
+            "POST",
+            "-H",
+            f"Authorization: {_authorization_header(token)}",
+            "-H",
+            "Content-Type: application/json; charset=utf-8",
+            "--data-binary",
+            "@-",
+            "-w",
+            f"{_CURL_CODE_SUFFIX}%{{http_code}}",
+            f"{MAX_MESSAGES_URL}?user_id={user_id}",
+        ]
+    )
+    payload = json.dumps(json_body, ensure_ascii=False).encode("utf-8")
+    proc = subprocess.run(
+        cmd,
+        input=payload,
+        capture_output=True,
+        timeout=120,
+        check=False,
+    )
+    if proc.returncode != 0 and not proc.stdout:
+        err = (proc.stderr or b"").decode("utf-8", errors="replace").strip()
+        raise RuntimeError(f"curl exit {proc.returncode}: {err[:500]}")
+    out = (proc.stdout or b"").decode("utf-8", errors="replace")
+    if _CURL_CODE_SUFFIX not in out:
+        raise RuntimeError(f"curl: unexpected output: {out[:300]}")
+    body, _, code_str = out.rpartition(_CURL_CODE_SUFFIX)
+    try:
+        code = int(code_str.strip())
+    except ValueError as e:
+        raise RuntimeError(f"curl: bad http code {code_str!r}") from e
+    return _MaxHttpResult(status_code=code, body=body.strip())
 
 
 def _authorization_header(raw_token: str) -> str:
@@ -80,7 +157,8 @@ def _truncate_message_text(text: str) -> str:
 def _max_get(*, token: str, url: str, params: dict | None = None) -> requests.Response:
     headers = {"Authorization": _authorization_header(token)}
     verify = _ssl_verify()
-    with _force_ipv4_dns():
+
+    def _do() -> requests.Response:
         return requests.get(
             url,
             params=params,
@@ -88,6 +166,8 @@ def _max_get(*, token: str, url: str, params: dict | None = None) -> requests.Re
             timeout=MAX_HTTP_TIMEOUT,
             verify=verify,
         )
+
+    return _retry_on_timeout(_do)
 
 
 def _max_post(
@@ -102,7 +182,8 @@ def _max_post(
         "Content-Type": "application/json",
     }
     verify = _ssl_verify()
-    with _force_ipv4_dns():
+
+    def _do() -> requests.Response:
         return requests.post(
             url,
             params=params,
@@ -111,6 +192,8 @@ def _max_post(
             timeout=MAX_HTTP_TIMEOUT,
             verify=verify,
         )
+
+    return _retry_on_timeout(_do)
 
 
 def probe_max_bot_api() -> tuple[bool, str]:
@@ -244,28 +327,49 @@ def send_fitting_request_notification(
     )
     token = str(settings.max_bot_token).strip()
     user_id = int(settings.max_notify_user_id)  # type: ignore[arg-type]
+    msg_body = {"text": text, "notify": True}
 
+    status_code = 0
+    resp_body = ""
     try:
-        r = _max_post(
+        curl_res = _max_post_messages_via_curl(
             token=token,
-            url=MAX_MESSAGES_URL,
-            params={"user_id": user_id},
-            json_body={"text": text, "notify": True},
+            user_id=user_id,
+            json_body=msg_body,
         )
-        if r.status_code >= 400:
+        status_code = curl_res.status_code
+        resp_body = curl_res.body
+    except (OSError, RuntimeError, subprocess.TimeoutExpired) as curl_err:
+        log.warning(
+            "MAX notify curl failed request_id=%s: %s; fallback requests",
+            request_id,
+            curl_err,
+        )
+        try:
+            r = _max_post(
+                token=token,
+                url=MAX_MESSAGES_URL,
+                params={"user_id": user_id},
+                json_body=msg_body,
+            )
+            status_code = r.status_code
+            resp_body = r.text or ""
+        except requests.RequestException as e:
             log.warning(
-                "MAX notify failed request_id=%s user_id=%s status=%s body=%s",
+                "MAX notify error request_id=%s user_id=%s: %s",
                 request_id,
                 user_id,
-                r.status_code,
-                (r.text or "")[:500],
+                e,
             )
             return
-        log.info("MAX notify sent request_id=%s user_id=%s", request_id, user_id)
-    except requests.RequestException as e:
+
+    if status_code >= 400:
         log.warning(
-            "MAX notify error request_id=%s user_id=%s: %s",
+            "MAX notify failed request_id=%s user_id=%s status=%s body=%s",
             request_id,
             user_id,
-            e,
+            status_code,
+            resp_body[:500],
         )
+        return
+    log.info("MAX notify sent request_id=%s user_id=%s", request_id, user_id)
