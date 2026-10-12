@@ -97,6 +97,10 @@ class Settings(BaseSettings):
         default=None,
         validation_alias=AliasChoices("MAX_RELAY_SECRET", "max_relay_secret"),
     )
+    max_relay_unix: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("MAX_RELAY_UNIX", "max_relay_unix"),
+    )
 
     # Web Push (PWA): VAPID-ключи — scripts/generate_vapid_keys.py
     vapid_public_key: str | None = Field(

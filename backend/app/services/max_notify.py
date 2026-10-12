@@ -136,30 +136,81 @@ def _max_post_messages_via_curl(
     return _MaxHttpResult(status_code=code, body=body.strip())
 
 
+def _parse_relay_envelope(raw: str) -> _MaxHttpResult:
+    data = json.loads(raw)
+    return _MaxHttpResult(
+        status_code=int(data.get("status_code") or 0),
+        body=str(data.get("body") or data.get("error") or ""),
+    )
+
+
 def _max_post_messages_via_relay(
     *,
     user_id: int,
     json_body: dict,
 ) -> _MaxHttpResult:
-    relay = (settings.max_notify_relay_url or "").strip().rstrip("/")
     secret = (settings.max_relay_secret or "").strip()
-    if not relay or not secret:
-        raise RuntimeError("MAX_NOTIFY_RELAY_URL / MAX_RELAY_SECRET не заданы")
-    # До relay на хосте — короткий connect; MAX API делает curl внутри relay
-    relay_timeout = (8.0, 120.0)
+    if not secret:
+        raise RuntimeError("MAX_RELAY_SECRET не задан")
+
+    unix_sock = (settings.max_relay_unix or "").strip()
+    if unix_sock:
+        payload = json.dumps(
+            {"user_id": user_id, **json_body},
+            ensure_ascii=False,
+        ).encode("utf-8")
+        cmd = [
+            "curl",
+            "-sS",
+            "--connect-timeout",
+            "5",
+            "--max-time",
+            "120",
+            "--unix-socket",
+            unix_sock,
+            "-X",
+            "POST",
+            "-H",
+            f"X-Max-Relay-Secret: {secret}",
+            "-H",
+            "Content-Type: application/json; charset=utf-8",
+            "--data-binary",
+            "@-",
+            "-w",
+            f"{_CURL_CODE_SUFFIX}%{{http_code}}",
+            "http://localhost/send",
+        ]
+        proc = subprocess.run(
+            cmd,
+            input=payload,
+            capture_output=True,
+            timeout=130,
+            check=False,
+        )
+        if proc.returncode != 0 and not proc.stdout:
+            err = (proc.stderr or b"").decode("utf-8", errors="replace").strip()
+            raise RuntimeError(f"relay unix curl: {err[:500]}")
+        out = (proc.stdout or b"").decode("utf-8", errors="replace")
+        if _CURL_CODE_SUFFIX not in out:
+            raise RuntimeError(f"relay unix: bad output {out[:300]}")
+        body, _, code_str = out.rpartition(_CURL_CODE_SUFFIX)
+        http_code = int(code_str.strip())
+        if http_code != 200:
+            return _MaxHttpResult(status_code=http_code, body=body.strip()[:500])
+        return _parse_relay_envelope(body.strip())
+
+    relay = (settings.max_notify_relay_url or "").strip().rstrip("/")
+    if not relay:
+        raise RuntimeError("MAX_RELAY_UNIX или MAX_NOTIFY_RELAY_URL не заданы")
     r = requests.post(
         f"{relay}/send",
         headers={"X-Max-Relay-Secret": secret, "Content-Type": "application/json"},
         json={"user_id": user_id, **json_body},
-        timeout=relay_timeout,
+        timeout=(8.0, 120.0),
     )
     if r.status_code != 200:
         return _MaxHttpResult(status_code=r.status_code, body=(r.text or "")[:500])
-    data = r.json()
-    return _MaxHttpResult(
-        status_code=int(data.get("status_code") or 0),
-        body=str(data.get("body") or ""),
-    )
+    return _parse_relay_envelope(r.text or "{}")
 
 
 def _authorization_header(raw_token: str) -> str:
@@ -363,8 +414,11 @@ def send_fitting_request_notification(
     status_code = 0
     resp_body = ""
     use_relay = bool(
-        (settings.max_notify_relay_url or "").strip()
-        and (settings.max_relay_secret or "").strip()
+        (settings.max_relay_secret or "").strip()
+        and (
+            (settings.max_relay_unix or "").strip()
+            or (settings.max_notify_relay_url or "").strip()
+        )
     )
     try:
         if use_relay:

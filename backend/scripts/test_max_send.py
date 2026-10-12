@@ -17,8 +17,11 @@ def main() -> None:
         raise SystemExit(1)
     uid = int(settings.max_notify_user_id)  # type: ignore[arg-type]
     body = {"text": "Тест заявки (backend)", "notify": True}
-    if (settings.max_notify_relay_url or "").strip() and (settings.max_relay_secret or "").strip():
-        print("via=relay", settings.max_notify_relay_url)
+    secret_ok = bool((settings.max_relay_secret or "").strip())
+    unix = (settings.max_relay_unix or "").strip()
+    relay_url = (settings.max_notify_relay_url or "").strip()
+    if secret_ok and (unix or relay_url):
+        print("via=relay", unix or relay_url)
         res = _max_post_messages_via_relay(user_id=uid, json_body=body)
     else:
         print("via=curl (direct from container — часто не работает на VPS)")

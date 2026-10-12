@@ -27,8 +27,9 @@ services:
     environment:
       REQUESTS_CA_BUNDLE: /etc/ssl/certs/ca-certificates.crt
       SSL_CERT_FILE: /etc/ssl/certs/ca-certificates.crt
-      # 127.0.0.1 недоступен из bridge; слушаем все интерфейсы хоста (секрет в X-Max-Relay-Secret)
-      MAX_RELAY_BIND: 0.0.0.0:18080
+      MAX_RELAY_UNIX: /run/antrasha-max-relay/relay.sock
+    volumes:
+      - antrasha_max_relay:/run/antrasha-max-relay
 
   backend:
     build:
@@ -36,16 +37,15 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     environment:
       REQUESTS_CA_BUNDLE: /etc/ssl/certs/ca-certificates.crt
       SSL_CERT_FILE: /etc/ssl/certs/ca-certificates.crt
-      MAX_NOTIFY_RELAY_URL: http://host.docker.internal:18080
+      MAX_RELAY_UNIX: /run/antrasha-max-relay/relay.sock
     env_file:
       - ./env/.env.backend.prod
       - ./env/.env.postgres.prod
     volumes:
+      - antrasha_max_relay:/run/antrasha-max-relay
       - antrasha_promo_media:/app/data/promo-banners
       - antrasha_hero_media:/app/data/hero-banners
       - antrasha_home_v2_media:/app/data/home-v2
@@ -244,6 +244,7 @@ volumes:
   antrasha_vton_hf_cache:
   antrasha_try_on_tmp:
   antrasha_embed_hf_cache:
+  antrasha_max_relay:
 
 networks:
   antrasha_net:

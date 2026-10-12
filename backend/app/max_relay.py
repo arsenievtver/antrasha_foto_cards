@@ -1,8 +1,7 @@
 """
-HTTP-ретранслятор MAX API на network_mode: host (Docker bridge до *.max.ru часто не ходит).
+HTTP-ретранслятор MAX API на network_mode: host (исходящий curl с сети хоста).
 
-Запуск: python -m app.max_relay
-Слушает только 127.0.0.1 — backend ходит через host.docker.internal.
+Backend вызывает relay через Unix-сокет в общем volume (UFW не режет, в отличие от TCP bridge→host).
 """
 
 from __future__ import annotations
@@ -11,7 +10,8 @@ import json
 import logging
 import os
 import socket
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from socketserver import ThreadingMixIn, UnixStreamServer
 from typing import Any
 
 from app.services import max_notify
@@ -82,7 +82,11 @@ class _RelayHandler(BaseHTTPRequestHandler):
         self.wfile.write(out.encode("utf-8"))
 
 
-def _parse_bind() -> tuple[str, int]:
+class _ThreadingUnixServer(ThreadingMixIn, UnixStreamServer):
+    daemon_threads = True
+
+
+def _parse_tcp_bind() -> tuple[str, int]:
     raw = (os.environ.get("MAX_RELAY_BIND") or "0.0.0.0:18080").strip()
     host, _, port_s = raw.partition(":")
     port = int(port_s or "18080")
@@ -91,12 +95,26 @@ def _parse_bind() -> tuple[str, int]:
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO)
-    host, port = _parse_bind()
-    # IPv4-only bind на host
-    class _Server(ThreadingHTTPServer):
-        address_family = socket.AF_INET
+    unix_path = (os.environ.get("MAX_RELAY_UNIX") or "").strip()
+    if unix_path:
+        parent = os.path.dirname(unix_path)
+        if parent:
+            os.makedirs(parent, exist_ok=True)
+        if os.path.exists(unix_path):
+            os.unlink(unix_path)
+        server = _ThreadingUnixServer(unix_path, _RelayHandler)
+        os.chmod(unix_path, 0o666)
+        log.info("MAX relay listening on unix:%s (POST /send)", unix_path)
+        server.serve_forever()
+        return
 
-    server = _Server((host, port), _RelayHandler)
+    host, port = _parse_tcp_bind()
+
+    class _TcpServer(ThreadingMixIn, HTTPServer):
+        address_family = socket.AF_INET
+        daemon_threads = True
+
+    server = _TcpServer((host, port), _RelayHandler)
     log.info("MAX relay listening on http://%s:%s (POST /send)", host, port)
     server.serve_forever()
 
