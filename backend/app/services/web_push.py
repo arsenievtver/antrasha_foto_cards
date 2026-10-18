@@ -7,6 +7,7 @@ import logging
 import uuid
 from datetime import datetime, timedelta, timezone
 
+import requests
 from pywebpush import WebPushException, webpush
 from sqlalchemy import or_, select, update
 from sqlalchemy.orm import Session
@@ -24,6 +25,10 @@ log = logging.getLogger("app.web_push")
 
 NOTIFY_COOLDOWN = timedelta(hours=24)
 NOTIFICATION_TAG = "antrasha-new-photos"
+# Часть anycast-адресов web.push.apple.com принимает TCP и не отвечает.
+# Без таймаута requests ждёт бесконечно, и вся рассылка в админке висит.
+PUSH_SEND_TIMEOUT = (5.0, 8.0)
+PUSH_SEND_ATTEMPTS = 3
 
 
 def web_push_configured(settings: Settings) -> bool:
@@ -184,29 +189,50 @@ def _send_one(
     settings: Settings,
     payload: dict,
 ) -> bool:
-    try:
-        webpush(
-            subscription_info=_subscription_info(row),
-            data=json.dumps(payload, ensure_ascii=False),
-            vapid_private_key=settings.vapid_private_key.strip(),
-            vapid_claims={"sub": settings.vapid_claims_sub.strip()},
-        )
-        return True
-    except WebPushException as ex:
-        status = ex.response.status_code if ex.response is not None else None
-        if status in (404, 410):
-            row.is_active = False
-            log.info("web_push: подписка %s деактивирована (HTTP %s)", row.id, status)
-        else:
-            log.warning(
-                "web_push: ошибка отправки подписке %s: %s",
-                row.id,
-                ex,
+    data = json.dumps(payload, ensure_ascii=False)
+    claims_sub = settings.vapid_claims_sub.strip()
+    private_key = settings.vapid_private_key.strip()
+    last_error: Exception | None = None
+    for attempt in range(1, PUSH_SEND_ATTEMPTS + 1):
+        try:
+            webpush(
+                subscription_info=_subscription_info(row),
+                data=data,
+                vapid_private_key=private_key,
+                vapid_claims={"sub": claims_sub},
+                timeout=PUSH_SEND_TIMEOUT,
             )
-        return False
-    except Exception:
-        log.exception("web_push: неожиданная ошибка для подписки %s", row.id)
-        return False
+            return True
+        except WebPushException as ex:
+            status = ex.response.status_code if ex.response is not None else None
+            if status in (404, 410):
+                row.is_active = False
+                log.info("web_push: подписка %s деактивирована (HTTP %s)", row.id, status)
+            else:
+                log.warning(
+                    "web_push: ошибка отправки подписке %s: %s",
+                    row.id,
+                    ex,
+                )
+            return False
+        except (requests.Timeout, requests.ConnectionError) as ex:
+            last_error = ex
+            log.warning(
+                "web_push: нет ответа от push-сервиса, подписка %s, попытка %s/%s",
+                row.id,
+                attempt,
+                PUSH_SEND_ATTEMPTS,
+            )
+        except Exception:
+            log.exception("web_push: неожиданная ошибка для подписки %s", row.id)
+            return False
+    log.warning(
+        "web_push: не отправилось подписке %s после %s попыток: %s",
+        row.id,
+        PUSH_SEND_ATTEMPTS,
+        last_error,
+    )
+    return False
 
 
 def _new_photos_count_for_scope(
