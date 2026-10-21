@@ -4,13 +4,16 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 import uuid
 from datetime import datetime, timedelta, timezone
 
 import requests
 from pywebpush import WebPushException, webpush
+from requests.adapters import HTTPAdapter
 from sqlalchemy import or_, select, update
 from sqlalchemy.orm import Session
+from urllib3.util.retry import Retry
 
 from app.config import Settings
 from app.models import PushSubscription
@@ -27,8 +30,65 @@ NOTIFY_COOLDOWN = timedelta(hours=24)
 NOTIFICATION_TAG = "antrasha-new-photos"
 # Часть anycast-адресов web.push.apple.com принимает TCP и не отвечает.
 # Без таймаута requests ждёт бесконечно, и вся рассылка в админке висит.
+# На VPS без IPv6 первый connect через голый requests часто упирается в AAAA (~5 с),
+# повторный клик «успешен» из‑за кэша/DNS — как в Avtomedik external_http (bind IPv4).
 PUSH_SEND_TIMEOUT = (5.0, 8.0)
 PUSH_SEND_ATTEMPTS = 3
+_PUSH_HTTP_SESSION: requests.Session | None = None
+
+
+class _IPv4HttpAdapter(HTTPAdapter):
+    def init_poolmanager(self, connections, maxsize, block=False, **pool_kwargs):
+        pool_kwargs["source_address"] = ("0.0.0.0", 0)
+        return super().init_poolmanager(connections, maxsize, block=block, **pool_kwargs)
+
+
+def push_http_session() -> requests.Session:
+    """Общая сессия для pywebpush: исходящий IPv4, без urllib3-retry на connect."""
+    global _PUSH_HTTP_SESSION
+    if _PUSH_HTTP_SESSION is None:
+        no_retry = Retry(total=0, connect=0, read=0, redirect=0, status=0)
+        adapter = _IPv4HttpAdapter(max_retries=no_retry)
+        session = requests.Session()
+        session.mount("https://", adapter)
+        session.mount("http://", adapter)
+        _PUSH_HTTP_SESSION = session
+    return _PUSH_HTTP_SESSION
+
+
+def probe_push_transport(
+    *,
+    url: str = "https://web.push.apple.com/",
+    timeout: tuple[float, float] = (5.0, 5.0),
+) -> list[dict[str, object]]:
+    """Диагностика: сравнить задержку default requests vs IPv4-session (см. scripts/diag_push_http.py)."""
+    rows: list[dict[str, object]] = []
+
+    def _one(label: str, session: requests.Session | None) -> None:
+        t0 = time.perf_counter()
+        err: str | None = None
+        status: int | None = None
+        try:
+            if session is None:
+                resp = requests.get(url, timeout=timeout)
+            else:
+                resp = session.get(url, timeout=timeout)
+            status = resp.status_code
+        except Exception as ex:
+            err = f"{type(ex).__name__}: {ex}"
+        rows.append(
+            {
+                "variant": label,
+                "seconds": round(time.perf_counter() - t0, 3),
+                "status": status,
+                "error": err,
+            }
+        )
+
+    _one("requests_default_cold", None)
+    _one("push_ipv4_session_cold", push_http_session())
+    _one("push_ipv4_session_warm", push_http_session())
+    return rows
 
 
 def web_push_configured(settings: Settings) -> bool:
@@ -263,6 +323,7 @@ def _send_one(
                 vapid_private_key=private_key,
                 vapid_claims={"sub": claims_sub},
                 timeout=PUSH_SEND_TIMEOUT,
+                requests_session=push_http_session(),
             )
             return True
         except WebPushException as ex:
