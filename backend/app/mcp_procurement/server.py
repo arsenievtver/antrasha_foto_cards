@@ -22,6 +22,7 @@ from app.mcp_procurement.registry import (
 from app.services.mcp_keys import McpActor
 
 import app.mcp_procurement.gift_certificate_tools  # noqa: F401,E402
+import app.mcp_procurement.marketing_tools  # noqa: F401,E402
 import app.mcp_procurement.ranking_eval_tools  # noqa: F401,E402
 import app.mcp_procurement.staff_feedback_tools  # noqa: F401,E402
 import app.mcp_procurement.tools  # noqa: F401,E402
@@ -79,7 +80,13 @@ SERVER_INSTRUCTIONS = (
     "Пользователи приложения (только ключ суперпользователя, без создания/редактирования): "
     "list_app_users (неактивные, по телефону, по имени), get_app_user (свайпы, вкус, push, "
     "ближайшие фото коллекции, сертификаты, заявки), lookup_app_users_by_phones, "
-    "list_fitting_requests."
+    "list_fitting_requests. "
+    "Маркетинг PWA (баннеры и акция сертификата): get_welcome_gift_settings, "
+    "update_welcome_gift_settings; list/get/create/update promo_banners и "
+    "upload_promo_banner_image; list/get/create/update hero_banners и "
+    "upload_hero_banner_image. Текст промо поддерживает **жирный**. "
+    "Картинки — base64 в upload_* или файл в админке «Реклама». Удаление баннеров "
+    "только в админке."
 )
 
 PARSE_ERROR = -32700

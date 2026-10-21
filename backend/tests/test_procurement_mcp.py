@@ -38,6 +38,9 @@ class ProcurementMcpProtocolTests(unittest.TestCase):
         self.assertIn("list_fx_rates", names)
         self.assertIn("list_gift_certificates", names)
         self.assertIn("get_gift_certificate", names)
+        self.assertIn("get_welcome_gift_settings", names)
+        self.assertIn("list_promo_banners", names)
+        self.assertIn("list_hero_banners", names)
         for user_tool in (
             "list_app_users",
             "get_app_user",
@@ -70,6 +73,10 @@ class ProcurementMcpProtocolTests(unittest.TestCase):
             "create_gift_certificates_batch",
             "send_gift_certificate_share_sms",
             "send_marketing_sms_batch",
+            "update_welcome_gift_settings",
+            "create_promo_banner",
+            "upload_promo_banner_image",
+            "create_hero_banner",
         ):
             self.assertIn(required, names)
         self.assertFalse(any("delete" in name for name in names))
