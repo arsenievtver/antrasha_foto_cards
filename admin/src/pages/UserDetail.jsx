@@ -1,6 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { fetchUserDetail, getRole, updateUser } from "../api.js";
+import {
+  fetchUserDetail,
+  getRole,
+  hasPermission,
+  sendPushToUser,
+  updateUser,
+} from "../api.js";
 
 function fmtDate(iso) {
   if (!iso) return "—";
@@ -82,6 +88,10 @@ export default function UserDetail() {
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(true);
   const [evalBusy, setEvalBusy] = useState(false);
+  const [pushTitle, setPushTitle] = useState("");
+  const [pushBody, setPushBody] = useState("Тестовое уведомление");
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushResult, setPushResult] = useState(null);
 
   useEffect(() => {
     let c = false;
@@ -184,12 +194,87 @@ export default function UserDetail() {
                         ? ` (${data.push_gender_scope === "male" ? "муж." : data.push_gender_scope === "female" ? "жен." : "оба"})`
                         : ""
                     }`
-                  : "Не подписан"}
+                  : "Не подписан (в базе нет активной подписки на этот аккаунт)"}
               </td>
             </tr>
           </tbody>
         </table>
       </div>
+
+      {hasPermission("ads") && u.role === "user" ? (
+        <div className="card form-stack" style={{ marginBottom: "1.25rem", maxWidth: "36rem" }}>
+          <h3 style={{ marginTop: 0, fontSize: "1rem" }}>Тестовый push этому клиенту</h3>
+          <p style={{ margin: "0 0 0.75rem", color: "var(--muted)", fontSize: "0.88rem" }}>
+            Не затрагивает остальных подписчиков. Если галочка Push в списке пустая — сначала
+            включите уведомления в PWA под этим телефоном (на iPhone надёжнее ярлык «на экран
+            Домой»).
+          </p>
+          <label>
+            Заголовок (необязательно)
+            <input
+              value={pushTitle}
+              onChange={(e) => setPushTitle(e.target.value)}
+              maxLength={80}
+              placeholder="Пусто — на iPhone возьмётся текст"
+            />
+          </label>
+          <label>
+            Текст
+            <textarea
+              value={pushBody}
+              onChange={(e) => setPushBody(e.target.value)}
+              maxLength={200}
+              rows={2}
+              required
+            />
+          </label>
+          <div className="flex-gap">
+            <button
+              type="button"
+              disabled={pushBusy || !pushBody.trim()}
+              onClick={async () => {
+                if (
+                  !window.confirm(
+                    `Отправить push на ${u.phone}? (только этому аккаунту)`,
+                  )
+                ) {
+                  return;
+                }
+                setPushBusy(true);
+                setErr("");
+                setPushResult(null);
+                try {
+                  const res = await sendPushToUser(userId, {
+                    title: pushTitle.trim(),
+                    body: pushBody.trim(),
+                  });
+                  setPushResult(res);
+                } catch (ex) {
+                  setErr(ex.message || String(ex));
+                } finally {
+                  setPushBusy(false);
+                }
+              }}
+            >
+              {pushBusy ? "Отправляем…" : "Отправить push"}
+            </button>
+          </div>
+          {pushResult ? (
+            <p style={{ margin: "0.75rem 0 0", fontSize: "0.9rem" }}>
+              {pushResult.subscribed ? (
+                <>
+                  Устройств с подпиской: {pushResult.endpoints}, доставлено{" "}
+                  <strong>{pushResult.sent}</strong>, ошибок {pushResult.failed}.
+                </>
+              ) : (
+                <span className="error">
+                  У клиента нет активной push-подписки на аккаунт — рассылка некуда слать.
+                </span>
+              )}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
 
       <h3 style={{ marginTop: "1.25rem" }}>Статистика свайпов</h3>
       <div className="stats-grid" style={{ marginBottom: "1.25rem" }}>

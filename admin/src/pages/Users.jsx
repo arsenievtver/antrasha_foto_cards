@@ -32,6 +32,15 @@ function fmtDate(iso) {
   }
 }
 
+function pushScopeTitle(subscribed, scope) {
+  if (!subscribed) {
+    return "Push не привязан к аккаунту — включите уведомления в приложении под своим логином (лучше из PWA на экране «Домой»)";
+  }
+  if (scope === "male") return "Push: подписан (мужское)";
+  if (scope === "female") return "Push: подписан (женское)";
+  return "Push: подписан (обе категории)";
+}
+
 function togglePerm(list, key) {
   const set = new Set(list || []);
   if (set.has(key)) set.delete(key);
@@ -296,6 +305,11 @@ export default function Users() {
                     {p.label}
                   </th>
                 ))}
+              {!isWorkers ? (
+                <th style={{ textAlign: "center" }} title="Web Push привязан к аккаунту">
+                  Push
+                </th>
+              ) : null}
               <th>Последний вход</th>
               <th />
             </tr>
@@ -303,7 +317,7 @@ export default function Users() {
           <tbody>
             {items.length === 0 && (
               <tr>
-                <td colSpan={isWorkers ? 3 + ADMIN_PERMISSIONS.length : 4} className="muted">
+                <td colSpan={isWorkers ? 3 + ADMIN_PERMISSIONS.length : 5} className="muted">
                   Пока пусто
                 </td>
               </tr>
@@ -320,6 +334,17 @@ export default function Users() {
                   )}
                 </td>
                 <td>{u.phone}</td>
+                {!isWorkers ? (
+                  <td style={{ textAlign: "center" }}>
+                    <input
+                      type="checkbox"
+                      readOnly
+                      checked={Boolean(u.push_subscribed)}
+                      title={pushScopeTitle(u.push_subscribed, u.push_gender_scope)}
+                      aria-label={pushScopeTitle(u.push_subscribed, u.push_gender_scope)}
+                    />
+                  </td>
+                ) : null}
                 {isWorkers &&
                   ADMIN_PERMISSIONS.map((p) => {
                     const checked = (u.admin_permissions || []).includes(p.key);

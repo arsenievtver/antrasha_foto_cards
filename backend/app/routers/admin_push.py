@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -10,12 +11,16 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.database import get_db
 from app.deps import AdminPrincipal, require_permission
+from app.models import User
 from app.schemas.push import (
     AdminPushBroadcastRequest,
     AdminPushBroadcastResponse,
+    AdminPushSendUserRequest,
+    AdminPushSendUserResponse,
     AdminPushStatsResponse,
 )
 from app.services.web_push import (
+    admin_send_push_to_user,
     broadcast_admin_push,
     push_subscription_stats,
     web_push_configured,
@@ -68,3 +73,38 @@ def push_broadcast(
         result["sent"],
     )
     return AdminPushBroadcastResponse(**result)
+
+
+@router.post("/send-user/{user_id}", response_model=AdminPushSendUserResponse)
+def push_send_user(
+    user_id: uuid.UUID,
+    body: AdminPushSendUserRequest,
+    db: Session = Depends(get_db),
+    _su: AdminPrincipal = Depends(require_permission("ads")),
+) -> AdminPushSendUserResponse:
+    _ = _su
+    u = db.get(User, user_id)
+    if u is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if not web_push_configured(settings):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Web Push не настроен (VAPID)",
+        )
+    result = admin_send_push_to_user(
+        db,
+        user_id=user_id,
+        settings=settings,
+        title=body.title,
+        body=body.body,
+        url=body.url,
+    )
+    log.info(
+        "admin push send-user role=%s admin=%s target=%s sent=%s failed=%s",
+        _su.role,
+        _su.user.id if _su.user else "superuser",
+        user_id,
+        result["sent"],
+        result["failed"],
+    )
+    return AdminPushSendUserResponse(**result)

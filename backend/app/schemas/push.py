@@ -67,3 +67,16 @@ class AdminPushBroadcastResponse(BaseModel):
     sent: int
     failed: int
     skipped: int
+
+
+class AdminPushSendUserRequest(BaseModel):
+    title: str = Field(default="", max_length=80)
+    body: str = Field(min_length=1, max_length=200)
+    url: str | None = Field(default=None, max_length=500)
+
+
+class AdminPushSendUserResponse(BaseModel):
+    subscribed: bool
+    endpoints: int
+    sent: int
+    failed: int

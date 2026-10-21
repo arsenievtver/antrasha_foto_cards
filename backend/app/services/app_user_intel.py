@@ -36,14 +36,19 @@ from app.services.gift_certificates import (
     set_actual_status,
 )
 from app.services.taste_nearest_photos import taste_previews_for_user
-from app.services.web_push import push_account_status_for_user
+from app.services.web_push import active_push_scope_by_user_ids, push_account_status_for_user
 
 
 class AppUserNotFoundError(Exception):
     pass
 
 
-def user_out(u: User) -> AdminUserOut:
+def user_out(
+    u: User,
+    *,
+    push_subscribed: bool = False,
+    push_gender_scope: str | None = None,
+) -> AdminUserOut:
     perms: list[str] = []
     if u.role == UserRole.worker.value:
         perms = effective_worker_permissions(u.admin_permissions)
@@ -54,6 +59,8 @@ def user_out(u: User) -> AdminUserOut:
         role=u.role,
         admin_permissions=perms,
         ranking_eval_enabled=bool(u.ranking_eval_enabled),
+        push_subscribed=push_subscribed,
+        push_gender_scope=push_gender_scope,
         created_at=u.created_at,
         last_login_at=u.last_login_at,
     )
@@ -424,9 +431,15 @@ def list_app_users(
         list_q = list_q.where(*filters)
     total = db.scalar(count_q) or 0
     rows = db.scalars(list_q.offset(skip).limit(limit)).all()
+    push_map = active_push_scope_by_user_ids(db, [u.id for u in rows])
     items: list[dict] = []
     for u in rows:
-        row = user_out(u).model_dump(mode="json")
+        scope = push_map.get(u.id)
+        row = user_out(
+            u,
+            push_subscribed=scope is not None,
+            push_gender_scope=scope,
+        ).model_dump(mode="json")
         row.update(signup_campaign_meta(db, u))
         if u.last_login_at is None:
             row["inactive_days_since_login"] = None

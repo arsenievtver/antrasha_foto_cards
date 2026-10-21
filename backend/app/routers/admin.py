@@ -88,6 +88,7 @@ from app.services.campaign_stats import (
 )
 from app.services.tagging_validation import validate_catalog_tag_selection
 from app.services.app_user_intel import AppUserNotFoundError, build_admin_user_detail
+from app.services.web_push import active_push_scope_by_user_ids
 from app.services.photo_embedding import (
     count_catalog_photos_needing_embedding,
     embed_catalog_backfill_batch,
@@ -114,7 +115,12 @@ log = logging.getLogger("app.api.admin")
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 
-def _admin_user_out(u: User) -> AdminUserOut:
+def _admin_user_out(
+    u: User,
+    *,
+    push_subscribed: bool = False,
+    push_gender_scope: str | None = None,
+) -> AdminUserOut:
     perms: list[str] = []
     if u.role == UserRole.worker.value:
         perms = effective_worker_permissions(u.admin_permissions)
@@ -125,6 +131,8 @@ def _admin_user_out(u: User) -> AdminUserOut:
         role=u.role,
         admin_permissions=perms,
         ranking_eval_enabled=bool(u.ranking_eval_enabled),
+        push_subscribed=push_subscribed,
+        push_gender_scope=push_gender_scope,
         created_at=u.created_at,
         last_login_at=u.last_login_at,
     )
@@ -1383,8 +1391,16 @@ def list_users(
         list_q = list_q.where(*filters)
     total = db.scalar(count_q) or 0
     rows = db.scalars(list_q.offset(skip).limit(limit)).all()
+    push_map = active_push_scope_by_user_ids(db, [u.id for u in rows])
     return AdminUserListResponse(
-        items=[_admin_user_out(u) for u in rows],
+        items=[
+            _admin_user_out(
+                u,
+                push_subscribed=u.id in push_map,
+                push_gender_scope=push_map.get(u.id),
+            )
+            for u in rows
+        ],
         total=total,
         skip=skip,
         limit=limit,

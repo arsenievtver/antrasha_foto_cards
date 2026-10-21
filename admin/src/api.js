@@ -1295,6 +1295,17 @@ export async function broadcastPush(payload) {
   return data;
 }
 
+export async function sendPushToUser(userId, payload) {
+  const res = await fetch(apiUrl(`/admin/push/send-user/${userId}`), {
+    method: "POST",
+    headers: headersJson(),
+    body: JSON.stringify(payload),
+  });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
 export async function fetchProcurementAiStatus() {
   const res = await fetch(apiUrl("/admin/procurement-ai/status"), {
     headers: headersJson(),

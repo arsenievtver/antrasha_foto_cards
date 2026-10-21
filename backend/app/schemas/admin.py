@@ -354,6 +354,8 @@ class AdminUserOut(BaseModel):
     role: str
     admin_permissions: list[str] = Field(default_factory=list)
     ranking_eval_enabled: bool = False
+    push_subscribed: bool = False
+    push_gender_scope: str | None = None
     created_at: datetime
     last_login_at: datetime | None
 

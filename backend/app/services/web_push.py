@@ -139,6 +139,50 @@ def send_push_to_user(
     tag: str,
 ) -> int:
     """Разовое уведомление пользователю. Не сдвигает кулдаун рассылки новинок."""
+    result = admin_send_push_to_user(
+        db,
+        user_id=user_id,
+        settings=settings,
+        title=title,
+        body=body,
+        url=url,
+        tag=tag,
+    )
+    return result["sent"]
+
+
+def active_push_scope_by_user_ids(
+    db: Session, user_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, str]:
+    """user_id → gender_scope для клиентов с активной push-подпиской (последняя по дате)."""
+    if not user_ids:
+        return {}
+    rows = db.execute(
+        select(PushSubscription.user_id, PushSubscription.gender_scope, PushSubscription.created_at)
+        .where(
+            PushSubscription.user_id.in_(user_ids),
+            PushSubscription.is_active.is_(True),
+        )
+        .order_by(PushSubscription.created_at.desc())
+    ).all()
+    out: dict[uuid.UUID, str] = {}
+    for uid, scope, _created in rows:
+        if uid is not None and uid not in out:
+            out[uid] = scope
+    return out
+
+
+def admin_send_push_to_user(
+    db: Session,
+    *,
+    user_id: uuid.UUID,
+    settings: Settings,
+    title: str,
+    body: str,
+    url: str | None = None,
+    tag: str = "antrasha-admin-test",
+) -> dict[str, int | bool]:
+    """Тестовый или разовый push одному клиенту (все его активные endpoint'ы)."""
     rows = list(
         db.execute(
             select(PushSubscription).where(
@@ -148,17 +192,35 @@ def send_push_to_user(
         ).scalars()
     )
     if not rows:
-        return 0
+        return {"subscribed": False, "endpoints": 0, "sent": 0, "failed": 0}
     if not web_push_configured(settings):
         log.info("web_push: VAPID не задан, текст для user %s: %s", user_id, body or title)
-        return 0
-    payload = {"title": title, "body": body, "url": url, "tag": tag}
+        return {"subscribed": True, "endpoints": len(rows), "sent": 0, "failed": len(rows)}
+
+    target_url = (url or "").strip() or f"{settings.public_app_url.rstrip('/')}/"
+    if target_url.startswith("/"):
+        target_url = f"{settings.public_app_url.rstrip('/')}{target_url}"
+
+    payload = {
+        "title": title.strip(),
+        "body": body.strip() or "Тестовое уведомление",
+        "url": target_url,
+        "tag": tag,
+    }
     sent = 0
+    failed = 0
     for row in rows:
         if _send_one(row, settings=settings, payload=payload):
             sent += 1
+        else:
+            failed += 1
     db.commit()
-    return sent
+    return {
+        "subscribed": True,
+        "endpoints": len(rows),
+        "sent": sent,
+        "failed": failed,
+    }
 
 
 def push_account_status_for_user(db: Session, user_id: uuid.UUID) -> tuple[bool, str | None]:
