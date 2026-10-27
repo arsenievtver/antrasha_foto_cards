@@ -46,3 +46,8 @@ exports/
 
 # Локальные прогоны Fashn (scripts/run_fashn_local_batch.py) — десятки МБ PNG
 .fashn_test/
+
+# Сырые ответы МойСклад для аналитики: ФИО и покупки клиентов
+.tmp_ms/insight/cache/
+.tmp_ms/insight/data/
+.tmp_ms/insight/iter*_result.json

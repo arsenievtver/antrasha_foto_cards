@@ -199,6 +199,15 @@ class Settings(BaseSettings):
         default=None,
         validation_alias=AliasChoices("MOYSKLAD_TOKEN", "moysklad_token"),
     )
+    # Недельный отчёт по МойСклад: в понедельник с этого часа по Москве (нужен MOYSKLAD_TOKEN).
+    weekly_insight_enabled: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("WEEKLY_INSIGHT_ENABLED", "weekly_insight_enabled"),
+    )
+    weekly_insight_hour: int = Field(
+        default=7,
+        validation_alias=AliasChoices("WEEKLY_INSIGHT_HOUR", "weekly_insight_hour"),
+    )
 
     # Подарочные сертификаты: SMS МТС и Telegram. Без MTS_SMS_ENABLED код пишется в лог.
     mts_sms_enabled: bool = Field(

@@ -26,6 +26,7 @@ from app.routers import (
     admin_ranking_eval,
     admin_staff_feedback,
     admin_warehouse_ai,
+    admin_weekly_insight,
     admin_welcome_gift,
     auth,
     brands,
@@ -47,6 +48,7 @@ from app.routers import (
 )
 from app.mcp_procurement.http import mcp_method_not_allowed, mcp_post
 from app.services.ai_ingest_worker import reset_stale_processing_jobs
+from app.services.weekly_insight.runner import run_scheduled_if_due
 from app.services.yc_photo_sync import run_sync_job_commit
 
 log = logging.getLogger("app.main")
@@ -69,6 +71,16 @@ async def _yc_auto_sync_loop() -> None:
         except Exception:
             log.exception("yc_auto_sync: ошибка синхронизации с Object Storage")
         await asyncio.sleep(interval_sec)
+
+
+async def _weekly_insight_loop() -> None:
+    await asyncio.sleep(120)
+    while True:
+        try:
+            await asyncio.to_thread(run_scheduled_if_due, settings)
+        except Exception:
+            log.exception("weekly_insight: ошибка планировщика")
+        await asyncio.sleep(15 * 60)
 
 
 async def lifespan(_app: FastAPI):
@@ -97,12 +109,15 @@ async def lifespan(_app: FastAPI):
     finally:
         db_boot.close()
 
-    task: asyncio.Task | None = None
+    tasks: list[asyncio.Task] = []
     if settings.yc_auto_sync_interval_minutes > 0:
-        task = asyncio.create_task(_yc_auto_sync_loop())
+        tasks.append(asyncio.create_task(_yc_auto_sync_loop()))
         log.info("Фоновая синхронизация Object Storage включена")
+    if settings.weekly_insight_enabled and settings.moysklad_configured:
+        tasks.append(asyncio.create_task(_weekly_insight_loop()))
+        log.info("Недельный отчёт МойСклад: по понедельникам с %s:00 МСК", settings.weekly_insight_hour)
     yield
-    if task:
+    for task in tasks:
         task.cancel()
         try:
             await task
@@ -139,6 +154,7 @@ app.include_router(admin_procurement.router)
 app.include_router(admin_procurement_ai.router)
 app.include_router(admin_mcp_keys.router)
 app.include_router(admin_staff_feedback.router)
+app.include_router(admin_weekly_insight.router)
 app.add_api_route("/mcp", mcp_post, methods=["POST"], include_in_schema=False)
 app.add_api_route(
     "/mcp",

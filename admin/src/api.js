@@ -979,6 +979,18 @@ export function fetchStaffFeedbackStats(query) {
   return procurementRequest("/admin/staff-feedback/stats", { query });
 }
 
+export function fetchWeeklyReports() {
+  return procurementRequest("/admin/weekly-insight");
+}
+
+export function fetchWeeklyReport(id) {
+  return procurementRequest(`/admin/weekly-insight/${encodeURIComponent(id)}`);
+}
+
+export function runWeeklyReport() {
+  return procurementRequest("/admin/weekly-insight/run", { method: "POST" });
+}
+
 export function fetchProcurementRefs() {
   return procurementRequest("/admin/procurement/refs");
 }

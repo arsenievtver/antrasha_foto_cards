@@ -27,6 +27,7 @@ import app.mcp_procurement.ranking_eval_tools  # noqa: F401,E402
 import app.mcp_procurement.staff_feedback_tools  # noqa: F401,E402
 import app.mcp_procurement.tools  # noqa: F401,E402
 import app.mcp_procurement.user_tools  # noqa: F401,E402
+import app.mcp_procurement.weekly_insight_tools  # noqa: F401,E402
 
 logger = logging.getLogger("app.mcp_procurement")
 
@@ -70,6 +71,10 @@ SERVER_INSTRUCTIONS = (
     "list_staff_feedback (тексты: что спрашивали и чего нет, размеры, бренды) и "
     "get_staff_feedback_stats (активность по сотрудникам). Текст свободный; сверяйте "
     "его со справочниками и закупками, а остатки и продажи смотрите в MCP МойСклад. "
+    "Недельные отчёты по МойСклад — только чтение и только по ключу суперпользователя: "
+    "list_weekly_reports и get_weekly_report (разделы «В общем», «За неделю», «Динамика», "
+    "«Предложения» и метрики; клиенты на контроле с телефонами — только include_watchlist). "
+    "Отчёт строится в понедельник утром или кнопкой в админке «Неделя». "
     "Подарочные сертификаты — list_gift_certificates, get_gift_certificate (чтение); "
     "create_gift_certificate, create_gift_certificates_batch, update_gift_certificate, "
     "send_gift_certificate_share_sms, send_marketing_sms_batch (запись; маркетинговые SMS — "
