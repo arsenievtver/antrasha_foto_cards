@@ -6,14 +6,15 @@ import unittest
 import uuid
 from datetime import date, datetime
 from types import SimpleNamespace
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 from zoneinfo import ZoneInfo
 
 from app.mcp_procurement.registry import ToolArgumentError, ToolPermissionError, get_tool, list_tools
 from app.mcp_procurement.server import handle_message
 from app.services.mcp_keys import McpActor
 from app.services.weekly_insight.compute import Periods, build_report, sales_block
-from app.services.weekly_insight.fetch import Dataset, href_id
+from app.services.warehouse_analytics.ms_client import MoySkladAnalyticsError
+from app.services.weekly_insight.fetch import Dataset, MsFetcher, href_id
 from app.services.weekly_insight.parse import arrival_month, category_of, season_of, size_of
 from app.services.weekly_insight.runner import scheduled_due
 
@@ -85,6 +86,26 @@ class ParseTests(unittest.TestCase):
     def test_href_id(self):
         obj = {"meta": {"href": "https://api.moysklad.ru/api/remap/1.2/entity/variant/1d4d5f44-7bb1-11e9-9109-f8fc00054224"}}
         self.assertEqual(href_id(obj), ("variant", "1d4d5f44-7bb1-11e9-9109-f8fc00054224"))
+
+
+class FetchRetryTests(unittest.TestCase):
+    def test_timeout_retried_then_reported_with_path(self):
+        client = MagicMock()
+        client.get.side_effect = [MoySkladAnalyticsError("Сеть МойСклад: Read timed out"), {"rows": []}]
+        f = MsFetcher(client)
+        with patch("app.services.weekly_insight.fetch.time.sleep"):
+            self.assertEqual(f._get("/report/profit/byproduct", {}), {"rows": []})
+            client.get.side_effect = MoySkladAnalyticsError("Сеть МойСклад: Read timed out")
+            with self.assertRaises(MoySkladAnalyticsError) as ctx:
+                f._get("/report/profit/byproduct", {"offset": 1000})
+        self.assertIn("/report/profit/byproduct offset=1000", str(ctx.exception))
+
+    def test_client_error_not_retried(self):
+        client = MagicMock()
+        client.get.side_effect = MoySkladAnalyticsError("HTTP 400", status=400)
+        with patch("app.services.weekly_insight.fetch.time.sleep"), self.assertRaises(MoySkladAnalyticsError):
+            MsFetcher(client)._get("/entity/product", {})
+        self.assertEqual(client.get.call_count, 1)
 
 
 class ComputeTests(unittest.TestCase):

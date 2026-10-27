@@ -26,7 +26,10 @@ log = logging.getLogger("app.weekly_insight.fetch")
 
 _ID_RE = re.compile(r"/entity/(product|variant|service|bundle|counterparty)/([0-9a-f-]{36})", re.I)
 _RETRIES_429 = 6
+_RETRIES_NETWORK = 3
 _PAUSE_SEC = 0.12
+# Отчёты прибыльности и остатков на дату за год считаются у МойСклад дольше минуты.
+HTTP_TIMEOUT_SEC = 300.0
 
 
 @dataclass
@@ -78,17 +81,25 @@ class MsFetcher:
         self.requests = 0
 
     def _get(self, path: str, params: dict[str, Any]) -> Any:
-        for attempt in range(_RETRIES_429 + 1):
+        """429 — ждём и повторяем; таймаут, сеть и 5xx — несколько повторов с паузой."""
+        rate_retries = network_retries = 0
+        while True:
             try:
                 self.requests += 1
                 data = self.client.get(path, params=params)
                 time.sleep(_PAUSE_SEC)
                 return data
             except MoySkladAnalyticsError as e:
-                if e.status != 429 or attempt == _RETRIES_429:
-                    raise
-                time.sleep(3.0 * (attempt + 1))
-        raise RuntimeError("unreachable")
+                if e.status == 429 and rate_retries < _RETRIES_429:
+                    rate_retries += 1
+                    time.sleep(3.0 * rate_retries)
+                    continue
+                if (e.status is None or e.status >= 500) and network_retries < _RETRIES_NETWORK:
+                    network_retries += 1
+                    log.warning("weekly_insight: повтор %s %s после ошибки: %s", network_retries, path, e)
+                    time.sleep(10.0 * network_retries)
+                    continue
+                raise MoySkladAnalyticsError(f"{e} [{path} offset={params.get('offset', 0)}]", status=e.status) from e
 
     def rows_all(self, path: str, params: dict[str, Any], *, page: int = 1000, max_pages: int = 300) -> list[dict]:
         out: list[dict] = []

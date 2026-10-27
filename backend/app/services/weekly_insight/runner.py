@@ -18,7 +18,7 @@ from app.models.staff_feedback import StaffFeedback
 from app.models.weekly_insight_report import WeeklyInsightReport
 from app.services.warehouse_analytics.ms_client import MoySkladAnalyticsClient
 from app.services.weekly_insight.compute import Periods, build_report
-from app.services.weekly_insight.fetch import load_dataset
+from app.services.weekly_insight.fetch import HTTP_TIMEOUT_SEC, load_dataset
 from app.services.weekly_insight.summary import generate_summary
 
 log = logging.getLogger("app.weekly_insight.runner")
@@ -137,7 +137,7 @@ def execute_report(settings: Settings, report_id: uuid.UUID) -> None:
                 raise RuntimeError("Не задан MOYSKLAD_TOKEN")
             today = datetime.now(TZ).date()
             p = Periods.for_run(today)
-            client = MoySkladAnalyticsClient(str(settings.moysklad_token).strip())
+            client = MoySkladAnalyticsClient(str(settings.moysklad_token).strip(), timeout=HTTP_TIMEOUT_SEC)
             ds, requests_count = load_dataset(
                 client,
                 today=today,
