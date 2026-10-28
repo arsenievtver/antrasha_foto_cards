@@ -428,6 +428,95 @@ def assortment_section(ds: Dataset, lines: list[dict], today: date) -> dict:
     }
 
 
+# ---------- сезон с начала: выручка, клиенты A и новая коллекция к прошлому году ----------
+
+
+def season_bounds(d: date) -> tuple[date, str]:
+    """Начало текущего сезона и код его коллекции: ОЗ — с 1 августа, ВЛ — с 1 февраля."""
+    if d.month >= 8:
+        return date(d.year, 8, 1), f"ОЗ{d.year}"
+    if d.month == 1:
+        return date(d.year - 1, 8, 1), f"ОЗ{d.year - 1}"
+    return date(d.year, 2, 1), f"ВЛ{d.year}"
+
+
+def _year_back(d: date) -> date:
+    try:
+        return d.replace(year=d.year - 1)
+    except ValueError:
+        return d.replace(year=d.year - 1, day=28)
+
+
+def _top_clients(lines: list[dict], a: date, b: date) -> set[str]:
+    """Верхние 20% покупателей по выручке за период — клиенты A до начала сезона."""
+    rev: dict[str, float] = defaultdict(float)
+    for l in lines:
+        if a <= l["_day"] <= b and _is_named(l):
+            rev[l["agent_id"]] += l["sum"]
+    ranked = sorted(rev, key=lambda k: -rev[k])
+    return set(ranked[: max(1, round(len(ranked) * 0.2))]) if ranked else set()
+
+
+def _variant_seasons(ds: Dataset) -> dict[str, str]:
+    first: dict[str, date] = {}
+    names: dict[str, str] = {}
+    for a in ds.arrivals:
+        if a["variant_key"] and a["qty"] > 0:
+            d = _d(a["day"])
+            first[a["variant_key"]] = min(first.get(a["variant_key"], d), d)
+            names.setdefault(a["variant_key"], a["variant_name"])
+    return {k: season_of(names.get(k), d) for k, d in first.items()}
+
+
+def _collection_on(ds: Dataset, lines: list[dict], seasons: dict[str, str], code: str, on: date) -> dict:
+    """Новая коллекция на дату: пришло и осталось на полке (приход минус продажи), брендовый товар."""
+    def branded(pid: str | None) -> bool:
+        c = ds.catalog.get(pid or "") or {}
+        return bool(c.get("brand")) and c.get("top") not in NON_ASSORTMENT_TOP_FOLDERS
+
+    arrived = [a for a in ds.arrivals if a["qty"] > 0 and seasons.get(a["variant_key"]) == code and _d(a["day"]) <= on and branded(a["product_id"])]
+    sold = [l for l in lines if seasons.get(l["variant_key"]) == code and l["_day"] <= on and branded(l["product_id"])]
+    units = sum(a["qty"] for a in arrived)
+    return {
+        "arrived_units": _r(units),
+        "arrived_cost": _r(sum(a["qty"] * a["cost"] for a in arrived)),
+        "on_hand_units": _r(units - sum(l["qty"] for l in sold)),
+        "sold_revenue": _r(sum(l["sum"] for l in sold)),
+    }
+
+
+def season_section(ds: Dataset, lines: list[dict], p: Periods) -> dict:
+    start, code = season_bounds(p.week_end)
+    ly_start, ly_end = _year_back(start), _year_back(p.week_end)
+    ly_code = f"{code[:2]}{int(code[2:]) - 1}"
+    seasons = _variant_seasons(ds)
+    a_cur = _top_clients(lines, start - timedelta(days=365), start - timedelta(days=1))
+    a_ly = _top_clients(lines, ly_start - timedelta(days=365), ly_start - timedelta(days=1))
+    cur = _in(lines, start, p.week_end)
+    ly = _in(lines, ly_start, ly_end)
+    ly_season_end = _year_back(date(start.year + 1, 2, 1) if code.startswith("ОЗ") else date(start.year, 8, 1)) - timedelta(days=1)
+
+    def a_block(ls: list[dict], a_set: set[str]) -> dict:
+        own = [l for l in ls if l["agent_id"] in a_set]
+        return {"clients": len(a_set), "buyers": len({l["agent_id"] for l in own}), "revenue": _r(sum(l["sum"] for l in own))}
+
+    return {
+        "code": code,
+        "period": {"from": start.isoformat(), "to": p.week_end.isoformat()},
+        "period_last_year": {"from": ly_start.isoformat(), "to": ly_end.isoformat()},
+        "sales": sales_block(cur),
+        "sales_last_year": sales_block(ly),
+        "revenue_change_pct": _change_pct(sum(l["sum"] for l in cur), sum(l["sum"] for l in ly)),
+        "clients_a": a_block(cur, a_cur),
+        "clients_a_last_year": a_block(ly, a_ly),
+        "collection": _collection_on(ds, lines, seasons, code, p.week_end),
+        "collection_last_year": _collection_on(ds, lines, seasons, ly_code, ly_end),
+        "collection_last_year_season_total": _collection_on(ds, lines, seasons, ly_code, ly_season_end),
+        "collection_4_weeks_ago": _collection_on(ds, lines, seasons, code, p.week_end - timedelta(days=28)),
+        "collection_last_year_4_weeks_ago": _collection_on(ds, lines, seasons, ly_code, ly_end - timedelta(days=28)),
+    }
+
+
 # ---------- сборка отчёта ----------
 
 
@@ -453,6 +542,7 @@ def build_report(
     *,
     prev_watchlist_ids: set[str] | None = None,
     staff_feedback: dict | None = None,
+    procurement: dict | None = None,
 ) -> tuple[dict, list[dict]]:
     """→ (metrics без ФИО, watchlist с ФИО и телефонами)."""
     p = Periods.for_run(run_day)
@@ -502,6 +592,9 @@ def build_report(
         blk = sales_block(_in(upto, a, b))
         ly = sales_block(_in(upto, a - timedelta(days=364), b - timedelta(days=364)))
         arr = sum(x["qty"] * x["cost"] for x in ds.arrivals if a <= _d(x["day"]) <= b)
+        arr_ly = sum(
+            x["qty"] * x["cost"] for x in ds.arrivals if a - timedelta(days=364) <= _d(x["day"]) <= b - timedelta(days=364)
+        )
         dynamics.append(
             {
                 "week_start": a.isoformat(),
@@ -511,6 +604,7 @@ def build_report(
                 "avg_discount_pct": blk["avg_discount_pct"],
                 "markdown_units_pct": blk["markdown_units_pct"],
                 "arrivals_cost": _r(arr),
+                "arrivals_cost_last_year": _r(arr_ly),
             }
         )
 
@@ -609,6 +703,8 @@ def build_report(
     metrics = {
         "run_day": run_day.isoformat(),
         "week": week_section,
+        "season": season_section(ds, upto, p),
+        "procurement": procurement or {},
         "dynamics": dynamics,
         "overall": overall,
         "clients": clients,
@@ -627,6 +723,24 @@ def rule_suggestions(m: dict) -> list[str]:
     """Детерминированные подсказки — основа для текста модели и запасной вариант без неё."""
     out: list[str] = []
     o, w, cl, asm = m["overall"], m["week"], m["clients"], m["assortment"]
+    s = m.get("season") or {}
+    if s:
+        col, col_ly = s["collection"], s["collection_last_year"]
+        out.append(
+            f"Сезон {s['code']} с {s['period']['from']}: {_fmt_mln(s['sales']['revenue'])} против "
+            f"{_fmt_mln(s['sales_last_year']['revenue'])} год назад ({s['revenue_change_pct']}%). "
+            f"Новой коллекции пришло {col['arrived_units']} шт, на полке {col['on_hand_units']} "
+            f"(год назад на ту же дату {col_ly['arrived_units']} и {col_ly['on_hand_units']}; "
+            f"за весь прошлый сезон пришло {s['collection_last_year_season_total']['arrived_units']}). "
+            "Неделю к году сравнивать с поправкой на сроки прихода."
+        )
+    pr = m.get("procurement") or {}
+    if pr.get("to_ship_eur"):
+        brands = ", ".join(f"{b['brand']} {b['to_ship_eur']:.0f} €" for b in pr.get("by_brand", [])[:5])
+        out.append(
+            f"По закупкам {pr['season']} ещё не доехало {pr['to_ship_eur']:.0f} € из {pr['orders_eur']:.0f} € "
+            f"({pr['to_ship_pct']}%), в пути {pr['in_transit_eur']:.0f} €. Больше всего: {brands}."
+        )
     if o["cogs_cur"] and o["bought_cost_cur"] > o["cogs_cur"] * 1.05:
         out.append(
             f"Закупка за 12 мес ({_fmt_mln(o['bought_cost_cur'])}) выше себестоимости продаж ({_fmt_mln(o['cogs_cur'])}); "

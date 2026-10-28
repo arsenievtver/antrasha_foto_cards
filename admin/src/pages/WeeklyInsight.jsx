@@ -118,13 +118,61 @@ function WeekSection({ week }) {
   );
 }
 
+function SeasonSection({ season, procurement }) {
+  const col = (c) => [num(c.arrived_units), mln(c.arrived_cost), num(c.on_hand_units), mln(c.sold_revenue)];
+  const pr = procurement || {};
+  return (
+    <>
+      <h3>
+        Сезон {season.code} с {season.period.from} к тому же периоду год назад
+      </h3>
+      <Table
+        head={["", "Этот сезон", "Год назад", "Изменение"]}
+        rows={[
+          ["Выручка", mln(season.sales.revenue), mln(season.sales_last_year.revenue), change(season.sales.revenue, season.sales_last_year.revenue)],
+          ["Чеков", num(season.sales.checks), num(season.sales_last_year.checks), change(season.sales.checks, season.sales_last_year.checks)],
+          ["Средняя скидка", pct(season.sales.avg_discount_pct), pct(season.sales_last_year.avg_discount_pct), ""],
+          ["Штук с уценкой", pct(season.sales.markdown_units_pct), pct(season.sales_last_year.markdown_units_pct), ""],
+          ["Клиенты A: выручка", mln(season.clients_a.revenue), mln(season.clients_a_last_year.revenue), change(season.clients_a.revenue, season.clients_a_last_year.revenue)],
+          ["Клиенты A: купили / всего", `${season.clients_a.buyers} / ${season.clients_a.clients}`, `${season.clients_a_last_year.buyers} / ${season.clients_a_last_year.clients}`, ""],
+        ]}
+      />
+      <p style={{ color: "var(--muted)", marginTop: 0 }}>
+        Клиенты A — верхние 20% покупателей за 12 месяцев до начала сезона. Неделю к году сравнивайте с поправкой на сроки прихода коллекции.
+      </p>
+      <Table
+        head={["Новая коллекция (брендовый товар)", "Пришло шт", "Приход (себест.)", "На полке шт", "Продано на"]}
+        rows={[
+          ["Сейчас", ...col(season.collection)],
+          ["Год назад на ту же дату", ...col(season.collection_last_year)],
+          ["4 недели назад", ...col(season.collection_4_weeks_ago)],
+          ["Год назад, 4 недели до даты", ...col(season.collection_last_year_4_weeks_ago)],
+          ["Весь прошлый сезон", ...col(season.collection_last_year_season_total)],
+        ]}
+      />
+      {pr.orders_eur ? (
+        <>
+          <p>
+            Закупки {pr.season}: заказано {num(pr.orders_eur)} €, доставлено {num(pr.delivered_eur)} €, ещё не доехало{" "}
+            {num(pr.to_ship_eur)} € ({pct(pr.to_ship_pct)}), из них в пути {num(pr.in_transit_eur)} €.
+          </p>
+          <Table
+            head={["Бренд", "Заказано €", "Не доехало €", "В пути €"]}
+            rows={(pr.by_brand || []).map((b) => [b.brand, num(b.orders_eur), num(b.to_ship_eur), num(b.in_transit_eur)])}
+          />
+        </>
+      ) : null}
+    </>
+  );
+}
+
 function DynamicsSection({ dynamics }) {
   const max = Math.max(1, ...dynamics.map((d) => Math.max(d.revenue || 0, d.revenue_last_year || 0)));
   return (
     <>
       <h3>Динамика, 13 недель</h3>
       <Table
-        head={["Неделя с", "Выручка", "", "Год назад", "Чеков", "Скидка", "Уценка", "Приход (себест.)"]}
+        head={["Неделя с", "Выручка", "", "Год назад", "Чеков", "Скидка", "Уценка", "Приход (себест.)", "Приход год назад"]}
         rows={dynamics.map((d) => [
           d.week_start,
           rub(d.revenue),
@@ -137,6 +185,7 @@ function DynamicsSection({ dynamics }) {
           pct(d.avg_discount_pct),
           pct(d.markdown_units_pct),
           rub(d.arrivals_cost),
+          rub(d.arrivals_cost_last_year),
         ])}
       />
     </>
@@ -361,6 +410,7 @@ export default function WeeklyInsight() {
 
       {m ? (
         <>
+          {m.season ? <SeasonSection season={m.season} procurement={m.procurement} /> : null}
           <WeekSection week={m.week} />
           <DynamicsSection dynamics={m.dynamics} />
           <OverallSection overall={m.overall} clients={m.clients} />

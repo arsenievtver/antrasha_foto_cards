@@ -5,15 +5,21 @@ from __future__ import annotations
 import logging
 import threading
 import uuid
+from collections import defaultdict
 from datetime import datetime, time, timedelta, timezone
+from decimal import Decimal
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.config import Settings
 from app.database import SessionLocal
+from app.models.brand import Brand
+from app.models.brand_order import BrandOrder
+from app.models.season import Season
+from app.models.shipment import Shipment
 from app.models.staff_feedback import StaffFeedback
 from app.models.weekly_insight_report import WeeklyInsightReport
 from app.services.warehouse_analytics.ms_client import MoySkladAnalyticsClient
@@ -111,6 +117,45 @@ def _staff_feedback(db: Session, p: Periods) -> dict:
     }
 
 
+def _procurement(db: Session) -> dict:
+    """Текущий сезон закупок: заказано, доставлено, в пути и остаток к поставке по брендам, в евро."""
+    season = db.scalars(select(Season).where(Season.visibility == "current")).first()
+    if season is None:
+        return {}
+    orders = dict(
+        db.execute(
+            select(BrandOrder.brand_id, func.sum(BrandOrder.amount_eur)).where(BrandOrder.season_id == season.id).group_by(BrandOrder.brand_id)
+        ).all()
+    )
+    if not orders:
+        return {"season": season.code}
+    shipped: dict = defaultdict(Decimal)
+    transit: dict = defaultdict(Decimal)
+    for brand_id, delivered, amount in db.execute(
+        select(Shipment.brand_id, Shipment.is_delivered, func.sum(Shipment.amount_eur))
+        .where(Shipment.season_id == season.id)
+        .group_by(Shipment.brand_id, Shipment.is_delivered)
+    ).all():
+        (shipped if delivered else transit)[brand_id] += Decimal(amount or 0)
+    names = dict(db.execute(select(Brand.id, Brand.name).where(Brand.id.in_(list(orders)))).all())
+    by_brand = [
+        {"brand": names.get(bid, "—"), "orders_eur": float(o or 0), "to_ship_eur": float((o or 0) - shipped[bid]), "in_transit_eur": float(transit[bid])}
+        for bid, o in orders.items()
+    ]
+    by_brand = sorted((b for b in by_brand if b["to_ship_eur"] > 0), key=lambda b: -b["to_ship_eur"])
+    total = float(sum(Decimal(o or 0) for o in orders.values()))
+    to_ship = total - float(sum(shipped.values()))
+    return {
+        "season": season.code,
+        "orders_eur": round(total, 2),
+        "delivered_eur": round(total - to_ship, 2),
+        "to_ship_eur": round(to_ship, 2),
+        "to_ship_pct": round(to_ship / total * 100, 1) if total else None,
+        "in_transit_eur": round(float(sum(transit.values())), 2),
+        "by_brand": [{k: (round(v, 2) if isinstance(v, float) else v) for k, v in b.items()} for b in by_brand],
+    }
+
+
 def _prev_watchlist_ids(db: Session, week_start) -> set[str]:
     prev = db.scalars(
         select(WeeklyInsightReport)
@@ -150,6 +195,7 @@ def execute_report(settings: Settings, report_id: uuid.UUID) -> None:
                 today,
                 prev_watchlist_ids=_prev_watchlist_ids(db, p.week_start),
                 staff_feedback=_staff_feedback(db, p),
+                procurement=_procurement(db),
             )
             summary, model, usage = generate_summary(settings, metrics)
             metrics["summary_usage"] = usage

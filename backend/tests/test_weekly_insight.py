@@ -12,7 +12,7 @@ from zoneinfo import ZoneInfo
 from app.mcp_procurement.registry import ToolArgumentError, ToolPermissionError, get_tool, list_tools
 from app.mcp_procurement.server import handle_message
 from app.services.mcp_keys import McpActor
-from app.services.weekly_insight.compute import Periods, build_report, sales_block
+from app.services.weekly_insight.compute import Periods, build_report, sales_block, season_bounds
 from app.services.warehouse_analytics.ms_client import MoySkladAnalyticsError
 from app.services.weekly_insight.fetch import Dataset, MsFetcher, href_id
 from app.services.weekly_insight.parse import arrival_month, category_of, season_of, size_of
@@ -113,6 +113,19 @@ class ComputeTests(unittest.TestCase):
         for run in (date(2026, 10, 26), RUN_DAY, date(2026, 11, 1)):
             p = Periods.for_run(run)
             self.assertEqual((p.week_start, p.week_end), (date(2026, 10, 19), date(2026, 10, 25)))
+
+    def test_season_bounds(self):
+        self.assertEqual(season_bounds(date(2026, 10, 25)), (date(2026, 8, 1), "ОЗ2026"))
+        self.assertEqual(season_bounds(date(2027, 1, 10)), (date(2026, 8, 1), "ОЗ2026"))
+        self.assertEqual(season_bounds(date(2027, 3, 1)), (date(2027, 2, 1), "ВЛ2027"))
+
+    def test_season_compares_same_dates_last_year(self):
+        metrics, _ = build_report(_dataset(), RUN_DAY, procurement={"season": "ОЗ26-27", "to_ship_eur": 0})
+        season = metrics["season"]
+        self.assertEqual(season["period"], {"from": "2026-08-01", "to": "2026-10-25"})
+        self.assertEqual(season["period_last_year"], {"from": "2025-08-01", "to": "2025-10-25"})
+        self.assertEqual(season["sales"]["revenue"], 18000 + 10000 + 18000)
+        self.assertEqual(metrics["procurement"]["season"], "ОЗ26-27")
 
     def test_sales_block_splits_card_and_markdown(self):
         blk = sales_block([_line("2026-10-20", "x", "p1", "v1", 18000), _line("2026-10-20", "x", "p1", "v1", 10000, discount=50)])
