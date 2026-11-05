@@ -1,4 +1,5 @@
 from app.models.ai_ingest_job import AiIngestJob
+from app.models.outlet_photo_job import OutletPhotoJob
 from app.models.outlet_photo_upload import OutletPhotoUpload
 from app.models.try_on_job import TryOnJob
 from app.models.brand import Brand
@@ -55,6 +56,7 @@ __all__ = [
     "StaffFeedback",
     "FxRate",
     "AiIngestJob",
+    "OutletPhotoJob",
     "OutletPhotoUpload",
     "TryOnJob",
     "FeedReleaseBatch",

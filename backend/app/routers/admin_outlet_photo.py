@@ -1,4 +1,4 @@
-"""Админка: аутлет — штрихкод → Fashn catalog → изображение в МойСклад."""
+"""Админка: аутлет — штрихкод → очередь на сервере → Fashn → изображение в МойСклад."""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from typing import Literal
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
+from fastapi.responses import FileResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -17,11 +18,12 @@ from app.config import settings
 from app.database import get_db
 from app.deps import AdminPrincipal, require_permission
 from app.externals.http.exceptions import ApiClientAbortableException
-from app.externals.http.fashn import CONTENT_MODE_SINGLE, FRAME_OUTLET, FashnClient
 from app.externals.http.moysklad import MoySkladClient
+from app.models.outlet_photo_job import OutletPhotoJob
 from app.models.outlet_photo_upload import OutletPhotoUpload
 from app.schemas.outlet_photo import (
-    OutletPhotoGenerateOut,
+    OutletPhotoJobCurrentOut,
+    OutletPhotoJobOut,
     OutletPhotoLookupIn,
     OutletPhotoLookupOut,
     OutletPhotoStatusOut,
@@ -31,7 +33,7 @@ from app.schemas.outlet_photo import (
     OutletPhotoUploadOut,
     OutletPhotoUploadTransferredIn,
 )
-from app.services.image_prepare import build_fashn_image_data_url_from_bytes, normalize_png_bytes
+from app.services import outlet_photo_jobs as outlet_jobs
 
 log = logging.getLogger("app.api.admin_outlet_photo")
 
@@ -84,6 +86,39 @@ def _uploader_identity(principal: AdminPrincipal) -> tuple[uuid.UUID | None, str
     user = principal.user
     label = (user.display_name or "").strip() or user.phone
     return user.id, label
+
+
+def _blank(value: str | None) -> str | None:
+    text = (value or "").strip()
+    return text or None
+
+
+def _job_out(row: OutletPhotoJob) -> OutletPhotoJobOut:
+    return OutletPhotoJobOut(
+        id=row.id,
+        status=row.status,
+        error_message=row.error_message,
+        gender=row.gender,
+        product_id=row.product_id,
+        name=row.product_name,
+        article=row.article,
+        code=row.code,
+        barcode=row.barcode,
+        path_name=row.path_name,
+        product_gender=row.product_gender,
+        created_at=row.created_at,
+    )
+
+
+def _owned_job(
+    db: Session,
+    job_id: uuid.UUID,
+    principal: AdminPrincipal,
+) -> OutletPhotoJob:
+    row = db.get(OutletPhotoJob, job_id)
+    if not row or not outlet_jobs.job_visible_to(row, principal):
+        raise HTTPException(status_code=404, detail="Задача не найдена")
+    return row
 
 
 def _upload_item_out(row: OutletPhotoUpload) -> OutletPhotoUploadItemOut:
@@ -218,19 +253,49 @@ async def outlet_photo_lookup(
     )
 
 
-@router.post("/generate", response_model=OutletPhotoGenerateOut)
-async def outlet_photo_generate(
-    gender: str = Form(...),
-    image: UploadFile = File(...),
+@router.post("/generate")
+async def outlet_photo_generate_gone(
     _p: AdminPrincipal = Depends(require_permission("outlet")),
-) -> OutletPhotoGenerateOut:
-    _require_moysklad()  # flow always needs MS later; fail early if misconfigured
-    api_key = _require_fashn()
+) -> None:
+    """Старый синхронный вызов держал соединение телефона, пока шёл Fashn."""
+    _ = _p
+    raise HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail="Обновите страницу: кадр считается на сервере, телефон его только спрашивает.",
+    )
 
+
+@router.get("/jobs/current", response_model=OutletPhotoJobCurrentOut)
+def outlet_photo_job_current(
+    db: Session = Depends(get_db),
+    principal: AdminPrincipal = Depends(require_permission("outlet")),
+) -> OutletPhotoJobCurrentOut:
+    row = outlet_jobs.current_job(db, principal)
+    return OutletPhotoJobCurrentOut(job=_job_out(row) if row else None)
+
+
+@router.post("/jobs", response_model=OutletPhotoJobOut, status_code=status.HTTP_201_CREATED)
+async def outlet_photo_job_create(
+    gender: str = Form(...),
+    product_id: str = Form(...),
+    image: UploadFile = File(...),
+    name: str = Form(""),
+    article: str = Form(""),
+    code: str = Form(""),
+    barcode: str = Form(""),
+    path_name: str = Form(""),
+    product_gender: str = Form(""),
+    db: Session = Depends(get_db),
+    principal: AdminPrincipal = Depends(require_permission("outlet")),
+) -> OutletPhotoJobOut:
+    _require_moysklad()
+    _require_fashn()
     g = gender.strip().lower()
     if g not in ("male", "female"):
         raise HTTPException(status_code=400, detail="gender: укажите male или female")
-
+    pid = product_id.strip()
+    if not _UUID_RE.match(pid):
+        raise HTTPException(status_code=400, detail="product_id: ожидается UUID товара МойСклад")
     raw = await image.read(_MAX_UPLOAD_BYTES + 1)
     if len(raw) > _MAX_UPLOAD_BYTES:
         raise HTTPException(
@@ -239,43 +304,131 @@ async def outlet_photo_generate(
         )
     if not raw:
         raise HTTPException(status_code=400, detail="Пустой файл изображения")
-
-    try:
-        data_url, _size = build_fashn_image_data_url_from_bytes(raw)
-    except Exception as e:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Не удалось прочитать изображение: {e}",
-        ) from e
-
-    proxy = str(settings.fashn_https_proxy).strip() if settings.fashn_https_proxy else None
-    client = FashnClient(
-        api_key=api_key,
-        proxy=proxy,
-        connect_timeout=settings.fashn_http_connect_timeout,
-        submit_timeout=settings.fashn_http_read_timeout_submit,
-        poll_timeout=settings.fashn_http_read_timeout_poll,
-        download_timeout=settings.fashn_http_read_timeout_download,
+    pg = _blank(product_gender)
+    if pg not in ("male", "female", None):
+        pg = None
+    row = outlet_jobs.create_job(
+        db,
+        principal,
+        raw=raw,
+        gender=g,
+        product_id=pid,
+        name=(name or "").strip(),
+        article=_blank(article),
+        code=_blank(code),
+        barcode=_blank(barcode),
+        path_name=_blank(path_name),
+        product_gender=pg,
     )
+    return _job_out(row)
+
+
+@router.get("/jobs/{job_id}", response_model=OutletPhotoJobOut)
+def outlet_photo_job_get(
+    job_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    principal: AdminPrincipal = Depends(require_permission("outlet")),
+) -> OutletPhotoJobOut:
+    return _job_out(_owned_job(db, job_id, principal))
+
+
+@router.get("/jobs/{job_id}/image")
+def outlet_photo_job_image(
+    job_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    principal: AdminPrincipal = Depends(require_permission("outlet")),
+) -> FileResponse:
+    row = _owned_job(db, job_id, principal)
+    if row.status not in ("ready", "uploaded"):
+        raise HTTPException(status_code=409, detail="Кадр ещё не готов")
     try:
-        # Товар ищется по штрихкоду, то есть герой всегда один — даже если в кадре весь образ.
-        png_bytes = await client.run_product_to_model(
-            gender=g,
-            product_image_data_url=data_url,
-            content_mode=CONTENT_MODE_SINGLE,
-            frame=FRAME_OUTLET,
+        path = outlet_jobs.result_file(row)
+    except (FileNotFoundError, ValueError) as e:
+        raise HTTPException(status_code=404, detail="Файл результата не найден") from e
+    return FileResponse(path, media_type="image/png", filename=f"outlet-{row.id.hex[:12]}.png")
+
+
+@router.post("/jobs/{job_id}/dismiss", response_model=OutletPhotoJobOut)
+def outlet_photo_job_dismiss(
+    job_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    principal: AdminPrincipal = Depends(require_permission("outlet")),
+) -> OutletPhotoJobOut:
+    row = _owned_job(db, job_id, principal)
+    return _job_out(outlet_jobs.dismiss_job(db, row))
+
+
+@router.post("/jobs/{job_id}/publish", response_model=OutletPhotoUploadOut)
+async def outlet_photo_job_publish(
+    job_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    principal: AdminPrincipal = Depends(require_permission("outlet")),
+) -> OutletPhotoUploadOut:
+    token = _require_moysklad()
+    row = _owned_job(db, job_id, principal)
+    if row.status != "ready":
+        raise HTTPException(status_code=409, detail="Сначала дождитесь кадра Fashn")
+    try:
+        raw = outlet_jobs.result_file(row).read_bytes()
+    except (FileNotFoundError, ValueError) as e:
+        raise HTTPException(status_code=404, detail="Файл результата не найден") from e
+    if not raw:
+        raise HTTPException(status_code=400, detail="Пустой файл результата")
+
+    filename = f"outlet-{row.id.hex[:12]}.png"
+    content = base64.b64encode(raw).decode("ascii")
+    client = MoySkladClient(token)
+    try:
+        images = await client.upload_product_image(
+            row.product_id,
+            filename=filename,
+            content_b64=content,
         )
-        png_bytes = normalize_png_bytes(png_bytes)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except ApiClientAbortableException as e:
+        detail = e.parsed_response
+        msg = str(detail)[:300] if detail else f"МойСклад HTTP {e.response.status}"
+        raise HTTPException(status_code=502, detail=f"МойСклад: {msg}") from e
     except Exception as e:
-        log.warning("outlet generate failed: %s: %s", type(e).__name__, e, exc_info=True)
+        log.exception("outlet publish job=%s", job_id)
         raise HTTPException(
             status_code=502,
-            detail=f"Fashn: {type(e).__name__}: {e}",
+            detail=f"Ошибка загрузки в МойСклад: {type(e).__name__}: {e}",
         ) from e
+    finally:
+        await client.close()
 
-    b64 = base64.b64encode(png_bytes).decode("ascii")
-    fname = f"outlet-{uuid.uuid4().hex[:12]}.png"
-    return OutletPhotoGenerateOut(image_base64=b64, mime="image/png", filename=fname)
+    user_id, label = _uploader_identity(principal)
+    gender = row.product_gender or row.gender
+    if gender not in ("male", "female"):
+        gender = None
+    saved = OutletPhotoUpload(
+        product_id=row.product_id,
+        product_name=row.product_name or "Без названия",
+        article=row.article,
+        code=row.code,
+        barcode=row.barcode,
+        path_name=row.path_name,
+        gender=gender,
+        uploaded_by_user_id=user_id,
+        uploaded_by_label=label,
+    )
+    row.status = "uploaded"
+    row.finished_at = datetime.now(timezone.utc)
+    row.error_message = None
+    db.add(saved)
+    db.commit()
+    db.refresh(saved)
+    db.refresh(row)
+    outlet_jobs.delete_job_files(row)
+
+    return OutletPhotoUploadOut(
+        product_id=row.product_id,
+        images_count=len(images),
+        images=images,
+        upload_id=saved.id,
+    )
 
 
 @router.post("/upload", response_model=OutletPhotoUploadOut)

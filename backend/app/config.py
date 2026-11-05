@@ -266,6 +266,9 @@ class Settings(BaseSettings):
     ai_ingest_worker_concurrency: int = 2
     # Пусто = backend/var/ai_ingest_tmp (создаётся при старте загрузки)
     ai_ingest_temp_dir: str | None = None
+    # Кадры аутлета, пока Fashn считает и пока сотрудник не забрал результат.
+    # Пусто = backend/var/outlet_photo_tmp
+    outlet_photo_temp_dir: str | None = None
 
     @property
     def cors_origin_list(self) -> list[str]:
@@ -289,6 +292,12 @@ class Settings(BaseSettings):
         if self.ai_ingest_temp_dir and str(self.ai_ingest_temp_dir).strip():
             return Path(self.ai_ingest_temp_dir).expanduser().resolve()
         return (_BACKEND_DIR / "var" / "ai_ingest_tmp").resolve()
+
+    @property
+    def outlet_photo_temp_path(self) -> Path:
+        if self.outlet_photo_temp_dir and str(self.outlet_photo_temp_dir).strip():
+            return Path(self.outlet_photo_temp_dir).expanduser().resolve()
+        return (_BACKEND_DIR / "var" / "outlet_photo_tmp").resolve()
 
     @property
     def promo_banner_media_path(self) -> Path:

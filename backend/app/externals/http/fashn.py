@@ -8,6 +8,8 @@ import random
 import time
 from pathlib import Path
 
+from aiohttp import ClientTimeout
+
 from app.externals.http.base import BaseApiClient
 from app.externals.http.exceptions import ApiClientAbortableException
 
@@ -100,6 +102,10 @@ def load_prompt(
 
 class FashnClient(BaseApiClient):
     BASE_URL = "https://api.fashn.ai/v1/"
+    # Иначе сессия режет запрос на 30 с, хотя submit рассчитан на сотни секунд.
+    request_timeout_seconds = 300
+    # Повтор всего прогона уже есть в run_*. Не умножать его на ещё три таймаута.
+    allowed_retries = 0
 
     def __init__(
         self,
@@ -118,6 +124,9 @@ class FashnClient(BaseApiClient):
         self._submit_timeout = submit_timeout
         self._poll_timeout = poll_timeout
         self._download_timeout = download_timeout
+
+    def _call_timeout(self, total: float) -> ClientTimeout:
+        return ClientTimeout(total=total, sock_connect=self._connect_timeout)
 
     @property
     def base_url(self) -> str:
@@ -158,7 +167,12 @@ class FashnClient(BaseApiClient):
             },
         }
         try:
-            resp = await self.post("/run", json=payload, **self._proxy_kwargs())
+            resp = await self.post(
+                "/run",
+                json=payload,
+                timeout=self._call_timeout(self._submit_timeout),
+                **self._proxy_kwargs(),
+            )
         except ApiClientAbortableException as e:
             log.warning(
                 "fashn submit HTTP %s body=%s",
@@ -183,7 +197,11 @@ class FashnClient(BaseApiClient):
             if elapsed > POLL_TIMEOUT_SEC:
                 raise TimeoutError(f"Fashn: polling timeout after {POLL_TIMEOUT_SEC}s (job={job_id})")
             try:
-                resp = await self.get(f"/status/{job_id}", **self._proxy_kwargs())
+                resp = await self.get(
+                    f"/status/{job_id}",
+                    timeout=self._call_timeout(self._poll_timeout),
+                    **self._proxy_kwargs(),
+                )
             except ApiClientAbortableException as e:
                 raise RuntimeError(f"Fashn poll HTTP {e.response.status}") from e
 
@@ -210,7 +228,11 @@ class FashnClient(BaseApiClient):
 
     async def download_png(self, url: str) -> bytes:
         """Downloads PNG from a Fashn result URL."""
-        async with self.session.get(url, **self._proxy_kwargs()) as resp:
+        async with self.session.get(
+            url,
+            timeout=self._call_timeout(self._download_timeout),
+            **self._proxy_kwargs(),
+        ) as resp:
             if resp.status != 200:
                 raise RuntimeError(f"Fashn download HTTP {resp.status}: {url}")
             return await resp.read()
@@ -237,7 +259,12 @@ class FashnClient(BaseApiClient):
             },
         }
         try:
-            resp = await self.post("/run", json=payload, **self._proxy_kwargs())
+            resp = await self.post(
+                "/run",
+                json=payload,
+                timeout=self._call_timeout(self._submit_timeout),
+                **self._proxy_kwargs(),
+            )
         except ApiClientAbortableException as e:
             log.warning(
                 "fashn tryon submit HTTP %s body=%s",

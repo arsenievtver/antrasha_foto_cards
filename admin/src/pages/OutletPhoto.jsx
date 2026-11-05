@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  createOutletPhotoJob,
+  dismissOutletPhotoJob,
+  fetchCurrentOutletPhotoJob,
+  fetchOutletPhotoJob,
+  fetchOutletPhotoJobImage,
   fetchOutletPhotoStatus,
-  generateOutletPhoto,
   lookupOutletPhotoBarcode,
-  uploadOutletPhotoToMoySklad,
+  publishOutletPhotoJob,
 } from "../api.js";
 import ImageCropModal from "../components/ImageCropModal.jsx";
 
@@ -11,9 +15,35 @@ const STEPS = {
   BARCODE: "barcode",
   PRODUCT: "product",
   PREVIEW_CROP: "preview_crop",
+  WAITING: "waiting",
   RESULT: "result",
   SUCCESS: "success",
 };
+
+function netMessage(error) {
+  const msg = error?.message || "Ошибка сети";
+  if (
+    msg === "Load failed" ||
+    msg === "Failed to fetch" ||
+    msg === "NetworkError when attempting to fetch resource."
+  ) {
+    return "Нет связи с сервером. Если кадр уже ушёл, откройте страницу снова — он доделается сам.";
+  }
+  return msg;
+}
+
+function productFromJob(job) {
+  return {
+    product_id: job.product_id,
+    name: job.name,
+    article: job.article,
+    code: job.code,
+    barcode: job.barcode,
+    path_name: job.path_name,
+    gender: job.product_gender,
+    existing_images_count: 0,
+  };
+}
 
 const CROP_ASPECT = 4 / 5;
 
@@ -37,14 +67,19 @@ export default function OutletPhoto() {
   const [cropOpen, setCropOpen] = useState(false);
   const [croppedFile, setCroppedFile] = useState(null);
   const [croppedPreview, setCroppedPreview] = useState("");
-  const [resultB64, setResultB64] = useState("");
-  const [resultMime, setResultMime] = useState("image/png");
-  const [resultFilename, setResultFilename] = useState("");
+  const [jobId, setJobId] = useState("");
+  const [resultUrl, setResultUrl] = useState("");
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const [loadingStatus, setLoadingStatus] = useState(true);
   const cameraRef = useRef(null);
   const fileRef = useRef(null);
+  const jobIdRef = useRef("");
+  const resultUrlRef = useRef("");
+  const croppedFileRef = useRef(null);
+  jobIdRef.current = jobId;
+  resultUrlRef.current = resultUrl;
+  croppedFileRef.current = croppedFile;
 
   const refreshStatus = useCallback(async () => {
     const data = await fetchOutletPhotoStatus();
@@ -58,8 +93,36 @@ export default function OutletPhoto() {
       setLoadingStatus(true);
       try {
         await refreshStatus();
+        const job = await fetchCurrentOutletPhotoJob();
+        if (c || !job) return;
+        setJobId(job.id);
+        setProduct(productFromJob(job));
+        setBarcode(job.barcode || "");
+        if (job.gender === "male" || job.gender === "female") setGender(job.gender);
+        if (job.status === "pending" || job.status === "running") {
+          setStep(STEPS.WAITING);
+        } else if (job.status === "ready") {
+          try {
+            const blob = await fetchOutletPhotoJobImage(job.id);
+            if (c) return;
+            const url = URL.createObjectURL(blob);
+            setResultUrl((prev) => {
+              revokeUrl(prev);
+              return url;
+            });
+            setStep(STEPS.RESULT);
+          } catch (imgErr) {
+            if (!c) {
+              setErr(netMessage(imgErr));
+              setStep(STEPS.WAITING);
+            }
+          }
+        } else if (job.status === "failed") {
+          setErr(job.error_message || "Fashn не смог сделать кадр");
+          setStep(STEPS.PRODUCT);
+        }
       } catch (e) {
-        if (!c) setErr(e.message);
+        if (!c) setErr(netMessage(e));
       } finally {
         if (!c) setLoadingStatus(false);
       }
@@ -76,9 +139,64 @@ export default function OutletPhoto() {
     };
   }, [rawSrc, croppedPreview]);
 
+  useEffect(() => () => revokeUrl(resultUrlRef.current), []);
+
+  useEffect(() => {
+    if (step !== STEPS.WAITING || !jobId) return undefined;
+    let stop = false;
+    let loadingImage = false;
+    async function tick() {
+      try {
+        const job = await fetchOutletPhotoJob(jobId);
+        if (stop) return;
+        if (job.status === "pending" || job.status === "running") {
+          setErr("");
+          return;
+        }
+        if (job.status === "ready") {
+          if (loadingImage) return;
+          loadingImage = true;
+          const blob = await fetchOutletPhotoJobImage(job.id);
+          if (stop) return;
+          const url = URL.createObjectURL(blob);
+          setResultUrl((prev) => {
+            revokeUrl(prev);
+            return url;
+          });
+          setStep(STEPS.RESULT);
+          setErr("");
+          return;
+        }
+        if (job.status === "failed") {
+          setErr(job.error_message || "Fashn не смог сделать кадр");
+          setStep(croppedFileRef.current ? STEPS.PREVIEW_CROP : STEPS.PRODUCT);
+          return;
+        }
+      } catch (ex) {
+        loadingImage = false;
+        if (!stop) setErr(netMessage(ex));
+      }
+    }
+    const timer = setInterval(() => {
+      void tick();
+    }, 2000);
+    const onVis = () => {
+      if (document.visibilityState === "visible") void tick();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    void tick();
+    return () => {
+      stop = true;
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, [step, jobId]);
+
   function resetAll() {
+    const id = jobIdRef.current;
     revokeUrl(rawSrc);
     revokeUrl(croppedPreview);
+    revokeUrl(resultUrlRef.current);
     setStep(STEPS.BARCODE);
     setBarcode("");
     setProduct(null);
@@ -86,11 +204,11 @@ export default function OutletPhoto() {
     setCropOpen(false);
     setCroppedFile(null);
     setCroppedPreview("");
-    setResultB64("");
-    setResultMime("image/png");
-    setResultFilename("");
+    setJobId("");
+    setResultUrl("");
     setErr("");
     setBusy(false);
+    if (id) void dismissOutletPhotoJob(id).catch(() => {});
     if (cameraRef.current) cameraRef.current.value = "";
     if (fileRef.current) fileRef.current.value = "";
   }
@@ -156,28 +274,28 @@ export default function OutletPhoto() {
   }
 
   async function onGenerate() {
-    if (!croppedFile) {
+    if (!croppedFile || !product?.product_id) {
       setErr("Сначала сделайте кадр");
       return;
     }
     setBusy(true);
     setErr("");
     try {
-      const data = await generateOutletPhoto(gender, croppedFile);
-      setResultB64(data.image_base64);
-      setResultMime(data.mime || "image/png");
-      setResultFilename(data.filename || `outlet-${Date.now()}.png`);
-      setStep(STEPS.RESULT);
+      const job = await createOutletPhotoJob({ gender, file: croppedFile, product });
+      setJobId(job.id);
+      setStep(STEPS.WAITING);
     } catch (ex) {
-      setErr(ex.message);
+      setErr(netMessage(ex));
     } finally {
       setBusy(false);
     }
   }
 
   function onRedo() {
-    setResultB64("");
-    setResultFilename("");
+    const id = jobIdRef.current;
+    revokeUrl(resultUrlRef.current);
+    setResultUrl("");
+    setJobId("");
     setErr("");
     setStep(STEPS.PRODUCT);
     setCroppedFile(null);
@@ -185,38 +303,25 @@ export default function OutletPhoto() {
     setCroppedPreview("");
     if (cameraRef.current) cameraRef.current.value = "";
     if (fileRef.current) fileRef.current.value = "";
+    if (id) void dismissOutletPhotoJob(id).catch(() => {});
   }
 
   async function onUpload() {
-    if (!product?.product_id || !resultB64) {
+    if (!jobId) {
       setErr("Нет результата для загрузки");
       return;
     }
     setBusy(true);
     setErr("");
     try {
-      await uploadOutletPhotoToMoySklad({
-        productId: product.product_id,
-        filename: resultFilename || `outlet-${Date.now()}.png`,
-        content: resultB64,
-        name: product.name,
-        article: product.article,
-        code: product.code,
-        barcode: product.barcode,
-        pathName: product.path_name,
-        gender: product.gender || gender,
-      });
+      await publishOutletPhotoJob(jobId);
       setStep(STEPS.SUCCESS);
     } catch (ex) {
-      setErr(ex.message);
+      setErr(netMessage(ex));
     } finally {
       setBusy(false);
     }
   }
-
-  const resultSrc = resultB64
-    ? `data:${resultMime};base64,${resultB64}`
-    : "";
 
   if (loadingStatus && !status) {
     return <p style={{ color: "var(--muted)" }}>Загрузка…</p>;
@@ -226,7 +331,8 @@ export default function OutletPhoto() {
     <div className="outlet-photo">
       <h2 style={{ marginTop: 0 }}>Аутлет: фото</h2>
       <p style={{ color: "var(--muted)", marginTop: 0, maxWidth: 560 }}>
-        Штрихкод → товар в МойСклад → кадр → Fashn (каталог) → загрузка изображения в товар.
+        Штрихкод → товар в МойСклад → кадр уходит на сервер. Fashn считается там, страница только
+        спрашивает готовность. Можно закрыть вкладку и открыть её снова.
       </p>
 
       {status && (
@@ -279,6 +385,7 @@ export default function OutletPhoto() {
 
       {(step === STEPS.PRODUCT ||
         step === STEPS.PREVIEW_CROP ||
+        step === STEPS.WAITING ||
         step === STEPS.RESULT ||
         step === STEPS.SUCCESS) &&
         product && (
@@ -415,7 +522,7 @@ export default function OutletPhoto() {
 
       {step === STEPS.PREVIEW_CROP && (
         <div style={{ maxWidth: 420 }}>
-          <p style={{ marginTop: 0 }}>Кадр 4:5 — отправить в Fashn?</p>
+          <p style={{ marginTop: 0 }}>Кадр 4:5 — отправить на сервер?</p>
           {croppedPreview ? (
             <img
               src={croppedPreview}
@@ -432,7 +539,7 @@ export default function OutletPhoto() {
           ) : null}
           <div className="flex-gap" style={{ flexWrap: "wrap" }}>
             <button type="button" disabled={busy} onClick={onGenerate}>
-              {busy ? "Генерация… (до ~5 мин)" : "Сгенерировать"}
+              {busy ? "Отправляем…" : "Отправить"}
             </button>
             <button
               type="button"
@@ -451,12 +558,22 @@ export default function OutletPhoto() {
         </div>
       )}
 
+      {step === STEPS.WAITING && (
+        <div style={{ maxWidth: 420 }}>
+          <p style={{ marginTop: 0, fontWeight: 600 }}>Fashn рисует кадр на сервере</p>
+          <p style={{ color: "var(--muted)", marginTop: 0 }}>
+            Телефон больше не ждёт ответ. Можно закрыть страницу и открыть её снова — здесь
+            появится готовый кадр.
+          </p>
+        </div>
+      )}
+
       {step === STEPS.RESULT && (
         <div style={{ maxWidth: 420 }}>
           <p style={{ marginTop: 0 }}>Результат Fashn</p>
-          {resultSrc ? (
+          {resultUrl ? (
             <img
-              src={resultSrc}
+              src={resultUrl}
               alt="Результат"
               style={{
                 width: "100%",
@@ -482,9 +599,9 @@ export default function OutletPhoto() {
       {step === STEPS.SUCCESS && (
         <div style={{ maxWidth: 420 }}>
           <p style={{ color: "var(--ok)", fontWeight: 600 }}>Изображение добавлено к товару в МойСклад.</p>
-          {resultSrc ? (
+          {resultUrl ? (
             <img
-              src={resultSrc}
+              src={resultUrl}
               alt="Загружено"
               style={{
                 width: "100%",

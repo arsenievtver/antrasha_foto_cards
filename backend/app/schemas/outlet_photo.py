@@ -31,10 +31,23 @@ class OutletPhotoLookupOut(BaseModel):
     existing_image_preview: str | None = None
 
 
-class OutletPhotoGenerateOut(BaseModel):
-    image_base64: str
-    mime: str = "image/png"
-    filename: str
+class OutletPhotoJobOut(BaseModel):
+    id: uuid.UUID
+    status: str
+    error_message: str | None = None
+    gender: str
+    product_id: str
+    name: str
+    article: str | None = None
+    code: str | None = None
+    barcode: str | None = None
+    path_name: str | None = None
+    product_gender: str | None = None
+    created_at: datetime
+
+
+class OutletPhotoJobCurrentOut(BaseModel):
+    job: OutletPhotoJobOut | None = None
 
 
 class OutletPhotoUploadIn(BaseModel):

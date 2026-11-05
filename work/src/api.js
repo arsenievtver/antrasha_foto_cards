@@ -305,14 +305,76 @@ export async function lookupOutletPhotoBarcode(barcode) {
   return data;
 }
 
-export async function generateOutletPhoto(gender, file) {
+export async function fetchCurrentOutletPhotoJob() {
+  const res = await fetch(apiUrl("/admin/outlet-photo/jobs/current"), {
+    headers: headersJson(),
+  });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data.job || null;
+}
+
+export async function fetchOutletPhotoJob(jobId) {
+  const res = await fetch(apiUrl(`/admin/outlet-photo/jobs/${jobId}`), {
+    headers: headersJson(),
+  });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
+export async function createOutletPhotoJob({ gender, file, product }) {
   const fd = new FormData();
   fd.append("gender", gender);
   fd.append("image", file);
-  const res = await fetch(apiUrl("/admin/outlet-photo/generate"), {
+  fd.append("product_id", product.product_id);
+  fd.append("name", product.name || "");
+  fd.append("article", product.article || "");
+  fd.append("code", product.code || "");
+  fd.append("barcode", product.barcode || "");
+  fd.append("path_name", product.path_name || "");
+  fd.append("product_gender", product.gender || "");
+  const res = await fetch(apiUrl("/admin/outlet-photo/jobs"), {
     method: "POST",
     headers: headersAuthOnly(),
     body: fd,
+  });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
+export async function fetchOutletPhotoJobImage(jobId) {
+  const res = await fetch(apiUrl(`/admin/outlet-photo/jobs/${jobId}/image`), {
+    headers: headersAuthOnly(),
+  });
+  if (!res.ok) {
+    let message = res.statusText;
+    try {
+      const data = await res.json();
+      message = detail(data, res.statusText);
+    } catch {
+      /* не JSON */
+    }
+    throw new Error(message);
+  }
+  return res.blob();
+}
+
+export async function publishOutletPhotoJob(jobId) {
+  const res = await fetch(apiUrl(`/admin/outlet-photo/jobs/${jobId}/publish`), {
+    method: "POST",
+    headers: headersAuthOnly(),
+  });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
+export async function dismissOutletPhotoJob(jobId) {
+  const res = await fetch(apiUrl(`/admin/outlet-photo/jobs/${jobId}/dismiss`), {
+    method: "POST",
+    headers: headersAuthOnly(),
   });
   const data = await parseResponseJson(res);
   if (!res.ok) throw new Error(detail(data, res.statusText));
