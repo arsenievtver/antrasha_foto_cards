@@ -1,6 +1,7 @@
 import asyncio
 import dataclasses
 import logging
+import socket
 from datetime import timedelta
 from typing import Any, Mapping, Tuple
 from urllib.parse import urljoin
@@ -13,6 +14,7 @@ from aiohttp import (
     ClientSession,
     ClientTimeout,
     ContentTypeError,
+    TCPConnector,
 )
 from app.externals.http.exceptions import (
     ApiClientAbortableException,
@@ -73,10 +75,14 @@ class BaseApiClient:
     def session(self) -> ClientSession:
         if self._session is None or self._session.closed:
 
+            # VPS без рабочего IPv6: aiohttp сначала берёт AAAA и висит до таймаута,
+            # повтор по IPv4 проходит сразу. Так же лечили исходящие в Автомедике
+            # и web push здесь — local_address / family только IPv4.
             self._session = ClientSession(
                 headers=self.base_headers,
                 json_serialize=ujson.dumps,
                 timeout=ClientTimeout(total=self.request_timeout_seconds),
+                connector=TCPConnector(family=socket.AF_INET),
             )
 
         return self._session

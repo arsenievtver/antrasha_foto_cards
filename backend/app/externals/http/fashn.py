@@ -103,9 +103,10 @@ def load_prompt(
 class FashnClient(BaseApiClient):
     BASE_URL = "https://api.fashn.ai/v1/"
     # Иначе сессия режет весь запрос на 30 с, хотя submit рассчитан на сотни секунд.
-    # Повторы оставляем как у BaseApiClient: до api.fashn.ai часто идём через прокси,
-    # первый connect срывается, без повтора задача в каталоге сразу падает.
     request_timeout_seconds = 300
+    # Первый TCP с VPS иногда не устанавливается (как в Автомедике после переезда).
+    # Короткий лимит, дальше срабатывает повтор BaseApiClient — второй заход быстрый.
+    _CONNECT_BUDGET_SEC = 5.0
 
     def __init__(
         self,
@@ -126,9 +127,8 @@ class FashnClient(BaseApiClient):
         self._download_timeout = download_timeout
 
     def _call_timeout(self, total: float) -> ClientTimeout:
-        # Только общий бюджет запроса. Отдельный sock_connect в 30 с обрывал
-        # TCP+TLS до прокси и давал ConnectionTimeoutError на /v1/run.
-        return ClientTimeout(total=total)
+        connect = min(self._CONNECT_BUDGET_SEC, self._connect_timeout, total)
+        return ClientTimeout(total=total, sock_connect=connect)
 
     @property
     def base_url(self) -> str:
