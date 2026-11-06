@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from urllib.parse import quote, unquote, urlparse
 
 import boto3
@@ -9,6 +10,8 @@ from botocore.client import BaseClient
 from app.config import Settings, settings
 
 _IMAGE_SUFFIXES = (".jpg", ".jpeg", ".png", ".webp", ".gif", ".avif", ".heic", ".bmp")
+# Исходник для Fashn живёт минуты и не должен попасть в каталог при синхронизации бакета.
+FASHN_SOURCE_PREFIX = "fashn-src/"
 
 
 def get_s3_client() -> BaseClient:
@@ -158,8 +161,23 @@ def bulk_delete_photo_files_from_object_storage(
 def is_image_key(key: str) -> bool:
     if not key or key.endswith("/"):
         return False
+    if key.startswith(FASHN_SOURCE_PREFIX) or f"/{FASHN_SOURCE_PREFIX}" in key:
+        return False
     lower = key.lower()
     return any(lower.endswith(s) for s in _IMAGE_SUFFIXES)
+
+
+def put_fashn_source_jpeg(bucket: str, body: bytes) -> str:
+    """Кладёт JPEG, который Fashn заберёт по публичной ссылке. Возвращает ключ."""
+    key = f"{FASHN_SOURCE_PREFIX}{uuid.uuid4().hex}.jpg"
+    put_image_object(bucket, key, body, content_type="image/jpeg")
+    return key
+
+
+def delete_fashn_source(bucket: str, key: str) -> None:
+    if not key.startswith(FASHN_SOURCE_PREFIX):
+        raise ValueError("not a fashn source key")
+    delete_object_from_managed_bucket(bucket, key)
 
 
 def put_image_object(

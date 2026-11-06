@@ -17,12 +17,14 @@ from app.database import SessionLocal
 from app.externals.http.fashn import FRAME_FEED, FashnClient, normalize_content_mode
 from app.models import AiIngestJob
 from app.services.feed_release_batch import get_or_create_draft_batch
-from app.services.image_prepare import (
-    build_fashn_product_image_data_url,
-    png_bytes_to_webp,
-)
+from app.services.image_prepare import jpeg_bytes_for_fashn_file, png_bytes_to_webp
 from app.services.yc_photo_sync import ensure_photo_row_for_yc_key
-from app.services.yc_storage import put_image_object
+from app.services.yc_storage import (
+    delete_fashn_source,
+    public_object_url,
+    put_fashn_source_jpeg,
+    put_image_object,
+)
 
 log = logging.getLogger("app.ai_ingest")
 
@@ -144,17 +146,21 @@ def run_single_ingest_job(cfg: Settings, job_id: uuid.UUID) -> None:
             return
 
         try:
-            data_url = build_fashn_product_image_data_url(path)
+            jpeg = jpeg_bytes_for_fashn_file(path)
+            source_bucket, _prefix = _bucket_and_prefix_for_gender(cfg, job.gender)
+            source_key = put_fashn_source_jpeg(source_bucket, jpeg)
         except Exception as e:
             log.exception("prepare image job_id=%s", job_id)
             _fail_job(db, job, f"Подготовка изображения: {e}")
             return
 
+        source_url = public_object_url(source_bucket, source_key)
         log.info(
-            "ai_ingest job_id=%s → Fashn product-to-model content_mode=%s (data_url ~%s символов)",
+            "ai_ingest job_id=%s → Fashn product-to-model content_mode=%s url=%s jpeg=%s байт",
             job_id,
             content_mode,
-            len(data_url),
+            source_url,
+            len(jpeg),
         )
         t0 = time.monotonic()
         try:
@@ -169,7 +175,7 @@ def run_single_ingest_job(cfg: Settings, job_id: uuid.UUID) -> None:
             png_bytes = asyncio.run(
                 client.run_product_to_model(
                     gender=job.gender,
-                    product_image_data_url=data_url,
+                    product_image_data_url=source_url,
                     content_mode=content_mode,
                     frame=FRAME_FEED,
                 )
@@ -183,6 +189,16 @@ def run_single_ingest_job(cfg: Settings, job_id: uuid.UUID) -> None:
             )
             _fail_job(db, job, f"{type(e).__name__}: {e}")
             return
+        finally:
+            try:
+                delete_fashn_source(source_bucket, source_key)
+            except Exception:
+                log.warning(
+                    "ai_ingest job_id=%s не удалился исходник %s",
+                    job_id,
+                    source_key,
+                    exc_info=True,
+                )
         dt = time.monotonic() - t0
         log.info("ai_ingest job_id=%s Fashn OK за %.1fs, png=%s байт", job_id, dt, len(png_bytes))
 

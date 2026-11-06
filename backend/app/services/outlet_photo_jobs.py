@@ -17,7 +17,8 @@ from app.database import SessionLocal
 from app.deps import AdminPrincipal
 from app.externals.http.fashn import CONTENT_MODE_SINGLE, FRAME_OUTLET, FashnClient
 from app.models.outlet_photo_job import OPEN_JOB_STATUSES, OutletPhotoJob
-from app.services.image_prepare import build_fashn_image_data_url_from_bytes, normalize_png_bytes
+from app.services.image_prepare import jpeg_bytes_for_fashn_bytes, normalize_png_bytes
+from app.services.yc_storage import delete_fashn_source, public_object_url, put_fashn_source_jpeg
 
 log = logging.getLogger("app.outlet_photo")
 
@@ -186,7 +187,11 @@ def _fail(db: Session, job: OutletPhotoJob, message: str) -> None:
 
 
 def _render_png(raw: bytes, gender: str) -> bytes:
-    data_url, _size = build_fashn_image_data_url_from_bytes(raw)
+    jpeg, _size = jpeg_bytes_for_fashn_bytes(raw)
+    g = (gender or "").strip().lower()
+    bucket = settings.yc_bucket_men if g == "male" else settings.yc_bucket_women
+    source_key = put_fashn_source_jpeg(bucket, jpeg)
+    source_url = public_object_url(bucket, source_key)
     proxy = str(settings.fashn_https_proxy).strip() if settings.fashn_https_proxy else None
     client = FashnClient(
         api_key=str(settings.fashn_api_key).strip(),
@@ -196,15 +201,21 @@ def _render_png(raw: bytes, gender: str) -> bytes:
         poll_timeout=settings.fashn_http_read_timeout_poll,
         download_timeout=settings.fashn_http_read_timeout_download,
     )
-    png = asyncio.run(
-        client.run_product_to_model(
-            gender=gender,
-            product_image_data_url=data_url,
-            content_mode=CONTENT_MODE_SINGLE,
-            frame=FRAME_OUTLET,
-        ),
-    )
-    return normalize_png_bytes(png)
+    try:
+        png = asyncio.run(
+            client.run_product_to_model(
+                gender=gender,
+                product_image_data_url=source_url,
+                content_mode=CONTENT_MODE_SINGLE,
+                frame=FRAME_OUTLET,
+            ),
+        )
+        return normalize_png_bytes(png)
+    finally:
+        try:
+            delete_fashn_source(bucket, source_key)
+        except Exception:
+            log.warning("outlet source delete %s failed", source_key, exc_info=True)
 
 
 def _acquire() -> uuid.UUID | None:

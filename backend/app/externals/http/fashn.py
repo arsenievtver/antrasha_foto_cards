@@ -104,9 +104,6 @@ class FashnClient(BaseApiClient):
     BASE_URL = "https://api.fashn.ai/v1/"
     # Иначе сессия режет весь запрос на 30 с, хотя submit рассчитан на сотни секунд.
     request_timeout_seconds = 300
-    # Первый TCP с VPS иногда не устанавливается (как в Автомедике после переезда).
-    # Короткий лимит, дальше срабатывает повтор BaseApiClient — второй заход быстрый.
-    _CONNECT_BUDGET_SEC = 5.0
 
     def __init__(
         self,
@@ -127,8 +124,9 @@ class FashnClient(BaseApiClient):
         self._download_timeout = download_timeout
 
     def _call_timeout(self, total: float) -> ClientTimeout:
-        connect = min(self._CONNECT_BUDGET_SEC, self._connect_timeout, total)
-        return ClientTimeout(total=total, sock_connect=connect)
+        # Без отдельного sock_connect: с ним aiohttp обрывал TCP до IPv4
+        # и задачи падали с ConnectionTimeoutError на /v1/run.
+        return ClientTimeout(total=total)
 
     @property
     def base_url(self) -> str:

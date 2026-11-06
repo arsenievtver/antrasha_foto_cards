@@ -88,8 +88,8 @@ def normalize_png_bytes(png_bytes: bytes) -> bytes:
     return buf.getvalue()
 
 
-def build_fashn_image_data_url_from_bytes(raw: bytes) -> tuple[str, tuple[int, int]]:
-    """Фото пользователя → JPEG data URL для Fashn. Возвращает (url, (width, height))."""
+def jpeg_bytes_for_fashn_bytes(raw: bytes) -> tuple[bytes, tuple[int, int]]:
+    """Фото пользователя → JPEG для Fashn и размер кадра."""
     _register_heif_once()
     img = Image.open(io.BytesIO(raw))
     img.load()
@@ -98,26 +98,28 @@ def build_fashn_image_data_url_from_bytes(raw: bytes) -> tuple[str, tuple[int, i
     img = _resize_long_edge(img)
     buf = io.BytesIO()
     img.save(buf, format="JPEG", quality=92, optimize=True)
-    jpeg = buf.getvalue()
+    return buf.getvalue(), img.size
+
+
+def build_fashn_image_data_url_from_bytes(raw: bytes) -> tuple[str, tuple[int, int]]:
+    """Фото пользователя → JPEG data URL для Fashn. Возвращает (url, (width, height))."""
+    jpeg, size = jpeg_bytes_for_fashn_bytes(raw)
     b64 = base64.b64encode(jpeg).decode("ascii")
-    return f"data:image/jpeg;base64,{b64}", img.size
+    return f"data:image/jpeg;base64,{b64}", size
 
 
-def build_fashn_product_image_data_url(path: Path) -> str:
+def jpeg_bytes_for_fashn_file(path: Path) -> bytes:
     """
-    `product_image` для Fashn: `data:image/jpeg;base64,...`
+    JPEG для Fashn.
 
-    Как в рабочем main: для .jpg/.jpeg — сырые байты файла + base64, без PIL
-    (меньше тело запроса и быстрее, чем пересохранение через Pillow).
-    HEIC/HEIF, PNG, WEBP и т.д. — декодирование и приведение к RGB JPEG.
+    Для .jpg/.jpeg — сырые байты файла, без PIL. HEIC/PNG/WEBP — RGB JPEG.
     """
     ext = path.suffix.lower()
     if ext in (".jpg", ".jpeg"):
         raw = path.read_bytes()
         if len(raw) > _JPEG_REENCODE_IF_LARGER_THAN_BYTES:
             raw = _reencode_jpeg_smaller_for_transport(raw)
-        b64 = base64.b64encode(raw).decode("ascii")
-        return f"data:image/jpeg;base64,{b64}"
+        return raw
 
     if ext in (".heic", ".heif"):
         _register_heif_once()
@@ -140,7 +142,12 @@ def build_fashn_product_image_data_url(path: Path) -> str:
 
     buf = io.BytesIO()
     img.save(buf, format="JPEG", quality=92, optimize=True)
-    raw = buf.getvalue()
+    return buf.getvalue()
+
+
+def build_fashn_product_image_data_url(path: Path) -> str:
+    """`product_image` для Fashn как data URL. Для каталога лучше публичная ссылка."""
+    raw = jpeg_bytes_for_fashn_file(path)
     b64 = base64.b64encode(raw).decode("ascii")
     return f"data:image/jpeg;base64,{b64}"
 
