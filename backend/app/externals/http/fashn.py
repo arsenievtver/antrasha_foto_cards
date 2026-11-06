@@ -5,10 +5,11 @@ from __future__ import annotations
 import asyncio
 import logging
 import random
+import socket
 import time
 from pathlib import Path
 
-from aiohttp import ClientTimeout
+from aiohttp import ClientSession, ClientTimeout, TCPConnector
 
 from app.externals.http.base import BaseApiClient
 from app.externals.http.exceptions import ApiClientAbortableException
@@ -18,6 +19,10 @@ log = logging.getLogger("app.fashn")
 POLL_INTERVAL_SEC = 3.0
 POLL_TIMEOUT_SEC = 300.0
 MAX_RETRIES = 2
+# Целиком файл с CDN Fashn по этому каналу не дочитывается и падает по таймауту.
+# Кусок в 4 КБ стабильно приходит, поэтому собираем PNG из таких кусков.
+_DOWNLOAD_CHUNK = 4096
+_DOWNLOAD_CHUNK_TRIES = 4
 
 RESOLUTION = "2k"
 GENERATION_MODE = "quality"
@@ -59,6 +64,15 @@ def normalize_content_mode(content_mode: str | None) -> str:
     if mode not in VALID_CONTENT_MODES:
         raise ValueError("content_mode must be single or look")
     return mode
+
+
+def _content_range_total(value: str) -> int | None:
+    if "/" not in value:
+        return None
+    total = value.rsplit("/", 1)[-1].strip()
+    if total.isdigit():
+        return int(total)
+    return None
 
 
 def normalize_frame(frame: str | None) -> str:
@@ -226,16 +240,59 @@ class FashnClient(BaseApiClient):
 
             await asyncio.sleep(POLL_INTERVAL_SEC)
 
+    async def _download_range(self, url: str, start: int, end: int) -> tuple[bytes, int | None]:
+        timeout = ClientTimeout(total=12, sock_connect=5, sock_read=8)
+        headers = {"Range": f"bytes={start}-{end}"}
+        last: Exception = RuntimeError("Fashn download: no response")
+        for _ in range(_DOWNLOAD_CHUNK_TRIES):
+            try:
+                async with ClientSession(
+                    timeout=timeout,
+                    connector=TCPConnector(family=socket.AF_INET, force_close=True),
+                ) as session:
+                    async with session.get(url, headers=headers, timeout=timeout) as resp:
+                        if resp.status == 206:
+                            body = await resp.read()
+                            return body, _content_range_total(resp.headers.get("Content-Range", ""))
+                        if resp.status == 200:
+                            length = resp.content_length or 0
+                            if 0 < length <= (end - start + 1):
+                                return await resp.read(), length
+                            raise RuntimeError(
+                                f"Fashn download ignored range, length={length}"
+                            )
+                        raise RuntimeError(f"Fashn download HTTP {resp.status}")
+            except Exception as e:
+                last = e
+                log.warning(
+                    "fashn download bytes %s-%s: %s",
+                    start,
+                    end,
+                    type(e).__name__,
+                )
+        raise last
+
     async def download_png(self, url: str) -> bytes:
-        """Downloads PNG from a Fashn result URL."""
-        async with self.session.get(
-            url,
-            timeout=self._call_timeout(self._download_timeout),
-            **self._proxy_kwargs(),
-        ) as resp:
-            if resp.status != 200:
-                raise RuntimeError(f"Fashn download HTTP {resp.status}: {url}")
-            return await resp.read()
+        """Собирает PNG с CDN Fashn короткими Range-запросами."""
+        start = 0
+        total: int | None = None
+        out = bytearray()
+        while total is None or start < total:
+            body, found = await self._download_range(url, start, start + _DOWNLOAD_CHUNK - 1)
+            if not body:
+                raise RuntimeError("Fashn download: empty chunk")
+            if found is not None:
+                total = found
+            elif len(body) < _DOWNLOAD_CHUNK:
+                total = start + len(body)
+            else:
+                raise RuntimeError("Fashn download: range without total size")
+            out += body
+            start += len(body)
+        if not out:
+            raise RuntimeError("Fashn download: empty file")
+        log.info("fashn download ok bytes=%s", len(out))
+        return bytes(out)
 
     async def submit_tryon_v16(
         self,
@@ -291,6 +348,7 @@ class FashnClient(BaseApiClient):
     ) -> bytes:
         """submit → poll → download PNG."""
         last_err: Exception = RuntimeError("Unknown error")
+        urls: list[str] | None = None
         try:
             for attempt in range(MAX_RETRIES):
                 log.info("fashn tryon-v1.6 attempt %s/%s", attempt + 1, MAX_RETRIES)
@@ -303,7 +361,7 @@ class FashnClient(BaseApiClient):
                     urls = await self.poll_status(job_id)
                     if not urls:
                         raise ValueError("Fashn tryon: empty output")
-                    return await self.download_png(urls[0])
+                    break
                 except Exception as e:
                     last_err = e
                     log.warning(
@@ -314,7 +372,9 @@ class FashnClient(BaseApiClient):
                         e,
                         exc_info=True,
                     )
-            raise last_err
+            if not urls:
+                raise last_err
+            return await self.download_png(urls[0])
         finally:
             await self.close()
 
@@ -335,6 +395,7 @@ class FashnClient(BaseApiClient):
         # сходилась к одному лицу и одной позе.
         seed = random.randint(0, MAX_SEED)
         last_err: Exception = RuntimeError("Unknown error")
+        urls: list[str] | None = None
         try:
             for attempt in range(MAX_RETRIES):
                 log.info(
@@ -359,7 +420,7 @@ class FashnClient(BaseApiClient):
                     urls = await self.poll_status(job_id)
                     if not urls:
                         raise ValueError("Fashn: empty output")
-                    return await self.download_png(urls[0])
+                    break
                 except Exception as e:
                     last_err = e
                     log.warning(
@@ -367,6 +428,16 @@ class FashnClient(BaseApiClient):
                         attempt + 1, MAX_RETRIES, type(e).__name__, e,
                         exc_info=True,
                     )
-            raise last_err
+            if not urls:
+                raise last_err
+            # Генерация уже оплачена. Повтор — только скачивание, не новый /run.
+            download_err: Exception = RuntimeError("Fashn download")
+            for _ in range(3):
+                try:
+                    return await self.download_png(urls[0])
+                except Exception as e:
+                    download_err = e
+                    log.warning("fashn download failed: %s: %s", type(e).__name__, e)
+            raise download_err
         finally:
             await self.close()
