@@ -33,6 +33,13 @@ class AiIngestJobOut(BaseModel):
     show_badge: bool = False
     original_filename: str
     status: str
+    # upload | submit | generating | download | save — пока status=processing.
+    stage: str | None = None
+    stage_at: datetime | None = None
+    # Заказ Fashn уже оплачен: «Повтор» его продолжит, а не закажет новый.
+    fashn_ordered: bool = False
+    # processing без движения больше 20 минут — можно удалить.
+    stale: bool = False
     error_message: str | None
     result_url: str | None
     created_at: datetime
@@ -62,6 +69,8 @@ class AiIngestReleaseDraftOut(BaseModel):
     gender: str
     batch_id: uuid.UUID | None = None
     photo_count: int = 0
+    embedded_count: int = 0
+    embed_pending: int = 0
     embed_error_count: int = 0
     last_embed_error: str | None = None
     fashn_pending: int = 0

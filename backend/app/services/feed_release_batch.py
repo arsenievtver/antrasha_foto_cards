@@ -8,7 +8,6 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.models import AiIngestJob, FeedReleaseBatch, Photo, PhotoEmbedding
-from app.services.photo_embedding import embed_photo_url, upsert_photo_embedding
 
 log = logging.getLogger("app.feed_release_batch")
 
@@ -34,88 +33,101 @@ def get_or_create_draft_batch(db: Session, *, gender: str) -> FeedReleaseBatch:
     return row
 
 
+def _draft_photos_query(draft_id: uuid.UUID):
+    return select(Photo).where(
+        Photo.release_batch_id == draft_id,
+        Photo.feed_visible.is_(False),
+        Photo.is_active.is_(True),
+    )
+
+
 def draft_batch_summary(db: Session, *, gender: str) -> dict:
     draft = get_draft_batch(db, gender=gender)
     if not draft:
         return {
             "batch_id": None,
             "photo_count": 0,
+            "embedded_count": 0,
             "embed_error_count": 0,
             "last_embed_error": None,
         }
-    photos = db.execute(
-        select(Photo).where(
-            Photo.release_batch_id == draft.id,
-            Photo.feed_visible.is_(False),
+    photos = db.execute(_draft_photos_query(draft.id)).scalars().all()
+    ids = [p.id for p in photos]
+    embedded = 0
+    if ids:
+        embedded = int(
+            db.scalar(
+                select(func.count())
+                .select_from(PhotoEmbedding)
+                .where(PhotoEmbedding.photo_id.in_(ids))
+            )
+            or 0
         )
-    ).scalars().all()
     err_n = sum(1 for p in photos if p.vector_embed_error)
     return {
         "batch_id": draft.id,
         "photo_count": len(photos),
+        "embedded_count": embedded,
         "embed_error_count": err_n,
         "last_embed_error": draft.last_embed_error,
     }
 
 
+def pick_draft_photo_needing_embedding(db: Session) -> Photo | None:
+    """Фото черновиков без вектора. Фото с ошибкой — в конце очереди, чтобы не крутиться на одном."""
+    return db.execute(
+        select(Photo)
+        .join(FeedReleaseBatch, FeedReleaseBatch.id == Photo.release_batch_id)
+        .outerjoin(PhotoEmbedding, PhotoEmbedding.photo_id == Photo.id)
+        .where(
+            FeedReleaseBatch.status == "draft",
+            Photo.feed_visible.is_(False),
+            Photo.is_active.is_(True),
+            PhotoEmbedding.photo_id.is_(None),
+        )
+        .order_by(Photo.vector_embed_error.is_not(None), Photo.created_at.asc())
+        .limit(1)
+    ).scalar_one_or_none()
+
+
 def publish_draft_batch(db: Session, *, gender: str) -> dict:
     """
-    Embed всех фото черновика и выпустить в ленту.
-    При ошибке embed черновик остаётся, успешные embed сохраняются, feed_visible не меняется.
+    Выпустить черновик в ленту. Векторы заранее считает ai-ingest-worker —
+    здесь только проверка, что они есть у всех фото: запрос админки не ждёт модель.
     """
-    try:
-        from fastembed import ImageEmbedding  # noqa: F401
-    except ImportError as e:
-        raise RuntimeError(
-            "На сервере не установлен fastembed — выпуск с векторами недоступен. "
-            "Установите requirements-embeddings.txt или запустите publish с машины разработчика."
-        ) from e
-
     g = gender.strip().lower()
     draft = get_draft_batch(db, gender=g)
     if not draft:
         raise ValueError("Нет черновика пакета для этого пола — сначала загрузите фото через ingest")
 
-    photos = list(
-        db.execute(
-            select(Photo).where(
-                Photo.release_batch_id == draft.id,
-                Photo.feed_visible.is_(False),
-                Photo.is_active.is_(True),
-            )
-        ).scalars().all()
-    )
+    photos = list(db.execute(_draft_photos_query(draft.id)).scalars().all())
     if not photos:
         raise ValueError("В черновике нет фото — дождитесь обработки Fashn")
 
-    failed: list[dict] = []
-    for photo in photos:
-        existing = db.get(PhotoEmbedding, photo.id)
-        if existing is not None:
-            photo.vector_embed_error = None
-            continue
-        try:
-            vec = embed_photo_url(photo.url)
-            upsert_photo_embedding(db, photo_id=photo.id, embedding=vec)
-            photo.vector_embed_error = None
-        except Exception as e:
-            msg = f"{type(e).__name__}: {e}"[:2000]
-            photo.vector_embed_error = msg
-            failed.append({"photo_id": str(photo.id), "error": msg})
-            log.warning("embed failed photo_id=%s: %s", photo.id, msg)
-
-    if failed:
-        draft.last_embed_error = f"Не удалось векторизовать {len(failed)} из {len(photos)}"
-        db.commit()
+    ids = [p.id for p in photos]
+    embedded_ids = set(
+        db.execute(select(PhotoEmbedding.photo_id).where(PhotoEmbedding.photo_id.in_(ids))).scalars().all()
+    )
+    missing = [p for p in photos if p.id not in embedded_ids]
+    if missing:
+        failed = [
+            {"photo_id": str(p.id), "error": p.vector_embed_error}
+            for p in missing
+            if p.vector_embed_error
+        ]
+        msg = f"Векторы готовы для {len(photos) - len(missing)} из {len(photos)} — воркер ещё считает"
+        if failed:
+            msg = f"{msg}; с ошибкой: {len(failed)}"
         return {
             "ok": False,
             "published": False,
             "failed": failed,
-            "message": draft.last_embed_error,
+            "message": msg,
         }
 
     for photo in photos:
         photo.feed_visible = True
+        photo.vector_embed_error = None
     draft.status = "published"
     draft.published_at = datetime.now(timezone.utc)
     draft.last_embed_error = None

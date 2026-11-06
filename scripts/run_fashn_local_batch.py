@@ -43,7 +43,7 @@ async def _run_one(
     data_url = build_fashn_product_image_data_url(src)
     png = await client.run_product_to_model(
         gender=gender,
-        product_image_data_url=data_url,
+        product_image_url=lambda: data_url,
         content_mode=content_mode,
         frame=frame,
     )

@@ -269,6 +269,9 @@ class Settings(BaseSettings):
     # Кадры аутлета, пока Fashn считает и пока сотрудник не забрал результат.
     # Пусто = backend/var/outlet_photo_tmp
     outlet_photo_temp_dir: str | None = None
+    # Кэш модели CLIP. Пусто = backend/var/fastembed_cache. В проде — отдельный том,
+    # иначе модель заново качается после каждого пересоздания контейнера.
+    fastembed_cache_dir: str | None = None
 
     @property
     def cors_origin_list(self) -> list[str]:
@@ -298,6 +301,12 @@ class Settings(BaseSettings):
         if self.outlet_photo_temp_dir and str(self.outlet_photo_temp_dir).strip():
             return Path(self.outlet_photo_temp_dir).expanduser().resolve()
         return (_BACKEND_DIR / "var" / "outlet_photo_tmp").resolve()
+
+    @property
+    def fastembed_cache_path(self) -> Path:
+        if self.fastembed_cache_dir and str(self.fastembed_cache_dir).strip():
+            return Path(self.fastembed_cache_dir).expanduser().resolve()
+        return (_BACKEND_DIR / "var" / "fastembed_cache").resolve()
 
     @property
     def promo_banner_media_path(self) -> Path:

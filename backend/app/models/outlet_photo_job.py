@@ -41,6 +41,8 @@ class OutletPhotoJob(Base):
     source_name: Mapped[str] = mapped_column(String(80), nullable=False)
     result_name: Mapped[str | None] = mapped_column(String(80), nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Оплаченный заказ Fashn: после рестарта API задача продолжает его, а не платит заново.
+    fashn_job_id: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     owner_user_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),

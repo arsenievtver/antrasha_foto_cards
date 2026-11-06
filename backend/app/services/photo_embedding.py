@@ -1,9 +1,15 @@
 from __future__ import annotations
 
 import logging
+import os
 import tempfile
+import threading
 import uuid
 from pathlib import Path
+
+# Xet-хранилище Hugging Face с сервера недоступно, обычный HTTP через CDN — да.
+# Должно стоять до импорта fastembed / huggingface_hub.
+os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
 
 import requests
 from sqlalchemy import func, select
@@ -19,9 +25,17 @@ from app.models import PHOTO_SOURCE_YC_OBJECT_STORAGE, Photo, PhotoEmbedding
 log = logging.getLogger("app.photo_embedding")
 
 _IMAGE_MODEL = None
+_IMAGE_MODEL_LOCK = threading.Lock()
 
 
 def _get_image_model():
+    if _IMAGE_MODEL is not None:
+        return _IMAGE_MODEL
+    with _IMAGE_MODEL_LOCK:
+        return _load_image_model()
+
+
+def _load_image_model():
     global _IMAGE_MODEL
     if _IMAGE_MODEL is not None:
         return _IMAGE_MODEL
@@ -32,8 +46,28 @@ def _get_image_model():
             "fastembed не установлен — worker эмбеддингов недоступен "
             "(pip install -r requirements-embeddings.txt)"
         ) from e
-    _IMAGE_MODEL = ImageEmbedding(model_name=FASTEMBED_IMAGE_MODEL)
+    from app.config import settings
+
+    cache_dir = settings.fastembed_cache_path
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    log.info("загрузка модели %s (кэш %s)", FASTEMBED_IMAGE_MODEL, cache_dir)
+    _IMAGE_MODEL = ImageEmbedding(model_name=FASTEMBED_IMAGE_MODEL, cache_dir=str(cache_dir))
+    log.info("модель %s готова", FASTEMBED_IMAGE_MODEL)
     return _IMAGE_MODEL
+
+
+def warm_image_model() -> None:
+    _get_image_model()
+
+
+def embed_image_bytes(data: bytes, *, suffix: str = ".webp") -> list[float]:
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+        tmp.write(data)
+        tmp_path = Path(tmp.name)
+    try:
+        return embed_image_file(tmp_path)
+    finally:
+        tmp_path.unlink(missing_ok=True)
 
 
 def embed_image_file(path: Path) -> list[float]:
@@ -60,13 +94,7 @@ def embed_photo_url(url: str) -> list[float]:
         suffix = ".png"
     elif ".webp" in url.lower():
         suffix = ".webp"
-    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
-        tmp.write(data)
-        tmp_path = Path(tmp.name)
-    try:
-        return embed_image_file(tmp_path)
-    finally:
-        tmp_path.unlink(missing_ok=True)
+    return embed_image_bytes(data, suffix=suffix)
 
 
 def upsert_photo_embedding(

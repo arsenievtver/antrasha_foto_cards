@@ -120,7 +120,7 @@ async def lifespan(_app: FastAPI):
     db_boot = SessionLocal()
     try:
         try:
-            reset_stale_processing_jobs(db_boot, older_than_minutes=90)
+            reset_stale_processing_jobs(db_boot)
         except ProgrammingError:
             db_boot.rollback()
             log.warning(

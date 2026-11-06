@@ -22,9 +22,17 @@ function fmtDate(iso) {
   }
 }
 
-const statusLabel = (s) => {
+const STAGE_LABELS = {
+  upload: "Отправка исходника",
+  submit: "Заказ в Fashn",
+  generating: "Fashn генерирует",
+  download: "Скачивание результата",
+  save: "Сохранение",
+};
+
+const statusLabel = (s, stage) => {
   if (s === "pending") return "В очереди";
-  if (s === "processing") return "Обработка";
+  if (s === "processing") return STAGE_LABELS[stage] || "Обработка";
   if (s === "completed") return "Готово";
   if (s === "failed") return "Ошибка";
   return s;
@@ -231,7 +239,7 @@ export default function AiIngest() {
     if (!releaseDraft?.can_publish) return;
     if (
       !confirm(
-        `Записать вектора и выпустить ${releaseDraft.photo_count} фото в ленту? После успеха черновик закроется.`,
+        `Выпустить ${releaseDraft.photo_count} фото в ленту? После успеха черновик закроется.`,
       )
     ) {
       return;
@@ -241,7 +249,7 @@ export default function AiIngest() {
     try {
       const result = await publishAiIngestRelease(gender);
       if (!result.ok) {
-        setErr(result.message || "Ошибка векторизации — см. детали ниже");
+        setErr(result.message || "Выпуск не прошёл — см. детали ниже");
       }
       await Promise.all([refreshMeta(), loadJobs(), loadReleaseDraft()]);
     } catch (ex) {
@@ -340,14 +348,20 @@ export default function AiIngest() {
             Пакет в ленту ({gender === "male" ? "мужской" : "женский"})
           </div>
           <p style={{ margin: "0 0 0.5rem", color: "var(--muted)", fontSize: "0.9rem" }}>
-            После Fashn задачи остаются в таблице со статусом «Готово», пока не нажмёте выпуск с
-            векторами. В ленте фото не видны до успешной векторизации; после выпуска записи
-            очереди для этого пакета удаляются.
+            После Fashn задачи остаются в таблице со статусом «Готово», пока пакет не выпущен.
+            Векторы считаются сами сразу после генерации; выпуск доступен, когда они готовы у всех
+            фото. После выпуска записи очереди для этого пакета удаляются.
           </p>
           <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap", alignItems: "center" }}>
             <span>
               В черновике: <strong>{releaseDraft.photo_count}</strong>
             </span>
+            {releaseDraft.photo_count > 0 ? (
+              <span style={{ color: releaseDraft.embed_pending > 0 ? "var(--muted)" : undefined }}>
+                Векторы: <strong>{releaseDraft.embedded_count}</strong> из {releaseDraft.photo_count}
+                {releaseDraft.embed_pending > 0 ? " — считаются" : ""}
+              </span>
+            ) : null}
             {releaseDraft.fashn_pending > 0 ? (
               <span style={{ color: "var(--muted)" }}>
                 Fashn в работе: <strong>{releaseDraft.fashn_pending}</strong>
@@ -376,7 +390,7 @@ export default function AiIngest() {
             disabled={!releaseDraft.can_publish || publishBusy}
             onClick={onPublishRelease}
           >
-            {publishBusy ? "Векторизация…" : "Записать вектора и выпустить в ленту"}
+            {publishBusy ? "Выпуск…" : "Выпустить в ленту"}
           </button>
         </div>
       ) : null}
@@ -533,7 +547,12 @@ export default function AiIngest() {
                 <td style={{ padding: "0.45rem 0.35rem" }}>{sourceModeLabel(j.source_mode)}</td>
                 <td style={{ padding: "0.45rem 0.35rem" }}>{j.brand_name || "—"}</td>
                 <td style={{ padding: "0.45rem 0.35rem" }}>{j.show_badge ? "да" : "—"}</td>
-                <td style={{ padding: "0.45rem 0.35rem" }}>{statusLabel(j.status)}</td>
+                <td style={{ padding: "0.45rem 0.35rem" }}>{statusLabel(j.status, j.stage)}
+                  {j.stale ? <div style={{ color: "var(--danger)", fontSize: "0.82rem" }}>зависла</div> : null}
+                  {j.status === "failed" && j.fashn_ordered ? (
+                    <div style={{ color: "var(--muted)", fontSize: "0.82rem" }}>заказ оплачен</div>
+                  ) : null}
+                </td>
                 <td style={{ padding: "0.45rem 0.35rem", color: "var(--muted)", whiteSpace: "nowrap" }}>
                   {fmtDate(j.created_at)}
                 </td>
@@ -552,7 +571,7 @@ export default function AiIngest() {
                       Повтор
                     </button>
                   ) : null}
-                  {j.status !== "processing" ? (
+                  {j.status !== "processing" || j.stale ? (
                     <button type="button" className="danger" onClick={() => onDelete(j.id)}>
                       Удалить
                     </button>

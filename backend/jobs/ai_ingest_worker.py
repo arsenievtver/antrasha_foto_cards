@@ -19,7 +19,12 @@ from sqlalchemy.exc import ProgrammingError
 from app.config import settings
 from app.database import SessionLocal
 from app.logging_config import setup_logging
-from app.services.ai_ingest_worker import reset_stale_processing_jobs, try_process_one_ingest_job
+from app.services.ai_ingest_worker import (
+    embed_one_draft_photo,
+    reset_stale_processing_jobs,
+    try_process_one_ingest_job,
+)
+from app.services.photo_embedding import warm_image_model
 
 log = logging.getLogger("app.jobs.ai_ingest_worker")
 
@@ -48,6 +53,37 @@ async def _slot() -> None:
             log.exception("ai_ingest slot error")
 
 
+async def _stale_watch() -> None:
+    while True:
+        await asyncio.sleep(300)
+        db = SessionLocal()
+        try:
+            await asyncio.to_thread(reset_stale_processing_jobs, db)
+        except Exception:
+            db.rollback()
+            log.exception("ai_ingest stale watch error")
+        finally:
+            db.close()
+
+
+async def _embed_loop() -> None:
+    """Модель грузится один раз при старте, дальше — векторы черновиков без embedding."""
+    while True:
+        try:
+            await asyncio.to_thread(warm_image_model)
+            break
+        except Exception:
+            log.exception("embed: модель не загрузилась, повтор через 60 с")
+            await asyncio.sleep(60)
+    while True:
+        try:
+            had = await asyncio.to_thread(embed_one_draft_photo)
+        except Exception:
+            await asyncio.sleep(60)
+            continue
+        await asyncio.sleep(1 if had else 10)
+
+
 async def main() -> None:
     setup_logging()
     log.info(
@@ -59,7 +95,8 @@ async def main() -> None:
 
     db = SessionLocal()
     try:
-        reset_stale_processing_jobs(db, older_than_minutes=90)
+        # Воркер один: всё, что числится в работе, осталось от прошлого запуска.
+        reset_stale_processing_jobs(db, older_than_minutes=0)
     except ProgrammingError:
         db.rollback()
         log.warning("reset_stale_processing_jobs skipped — run alembic upgrade head first")
@@ -67,7 +104,7 @@ async def main() -> None:
         db.close()
 
     n = max(1, settings.ai_ingest_worker_concurrency)
-    await asyncio.gather(*[_slot() for _ in range(n)])
+    await asyncio.gather(*[_slot() for _ in range(n)], _stale_watch(), _embed_loop())
 
 
 if __name__ == "__main__":

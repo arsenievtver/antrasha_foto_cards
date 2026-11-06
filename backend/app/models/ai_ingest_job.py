@@ -42,6 +42,11 @@ class AiIngestJob(Base):
         index=True,
     )
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Оплаченный заказ Fashn. Пока он есть, повтор только ждёт и скачивает результат.
+    fashn_job_id: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # upload | submit | generating | download | save | embed — для админки и поиска зависших.
+    stage: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    stage_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     result_bucket: Mapped[str | None] = mapped_column(Text, nullable=True)
     result_key: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(

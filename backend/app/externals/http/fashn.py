@@ -8,8 +8,10 @@ import random
 import socket
 import time
 from pathlib import Path
+from typing import Callable
 
-from aiohttp import ClientSession, ClientTimeout, TCPConnector
+import aiohttp
+from aiohttp import ClientConnectorError, ClientSession, ClientTimeout, TCPConnector
 
 from app.externals.http.base import BaseApiClient
 from app.externals.http.exceptions import ApiClientAbortableException
@@ -18,9 +20,13 @@ log = logging.getLogger("app.fashn")
 
 POLL_INTERVAL_SEC = 3.0
 POLL_TIMEOUT_SEC = 300.0
-MAX_RETRIES = 2
-# Целиком файл с CDN Fashn по этому каналу не дочитывается и падает по таймауту.
-# Кусок в 4 КБ стабильно приходит, поэтому собираем PNG из таких кусков.
+# TCP + TLS до api.fashn.ai. Тело запроса за это время ещё не ушло,
+# поэтому такой обрыв можно повторить без второго платного заказа.
+CONNECT_TIMEOUT_SEC = 20.0
+SUBMIT_CONNECT_TRIES = 4
+# С этого VPS напрямую файл с CDN Fashn целиком не дочитывается: соединение
+# замирает после первых килобайт. Кусок в 4 КБ приходит, поэтому без прокси
+# PNG собирается из таких кусков.
 _DOWNLOAD_CHUNK = 4096
 _DOWNLOAD_CHUNK_TRIES = 4
 
@@ -54,8 +60,25 @@ ASPECT_RATIO_BY_FRAME = {
     FRAME_OUTLET: "3:4",
 }
 
+# Этапы задачи — показываются в админке вместо голого «Обработка».
+STAGE_SUBMIT = "submit"
+STAGE_GENERATING = "generating"
+STAGE_DOWNLOAD = "download"
+
 _PROMPTS_DIR = Path(__file__).resolve().parent.parent.parent / "prompts"
 _PROMPT_PART_CACHE: dict[str, str] = {}
+
+_CONNECT_ERRORS: tuple[type[BaseException], ...] = (ClientConnectorError,)
+if hasattr(aiohttp, "ConnectionTimeoutError"):
+    _CONNECT_ERRORS = (*_CONNECT_ERRORS, aiohttp.ConnectionTimeoutError)
+
+
+class FashnJobFailed(RuntimeError):
+    """Fashn сам завершил генерацию ошибкой. Повтор — новый заказ."""
+
+
+class FashnJobGone(RuntimeError):
+    """Заказ или его результат у Fashn больше не найден. Повтор — новый заказ."""
 
 
 def normalize_content_mode(content_mode: str | None) -> str:
@@ -114,6 +137,10 @@ def load_prompt(
     return "\n".join(_load_prompt_part(p) for p in parts)
 
 
+def _noop(*_args) -> None:
+    return None
+
+
 class FashnClient(BaseApiClient):
     BASE_URL = "https://api.fashn.ai/v1/"
     # Иначе сессия режет весь запрос на 30 с, хотя submit рассчитан на сотни секунд.
@@ -132,15 +159,13 @@ class FashnClient(BaseApiClient):
         super().__init__(keep_session=True)
         self._api_key = api_key.strip()
         self._proxy = proxy or None
-        self._connect_timeout = connect_timeout
+        self._connect_timeout = min(connect_timeout, CONNECT_TIMEOUT_SEC)
         self._submit_timeout = submit_timeout
         self._poll_timeout = poll_timeout
         self._download_timeout = download_timeout
 
     def _call_timeout(self, total: float) -> ClientTimeout:
-        # Без отдельного sock_connect: с ним aiohttp обрывал TCP до IPv4
-        # и задачи падали с ConnectionTimeoutError на /v1/run.
-        return ClientTimeout(total=total)
+        return ClientTimeout(total=total, sock_connect=min(self._connect_timeout, total))
 
     @property
     def base_url(self) -> str:
@@ -155,6 +180,49 @@ class FashnClient(BaseApiClient):
 
     def _proxy_kwargs(self) -> dict:
         return {"proxy": self._proxy} if self._proxy else {}
+
+    async def _submit_payload(self, payload: dict, *, label: str) -> str:
+        """POST /run один раз. Повтор — только если соединение так и не открылось."""
+        last: BaseException | None = None
+        for attempt in range(1, SUBMIT_CONNECT_TRIES + 1):
+            try:
+                resp = await self.post(
+                    "/run",
+                    json=payload,
+                    timeout=self._call_timeout(self._submit_timeout),
+                    retry=False,
+                    **self._proxy_kwargs(),
+                )
+                break
+            except _CONNECT_ERRORS as e:
+                last = e
+                log.warning(
+                    "fashn %s: соединение не открылось (%s/%s): %s",
+                    label,
+                    attempt,
+                    SUBMIT_CONNECT_TRIES,
+                    type(e).__name__,
+                )
+            except ApiClientAbortableException as e:
+                log.warning(
+                    "fashn %s HTTP %s body=%s",
+                    label,
+                    e.response.status,
+                    str(e.parsed_response)[:500],
+                )
+                raise
+        else:
+            assert last is not None
+            raise last
+        if resp.status >= 400:
+            raise RuntimeError(f"Fashn {label} HTTP {resp.status}: {str(resp.parsed_response)[:300]}")
+        log.info("fashn %s HTTP %s body=%s", label, resp.status, str(resp.parsed_response)[:300])
+        job_id = (resp.parsed_response or {}).get("id")
+        if not job_id:
+            raise ValueError(f"Fashn: response missing id (HTTP {resp.status}): {resp.parsed_response}")
+        jid = str(job_id)
+        log.info("fashn %s OK remote_id=%s…", label, jid[:10])
+        return jid
 
     async def submit(
         self,
@@ -180,27 +248,7 @@ class FashnClient(BaseApiClient):
                 "seed": seed,
             },
         }
-        try:
-            resp = await self.post(
-                "/run",
-                json=payload,
-                timeout=self._call_timeout(self._submit_timeout),
-                **self._proxy_kwargs(),
-            )
-        except ApiClientAbortableException as e:
-            log.warning(
-                "fashn submit HTTP %s body=%s",
-                e.response.status,
-                str(e.parsed_response)[:500],
-            )
-            raise
-        log.info("fashn submit HTTP %s body=%s", resp.status, str(resp.parsed_response)[:300])
-        job_id = (resp.parsed_response or {}).get("id")
-        if not job_id:
-            raise ValueError(f"Fashn: response missing id (HTTP {resp.status}): {resp.parsed_response}")
-        jid = str(job_id)
-        log.info("fashn submit OK remote_id=%s… (len=%s)", jid[:10], len(jid))
-        return jid
+        return await self._submit_payload(payload, label="submit")
 
     async def poll_status(self, job_id: str) -> list[str]:
         """Polls job status until completion, returns list of result URLs."""
@@ -217,6 +265,8 @@ class FashnClient(BaseApiClient):
                     **self._proxy_kwargs(),
                 )
             except ApiClientAbortableException as e:
+                if e.response.status == 404:
+                    raise FashnJobGone(f"Fashn: заказ {job_id} не найден") from e
                 raise RuntimeError(f"Fashn poll HTTP {e.response.status}") from e
 
             data: dict = resp.parsed_response or {}
@@ -236,63 +286,101 @@ class FashnClient(BaseApiClient):
                     raise ValueError("Fashn: unexpected output format")
                 return [str(u) for u in out if u]
             if status == "failed":
-                raise RuntimeError(f"Fashn job failed: {str(data.get('error') or data)[:500]}")
+                raise FashnJobFailed(f"Fashn job failed: {str(data.get('error') or data)[:500]}")
 
             await asyncio.sleep(POLL_INTERVAL_SEC)
 
-    async def _download_range(self, url: str, start: int, end: int) -> tuple[bytes, int | None]:
-        timeout = ClientTimeout(total=12, sock_connect=5, sock_read=8)
+    async def _download_whole(self, url: str) -> bytes:
+        async with self.session.get(
+            url,
+            timeout=self._call_timeout(self._download_timeout),
+            **self._proxy_kwargs(),
+        ) as resp:
+            if resp.status in (403, 404, 410):
+                raise FashnJobGone(f"Fashn download HTTP {resp.status}")
+            if resp.status != 200:
+                raise RuntimeError(f"Fashn download HTTP {resp.status}")
+            return await resp.read()
+
+    async def _download_range(
+        self,
+        session: ClientSession,
+        url: str,
+        start: int,
+        end: int,
+    ) -> tuple[bytes, int | None]:
+        timeout = ClientTimeout(total=15, sock_connect=10, sock_read=10)
         headers = {"Range": f"bytes={start}-{end}"}
         last: Exception = RuntimeError("Fashn download: no response")
         for _ in range(_DOWNLOAD_CHUNK_TRIES):
             try:
-                async with ClientSession(
+                async with session.get(
+                    url,
+                    headers=headers,
                     timeout=timeout,
-                    connector=TCPConnector(family=socket.AF_INET, force_close=True),
-                ) as session:
-                    async with session.get(url, headers=headers, timeout=timeout) as resp:
-                        if resp.status == 206:
-                            body = await resp.read()
-                            return body, _content_range_total(resp.headers.get("Content-Range", ""))
-                        if resp.status == 200:
-                            length = resp.content_length or 0
-                            if 0 < length <= (end - start + 1):
-                                return await resp.read(), length
-                            raise RuntimeError(
-                                f"Fashn download ignored range, length={length}"
-                            )
-                        raise RuntimeError(f"Fashn download HTTP {resp.status}")
+                    **self._proxy_kwargs(),
+                ) as resp:
+                    if resp.status in (403, 404, 410):
+                        raise FashnJobGone(f"Fashn download HTTP {resp.status}")
+                    if resp.status == 206:
+                        body = await resp.read()
+                        return body, _content_range_total(resp.headers.get("Content-Range", ""))
+                    if resp.status == 200:
+                        length = resp.content_length or 0
+                        if 0 < length <= (end - start + 1):
+                            return await resp.read(), length
+                        raise RuntimeError(f"Fashn download ignored range, length={length}")
+                    raise RuntimeError(f"Fashn download HTTP {resp.status}")
+            except FashnJobGone:
+                raise
             except Exception as e:
                 last = e
-                log.warning(
-                    "fashn download bytes %s-%s: %s",
-                    start,
-                    end,
-                    type(e).__name__,
-                )
+                log.warning("fashn download bytes %s-%s: %s", start, end, type(e).__name__)
         raise last
 
-    async def download_png(self, url: str) -> bytes:
-        """Собирает PNG с CDN Fashn короткими Range-запросами."""
+    async def _download_ranges(self, url: str) -> bytes:
         start = 0
         total: int | None = None
         out = bytearray()
-        while total is None or start < total:
-            body, found = await self._download_range(url, start, start + _DOWNLOAD_CHUNK - 1)
-            if not body:
-                raise RuntimeError("Fashn download: empty chunk")
-            if found is not None:
-                total = found
-            elif len(body) < _DOWNLOAD_CHUNK:
-                total = start + len(body)
-            else:
-                raise RuntimeError("Fashn download: range without total size")
-            out += body
-            start += len(body)
-        if not out:
-            raise RuntimeError("Fashn download: empty file")
-        log.info("fashn download ok bytes=%s", len(out))
+        # force_close: каждому куску своё соединение, иначе замирает и оно.
+        async with ClientSession(
+            connector=TCPConnector(family=socket.AF_INET, force_close=True),
+        ) as session:
+            while total is None or start < total:
+                body, found = await self._download_range(
+                    session, url, start, start + _DOWNLOAD_CHUNK - 1
+                )
+                if not body:
+                    raise RuntimeError("Fashn download: empty chunk")
+                if found is not None:
+                    total = found
+                elif len(body) < _DOWNLOAD_CHUNK:
+                    total = start + len(body)
+                else:
+                    raise RuntimeError("Fashn download: range without total size")
+                out += body
+                start += len(body)
         return bytes(out)
+
+    async def download_png(self, url: str) -> bytes:
+        """PNG с CDN Fashn: через прокси целиком, без прокси — кусками."""
+        last: Exception = RuntimeError("Fashn download")
+        for attempt in range(1, 4):
+            try:
+                if self._proxy:
+                    data = await self._download_whole(url)
+                else:
+                    data = await self._download_ranges(url)
+                if not data:
+                    raise RuntimeError("Fashn download: empty file")
+                log.info("fashn download ok bytes=%s", len(data))
+                return data
+            except FashnJobGone:
+                raise
+            except Exception as e:
+                last = e
+                log.warning("fashn download %s/3 failed: %s: %s", attempt, type(e).__name__, e)
+        raise last
 
     async def submit_tryon_v16(
         self,
@@ -315,29 +403,7 @@ class FashnClient(BaseApiClient):
                 "return_base64": False,
             },
         }
-        try:
-            resp = await self.post(
-                "/run",
-                json=payload,
-                timeout=self._call_timeout(self._submit_timeout),
-                **self._proxy_kwargs(),
-            )
-        except ApiClientAbortableException as e:
-            log.warning(
-                "fashn tryon submit HTTP %s body=%s",
-                e.response.status,
-                str(e.parsed_response)[:500],
-            )
-            raise
-        log.info("fashn tryon submit HTTP %s body=%s", resp.status, str(resp.parsed_response)[:300])
-        job_id = (resp.parsed_response or {}).get("id")
-        if not job_id:
-            raise ValueError(
-                f"Fashn tryon: response missing id (HTTP {resp.status}): {resp.parsed_response}"
-            )
-        jid = str(job_id)
-        log.info("fashn tryon submit OK remote_id=%s…", jid[:10])
-        return jid
+        return await self._submit_payload(payload, label="tryon submit")
 
     async def run_tryon_v16(
         self,
@@ -346,34 +412,16 @@ class FashnClient(BaseApiClient):
         garment_image: str,
         garment_photo_type: str = "model",
     ) -> bytes:
-        """submit → poll → download PNG."""
-        last_err: Exception = RuntimeError("Unknown error")
-        urls: list[str] | None = None
+        """submit → poll → download PNG. Заказ уходит один раз."""
         try:
-            for attempt in range(MAX_RETRIES):
-                log.info("fashn tryon-v1.6 attempt %s/%s", attempt + 1, MAX_RETRIES)
-                try:
-                    job_id = await self.submit_tryon_v16(
-                        model_image=model_image,
-                        garment_image=garment_image,
-                        garment_photo_type=garment_photo_type,
-                    )
-                    urls = await self.poll_status(job_id)
-                    if not urls:
-                        raise ValueError("Fashn tryon: empty output")
-                    break
-                except Exception as e:
-                    last_err = e
-                    log.warning(
-                        "fashn tryon attempt %s/%s failed: %s: %s",
-                        attempt + 1,
-                        MAX_RETRIES,
-                        type(e).__name__,
-                        e,
-                        exc_info=True,
-                    )
+            job_id = await self.submit_tryon_v16(
+                model_image=model_image,
+                garment_image=garment_image,
+                garment_photo_type=garment_photo_type,
+            )
+            urls = await self.poll_status(job_id)
             if not urls:
-                raise last_err
+                raise ValueError("Fashn tryon: empty output")
             return await self.download_png(urls[0])
         finally:
             await self.close()
@@ -382,62 +430,58 @@ class FashnClient(BaseApiClient):
         self,
         *,
         gender: str,
-        product_image_data_url: str,
+        product_image_url: Callable[[], str],
         content_mode: str = CONTENT_MODE_SINGLE,
         frame: str = FRAME_FEED,
+        remote_id: str | None = None,
+        on_submitted: Callable[[str], None] = _noop,
+        on_stage: Callable[[str], None] = _noop,
     ) -> bytes:
-        """Full submit → poll → download cycle with MAX_RETRIES attempts."""
+        """
+        Заказ → ожидание → PNG. Генерация платная, поэтому заказ уходит один раз.
+
+        remote_id — заказ, который уже оплачен (после рестарта воркера или «Повтора»):
+        тогда только ждём и скачиваем. product_image_url вызывается лишь когда
+        нужен новый заказ — исходник не грузится в хранилище зря.
+        """
         mode = normalize_content_mode(content_mode)
         frm = normalize_frame(frame)
-        prompt = load_prompt(gender, mode, frm)
-        aspect_ratio = ASPECT_RATIO_BY_FRAME[frm]
-        # Seed на задачу, а не на модуль: на фиксированном seed лента из сотни фото
-        # сходилась к одному лицу и одной позе.
-        seed = random.randint(0, MAX_SEED)
-        last_err: Exception = RuntimeError("Unknown error")
-        urls: list[str] | None = None
         try:
-            for attempt in range(MAX_RETRIES):
+            urls: list[str] | None = None
+            if remote_id:
+                on_stage(STAGE_GENERATING)
+                try:
+                    urls = await self.poll_status(remote_id)
+                except FashnJobGone:
+                    log.warning("fashn: заказ %s… пропал, нужен новый", remote_id[:12])
+                    remote_id = None
+            if not remote_id:
+                on_stage(STAGE_SUBMIT)
+                # Seed на задачу, а не на модуль: на фиксированном seed лента из сотни
+                # фото сходилась к одному лицу и одной позе.
+                seed = random.randint(0, MAX_SEED)
                 log.info(
-                    "fashn product-to-model attempt %s/%s gender=%s content_mode=%s "
-                    "frame=%s aspect=%s resolution=%s seed=%s",
-                    attempt + 1,
-                    MAX_RETRIES,
+                    "fashn product-to-model gender=%s content_mode=%s frame=%s aspect=%s "
+                    "resolution=%s seed=%s",
                     gender,
                     mode,
                     frm,
-                    aspect_ratio,
+                    ASPECT_RATIO_BY_FRAME[frm],
                     RESOLUTION,
                     seed,
                 )
-                try:
-                    job_id = await self.submit(
-                        product_image_data_url=product_image_data_url,
-                        prompt=prompt,
-                        aspect_ratio=aspect_ratio,
-                        seed=seed,
-                    )
-                    urls = await self.poll_status(job_id)
-                    if not urls:
-                        raise ValueError("Fashn: empty output")
-                    break
-                except Exception as e:
-                    last_err = e
-                    log.warning(
-                        "fashn attempt %s/%s failed: %s: %s",
-                        attempt + 1, MAX_RETRIES, type(e).__name__, e,
-                        exc_info=True,
-                    )
+                remote_id = await self.submit(
+                    product_image_data_url=product_image_url(),
+                    prompt=load_prompt(gender, mode, frm),
+                    aspect_ratio=ASPECT_RATIO_BY_FRAME[frm],
+                    seed=seed,
+                )
+                on_submitted(remote_id)
+                on_stage(STAGE_GENERATING)
+                urls = await self.poll_status(remote_id)
             if not urls:
-                raise last_err
-            # Генерация уже оплачена. Повтор — только скачивание, не новый /run.
-            download_err: Exception = RuntimeError("Fashn download")
-            for _ in range(3):
-                try:
-                    return await self.download_png(urls[0])
-                except Exception as e:
-                    download_err = e
-                    log.warning("fashn download failed: %s: %s", type(e).__name__, e)
-            raise download_err
+                raise ValueError("Fashn: empty output")
+            on_stage(STAGE_DOWNLOAD)
+            return await self.download_png(urls[0])
         finally:
             await self.close()

@@ -52,6 +52,7 @@ class BaseApiClient:
     def __init__(self, keep_session: bool = False):
         self.logger = logging.getLogger('control')
         self.failsafe = self._init_failsafe()
+        self._failsafe_once = self._init_failsafe(allowed_retries=0)
         self.keep_session = keep_session
 
     @property
@@ -62,9 +63,9 @@ class BaseApiClient:
     def base_headers(self) -> dict:
         return {}
 
-    def _init_failsafe(self) -> Failsafe:
+    def _init_failsafe(self, allowed_retries: int | None = None) -> Failsafe:
         retry_policy = RetryPolicy(
-            allowed_retries=self.allowed_retries,
+            allowed_retries=self.allowed_retries if allowed_retries is None else allowed_retries,
             backoff=Delay(timedelta(seconds=self.backoff_seconds)),
             abortable_exceptions=self.abortable_exceptions,
             retriable_exceptions=self.retriable_exceptions,
@@ -133,10 +134,13 @@ class BaseApiClient:
         self, method: str, endpoint: str, **params
     ) -> BaseApiClientResponse:
         raise_for_status = params.pop('raise_for_status', True)
+        # retry=False — для платных или неидемпотентных вызовов: повтор после
+        # потерянного ответа создаёт второй заказ.
+        failsafe = self.failsafe if params.pop('retry', True) else self._failsafe_once
         url = urljoin(self.base_url, endpoint.lstrip('/'))
         orig_error, response, parsed_response = None, None, None
         try:
-            response, parsed_response = await self.failsafe.run(
+            response, parsed_response = await failsafe.run(
                 lambda: self._make_request(method, url, **params)
             )
         except FailsafeError as e:

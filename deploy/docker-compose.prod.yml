@@ -41,6 +41,8 @@ services:
       REQUESTS_CA_BUNDLE: /etc/ssl/certs/ca-certificates.crt
       SSL_CERT_FILE: /etc/ssl/certs/ca-certificates.crt
       MAX_RELAY_UNIX: /run/antrasha-max-relay/relay.sock
+      HF_HUB_DISABLE_XET: "1"
+      FASTEMBED_CACHE_DIR: /app/var/fastembed_cache
     env_file:
       - ./env/.env.backend.prod
       - ./env/.env.postgres.prod
@@ -53,6 +55,7 @@ services:
       - antrasha_ai_ingest_tmp:/app/var/ai_ingest_tmp
       - antrasha_outlet_photo_tmp:/app/var/outlet_photo_tmp
       - antrasha_try_on_tmp:/app/var/try_on_tmp
+      - antrasha_fastembed_cache:/app/var/fastembed_cache
     depends_on:
       max-relay:
         condition: service_started
@@ -101,8 +104,12 @@ services:
     env_file:
       - ./env/.env.backend.prod
       - ./env/.env.postgres.prod
+    environment:
+      HF_HUB_DISABLE_XET: "1"
+      FASTEMBED_CACHE_DIR: /app/var/fastembed_cache
     volumes:
       - antrasha_ai_ingest_tmp:/app/var/ai_ingest_tmp
+      - antrasha_fastembed_cache:/app/var/fastembed_cache
     depends_on:
       postgres:
         condition: service_healthy
@@ -246,6 +253,7 @@ volumes:
   antrasha_vton_hf_cache:
   antrasha_try_on_tmp:
   antrasha_embed_hf_cache:
+  antrasha_fastembed_cache:
   antrasha_max_relay:
 
 networks:

@@ -15,12 +15,20 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.database import SessionLocal
 from app.deps import AdminPrincipal
-from app.externals.http.fashn import CONTENT_MODE_SINGLE, FRAME_OUTLET, FashnClient
+from app.externals.http.fashn import (
+    CONTENT_MODE_SINGLE,
+    FRAME_OUTLET,
+    FashnClient,
+    FashnJobFailed,
+    FashnJobGone,
+)
 from app.models.outlet_photo_job import OPEN_JOB_STATUSES, OutletPhotoJob
 from app.services.image_prepare import jpeg_bytes_for_fashn_bytes, normalize_png_bytes
 from app.services.yc_storage import delete_fashn_source, public_object_url, put_fashn_source_jpeg
 
 log = logging.getLogger("app.outlet_photo")
+
+JOB_DEADLINE_SEC = 15 * 60
 
 
 def _root() -> Path:
@@ -165,7 +173,10 @@ def current_job(db: Session, principal: AdminPrincipal) -> OutletPhotoJob | None
 
 
 def reset_running_jobs(db: Session) -> int:
-    """Очередь живёт в процессе API. После рестарта running уже никто не ведёт."""
+    """
+    Очередь живёт в процессе API. После рестарта running уже никто не ведёт.
+    fashn_job_id остаётся — задача продолжит оплаченный заказ.
+    """
     res = db.execute(
         update(OutletPhotoJob)
         .where(OutletPhotoJob.status == "running")
@@ -186,12 +197,28 @@ def _fail(db: Session, job: OutletPhotoJob, message: str) -> None:
     delete_job_files(job)
 
 
-def _render_png(raw: bytes, gender: str) -> bytes:
-    jpeg, _size = jpeg_bytes_for_fashn_bytes(raw)
+def _save_fashn_job_id(job_id: uuid.UUID, remote_id: str | None) -> None:
+    db = SessionLocal()
+    try:
+        db.execute(
+            update(OutletPhotoJob).where(OutletPhotoJob.id == job_id).values(fashn_job_id=remote_id),
+        )
+        db.commit()
+    finally:
+        db.close()
+
+
+def _render_png(job_id: uuid.UUID, raw: bytes, gender: str, remote_id: str | None) -> bytes:
     g = (gender or "").strip().lower()
     bucket = settings.yc_bucket_men if g == "male" else settings.yc_bucket_women
-    source_key = put_fashn_source_jpeg(bucket, jpeg)
-    source_url = public_object_url(bucket, source_key)
+    uploaded: list[str] = []
+
+    def source_url() -> str:
+        jpeg, _size = jpeg_bytes_for_fashn_bytes(raw)
+        key = put_fashn_source_jpeg(bucket, jpeg)
+        uploaded.append(key)
+        return public_object_url(bucket, key)
+
     proxy = str(settings.fashn_https_proxy).strip() if settings.fashn_https_proxy else None
     client = FashnClient(
         api_key=str(settings.fashn_api_key).strip(),
@@ -203,19 +230,25 @@ def _render_png(raw: bytes, gender: str) -> bytes:
     )
     try:
         png = asyncio.run(
-            client.run_product_to_model(
-                gender=gender,
-                product_image_data_url=source_url,
-                content_mode=CONTENT_MODE_SINGLE,
-                frame=FRAME_OUTLET,
+            asyncio.wait_for(
+                client.run_product_to_model(
+                    gender=gender,
+                    product_image_url=source_url,
+                    content_mode=CONTENT_MODE_SINGLE,
+                    frame=FRAME_OUTLET,
+                    remote_id=remote_id,
+                    on_submitted=lambda rid: _save_fashn_job_id(job_id, rid),
+                ),
+                timeout=JOB_DEADLINE_SEC,
             ),
         )
         return normalize_png_bytes(png)
     finally:
-        try:
-            delete_fashn_source(bucket, source_key)
-        except Exception:
-            log.warning("outlet source delete %s failed", source_key, exc_info=True)
+        for key in uploaded:
+            try:
+                delete_fashn_source(bucket, key)
+            except Exception:
+                log.warning("outlet source delete %s failed", key, exc_info=True)
 
 
 def _acquire() -> uuid.UUID | None:
@@ -250,6 +283,7 @@ def _run(job_id: uuid.UUID) -> None:
             return
         gender = job.gender
         source_name = job.source_name
+        remote_id = job.fashn_job_id
     finally:
         db.close()
 
@@ -268,7 +302,7 @@ def _run(job_id: uuid.UUID) -> None:
 
     t0 = time.monotonic()
     try:
-        png = _render_png(raw, gender)
+        png = _render_png(job_id, raw, gender, remote_id)
     except Exception as e:
         dt = time.monotonic() - t0
         log.warning(
@@ -282,6 +316,8 @@ def _run(job_id: uuid.UUID) -> None:
         db = SessionLocal()
         try:
             job = db.get(OutletPhotoJob, job_id)
+            if job and isinstance(e, (FashnJobFailed, FashnJobGone)):
+                job.fashn_job_id = None
             if job and job.status == "running":
                 _fail(db, job, f"Fashn: {type(e).__name__}: {e}")
             elif job:

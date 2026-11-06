@@ -26,7 +26,7 @@ from app.schemas.ai_ingest import (
     AiIngestUploadResponse,
 )
 from app.externals.http.fashn import VALID_CONTENT_MODES, normalize_content_mode
-from app.services.ai_ingest_worker import count_pending_jobs
+from app.services.ai_ingest_worker import count_pending_jobs, is_processing_stale
 from app.services.feed_release_batch import (
     count_failed_fashn_for_draft,
     count_pending_fashn_for_draft,
@@ -94,6 +94,10 @@ def _job_out(j: AiIngestJob) -> AiIngestJobOut:
         show_badge=bool(j.show_badge),
         original_filename=j.original_filename,
         status=j.status,
+        stage=j.stage if j.status == "processing" else None,
+        stage_at=j.stage_at if j.status == "processing" else None,
+        fashn_ordered=bool(j.fashn_job_id) and j.status != "completed",
+        stale=j.status == "processing" and is_processing_stale(j),
         error_message=j.error_message,
         result_url=url,
         created_at=j.created_at,
@@ -168,11 +172,17 @@ def get_release_draft(
         fashn_pending = count_pending_fashn_for_draft(db, batch_id)
         fashn_failed = count_failed_fashn_for_draft(db, batch_id)
     photo_count = int(summary["photo_count"])
-    can_publish = photo_count > 0 and fashn_pending == 0 and fashn_failed == 0
+    embedded_count = int(summary["embedded_count"])
+    embed_pending = max(0, photo_count - embedded_count)
+    can_publish = (
+        photo_count > 0 and fashn_pending == 0 and fashn_failed == 0 and embed_pending == 0
+    )
     return AiIngestReleaseDraftOut(
         gender=g,
         batch_id=batch_id,
         photo_count=photo_count,
+        embedded_count=embedded_count,
+        embed_pending=embed_pending,
         embed_error_count=int(summary["embed_error_count"]),
         last_embed_error=summary.get("last_embed_error"),
         fashn_pending=fashn_pending,
@@ -433,13 +443,15 @@ def retry_job(
     if j.status != "failed":
         raise HTTPException(status_code=400, detail="Повтор только для failed")
     p = Path(j.temp_path)
-    if not p.is_file():
+    if not j.fashn_job_id and not p.is_file():
         raise HTTPException(
             status_code=400,
             detail="Исходный файл отсутствует на диске — загрузите снова",
         )
     j.status = "pending"
     j.error_message = None
+    j.stage = None
+    j.stage_at = None
     j.started_at = None
     j.finished_at = None
     j.result_bucket = None
@@ -459,7 +471,7 @@ def delete_job(
     j = db.get(AiIngestJob, job_id)
     if not j:
         raise HTTPException(status_code=404, detail="Задача не найдена")
-    if j.status == "processing":
+    if j.status == "processing" and not is_processing_stale(j):
         raise HTTPException(status_code=409, detail="Задача выполняется — подождите")
     p = Path(j.temp_path)
     try:
