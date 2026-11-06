@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Callable
 
 import aiohttp
+import ujson
 from aiohttp import ClientConnectorError, ClientSession, ClientTimeout, TCPConnector
 
 from app.externals.http.base import BaseApiClient
@@ -71,6 +72,13 @@ _PROMPT_PART_CACHE: dict[str, str] = {}
 _CONNECT_ERRORS: tuple[type[BaseException], ...] = (ClientConnectorError,)
 if hasattr(aiohttp, "ConnectionTimeoutError"):
     _CONNECT_ERRORS = (*_CONNECT_ERRORS, aiohttp.ConnectionTimeoutError)
+try:
+    from python_socks import ProxyConnectionError, ProxyError, ProxyTimeoutError
+
+    # Ошибки SOCKS-рукопожатия: до Fashn ещё ничего не ушло.
+    _CONNECT_ERRORS = (*_CONNECT_ERRORS, ProxyConnectionError, ProxyError, ProxyTimeoutError)
+except ImportError:
+    pass
 
 
 class FashnJobFailed(RuntimeError):
@@ -164,6 +172,26 @@ class FashnClient(BaseApiClient):
         self._poll_timeout = poll_timeout
         self._download_timeout = download_timeout
 
+    @property
+    def _socks(self) -> bool:
+        return bool(self._proxy) and self._proxy.lower().startswith("socks")
+
+    @property
+    def session(self) -> ClientSession:
+        if not self._socks:
+            return super().session
+        if self._session is None or self._session.closed:
+            from aiohttp_socks import ProxyConnector
+
+            # aiohttp сам умеет только HTTP-прокси; SOCKS — через коннектор, DNS на стороне прокси.
+            self._session = ClientSession(
+                headers=self.base_headers,
+                json_serialize=ujson.dumps,
+                timeout=ClientTimeout(total=self.request_timeout_seconds),
+                connector=ProxyConnector.from_url(self._proxy, rdns=True),
+            )
+        return self._session
+
     def _call_timeout(self, total: float) -> ClientTimeout:
         return ClientTimeout(total=total, sock_connect=min(self._connect_timeout, total))
 
@@ -179,7 +207,7 @@ class FashnClient(BaseApiClient):
         }
 
     def _proxy_kwargs(self) -> dict:
-        return {"proxy": self._proxy} if self._proxy else {}
+        return {"proxy": self._proxy} if self._proxy and not self._socks else {}
 
     async def _submit_payload(self, payload: dict, *, label: str) -> str:
         """POST /run один раз. Повтор — только если соединение так и не открылось."""

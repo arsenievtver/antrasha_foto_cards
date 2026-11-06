@@ -303,6 +303,14 @@ class Settings(BaseSettings):
         return (_BACKEND_DIR / "var" / "outlet_photo_tmp").resolve()
 
     @property
+    def fashn_proxy_url(self) -> str | None:
+        """Свой прокси Fashn, иначе тот же выход, что у Claude (ANTHROPIC_HTTPS_PROXY)."""
+        for value in (self.fashn_https_proxy, self.anthropic_https_proxy):
+            if value and str(value).strip():
+                return str(value).strip()
+        return None
+
+    @property
     def fastembed_cache_path(self) -> Path:
         if self.fastembed_cache_dir and str(self.fastembed_cache_dir).strip():
             return Path(self.fastembed_cache_dir).expanduser().resolve()

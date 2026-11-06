@@ -219,10 +219,9 @@ def _render_png(job_id: uuid.UUID, raw: bytes, gender: str, remote_id: str | Non
         uploaded.append(key)
         return public_object_url(bucket, key)
 
-    proxy = str(settings.fashn_https_proxy).strip() if settings.fashn_https_proxy else None
     client = FashnClient(
         api_key=str(settings.fashn_api_key).strip(),
-        proxy=proxy,
+        proxy=settings.fashn_proxy_url,
         connect_timeout=settings.fashn_http_connect_timeout,
         submit_timeout=settings.fashn_http_read_timeout_submit,
         poll_timeout=settings.fashn_http_read_timeout_poll,

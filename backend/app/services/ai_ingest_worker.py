@@ -190,7 +190,7 @@ def _save_fashn_job_id(job_id: uuid.UUID, remote_id: str | None) -> None:
 def _fashn_client(cfg: Settings) -> FashnClient:
     return FashnClient(
         api_key=str(cfg.fashn_api_key).strip(),
-        proxy=str(cfg.fashn_https_proxy).strip() if cfg.fashn_https_proxy else None,
+        proxy=cfg.fashn_proxy_url,
         connect_timeout=cfg.fashn_http_connect_timeout,
         submit_timeout=cfg.fashn_http_read_timeout_submit,
         poll_timeout=cfg.fashn_http_read_timeout_poll,

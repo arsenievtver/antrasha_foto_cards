@@ -175,7 +175,7 @@ async def run_try_on(
     t0 = time.monotonic()
     client = FashnClient(
         api_key=str(settings.fashn_api_key).strip(),
-        proxy=str(settings.fashn_https_proxy).strip() if settings.fashn_https_proxy else None,
+        proxy=settings.fashn_proxy_url,
         connect_timeout=settings.fashn_http_connect_timeout,
         submit_timeout=settings.fashn_http_read_timeout_submit,
         poll_timeout=settings.fashn_http_read_timeout_poll,
