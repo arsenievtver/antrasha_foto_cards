@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Пятничный бэкап Антраши, пока Mac включён и пользователь вошёл в систему.
-# launchd вызывает скрипт при входе и раз в час. В один день архив снимается один раз.
+# launchd вызывает скрипт при входе и раз в два часа. В один день архив снимается один раз.
+# VPN или ошибка отметку не ставят: пока Mac включён, попытка повторяется каждые два часа.
 #
 # Отметка о успехе лежит вне Documents: фоновому заданию macOS не даёт читать эту папку.
 #
@@ -22,12 +23,35 @@ if [[ -z "${SSH_AUTH_SOCK:-}" ]]; then
   fi
 fi
 
+# Печатает причину и возвращает 0, если сессия пойдёт через VPN.
+vpn_reason() {
+  local line iface
+  line="$(scutil --nc list 2>/dev/null | grep '(Connected)' | head -1 || true)"
+  if [[ -n "$line" ]]; then
+    printf '%s' "$line"
+    return 0
+  fi
+  iface="$(route -n get default 2>/dev/null | awk '/interface:/{print $2; exit}' || true)"
+  case "$iface" in
+    utun*|ipsec*|ppp*)
+      printf 'маршрут по умолчанию через %s' "$iface"
+      return 0
+      ;;
+  esac
+  return 1
+}
+
 if [[ "$(date +%u)" != "5" ]]; then
   exit 0
 fi
 
 mkdir -p "$STATE_DIR"
 if [[ -f "$STAMP_FILE" ]] && [[ "$(cat "$STAMP_FILE")" == "$TODAY" ]]; then
+  exit 0
+fi
+
+if reason="$(vpn_reason)"; then
+  echo "$(date '+%Y-%m-%d %H:%M:%S') VPN включён, бэкап отложен ($reason)"
   exit 0
 fi
 
