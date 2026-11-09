@@ -31,6 +31,7 @@ function NavGroup({ title, children }) {
 
 export default function Layout() {
   const nav = useNavigate();
+  const [navOpen, setNavOpen] = useState(false);
   const role = getRole();
   const isSuperuser = role === "superuser";
   const isWorker = role === "worker";
@@ -62,11 +63,11 @@ export default function Layout() {
   const can = (perm) => isSuperuser || hasPermission(perm);
 
   return (
-    <div className="layout">
+    <div className={navOpen ? "layout" : "layout layout--nav-closed"}>
       <aside className="sidebar">
         <div className="sidebar__brand">Админка</div>
 
-        <nav className="sidebar__nav">
+        <nav className="sidebar__nav" onClick={() => setNavOpen(false)}>
           <NavGroup title="Обзор">
             {can("stats") && (
               <NavItem end to="/">
@@ -144,6 +145,15 @@ export default function Layout() {
         </div>
       </aside>
       <main className="content">
+        <button
+          type="button"
+          className="secondary"
+          aria-expanded={navOpen}
+          onClick={() => setNavOpen((open) => !open)}
+          style={{ marginBottom: "0.75rem" }}
+        >
+          {navOpen ? "✕" : "☰"}
+        </button>
         <Outlet />
       </main>
     </div>

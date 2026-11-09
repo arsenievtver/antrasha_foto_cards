@@ -189,6 +189,8 @@ def assign_comments(db: Session) -> dict:
 
 def rebuild_caretakers(db: Session) -> int:
     """Автор комментария о клиенте становится его сотрудником. Ручные и снятые не затираются."""
+    # Сессия без autoflush: свежие client_id иначе не попадают в SELECT и сотрудник не создаётся.
+    db.flush()
     comments = list(
         db.scalars(
             select(StaffFeedback).where(

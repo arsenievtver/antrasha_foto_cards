@@ -153,10 +153,7 @@ export default function AClients() {
       ]);
       setItems(list.items || []);
       setStaff(stats.items || []);
-      setSelectedId((prev) => {
-        if (prev && (list.items || []).some((row) => row.id === prev)) return prev;
-        return list.items?.[0]?.id || "";
-      });
+      setSelectedId((prev) => (prev && (list.items || []).some((row) => row.id === prev) ? prev : ""));
     } catch (e) {
       setErr(e.message);
     } finally {
@@ -381,8 +378,8 @@ export default function AClients() {
               : "Список ещё не собран. Нажмите «Обновить из недель»: возьмём клиентов из готовых отчётов и разберём комментарии."}
         </p>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: "1.25rem", alignItems: "start" }}>
-          <div style={{ overflowX: "auto" }}>
+        <>
+        <div style={{ overflowX: "auto" }}>
             <table>
               <thead>
                 <tr>
@@ -419,7 +416,7 @@ export default function AClients() {
                       <div style={{ color: "var(--muted)", fontSize: "0.85rem" }}>было {rub(row.rev_prev12)}</div>
                     </td>
                     <td>{staffNames(row).join(", ") || "—"}</td>
-                    <td style={{ maxWidth: 280 }}>
+                    <td>
                       {row.last_comment_text ? (
                         <>
                           <div style={{ color: "var(--muted)", fontSize: "0.8rem" }}>
@@ -435,10 +432,13 @@ export default function AClients() {
                 ))}
               </tbody>
             </table>
-          </div>
+        </div>
 
-          {detail ? (
-            <aside>
+        {selectedId ? (
+          <div className="modal-backdrop" role="presentation" onClick={() => setSelectedId("")}>
+            <div className="modal" role="dialog" onClick={(e) => e.stopPropagation()}>
+          {detail && detail.id === selectedId ? (
+            <>
               <h3 style={{ marginTop: 0 }}>{detail.name}</h3>
               <p style={{ marginTop: 0 }}>
                 {detail.phone || "телефона нет"}
@@ -550,9 +550,17 @@ export default function AClients() {
               {(detail.brands || []).length ? (
                 <p style={{ color: "var(--muted)", fontSize: "0.9rem" }}>Бренды: {detail.brands.join(", ")}</p>
               ) : null}
-            </aside>
-          ) : null}
-        </div>
+            </>
+          ) : (
+            <p style={{ color: "var(--muted)" }}>Загрузка…</p>
+          )}
+              <button type="button" className="secondary" onClick={() => setSelectedId("")} style={{ marginTop: "0.75rem" }}>
+                Закрыть
+              </button>
+            </div>
+          </div>
+        ) : null}
+        </>
       )}
         </>
       )}

@@ -92,6 +92,10 @@ textarea {
   min-height: 100vh;
 }
 
+.layout--nav-closed .sidebar {
+  display: none;
+}
+
 .sidebar {
   width: 240px;
   padding: 1.1rem 0.9rem;
