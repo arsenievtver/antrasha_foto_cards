@@ -120,7 +120,7 @@ class ComputeTests(unittest.TestCase):
         self.assertEqual(season_bounds(date(2027, 3, 1)), (date(2027, 2, 1), "ВЛ2027"))
 
     def test_season_compares_same_dates_last_year(self):
-        metrics, _ = build_report(_dataset(), RUN_DAY, procurement={"season": "ОЗ26-27", "to_ship_eur": 0})
+        metrics, _, _ = build_report(_dataset(), RUN_DAY, procurement={"season": "ОЗ26-27", "to_ship_eur": 0})
         season = metrics["season"]
         self.assertEqual(season["period"], {"from": "2026-08-01", "to": "2026-10-25"})
         self.assertEqual(season["period_last_year"], {"from": "2025-08-01", "to": "2025-10-25"})
@@ -134,7 +134,7 @@ class ComputeTests(unittest.TestCase):
         self.assertEqual(blk["avg_discount_pct"], 30.0)
 
     def test_report_week_clients_and_watchlist(self):
-        metrics, watch = build_report(_dataset(), RUN_DAY, prev_watchlist_ids={"b"}, staff_feedback={"messages_week": 0})
+        metrics, watch, active = build_report(_dataset(), RUN_DAY, prev_watchlist_ids={"b"}, staff_feedback={"messages_week": 0})
         week = metrics["week"]
         self.assertEqual(week["sales"]["revenue"], 28000)
         self.assertEqual(week["buyers_named"], 2)
@@ -146,6 +146,8 @@ class ComputeTests(unittest.TestCase):
         self.assertEqual([w["id"] for w in watch], ["a"])
         self.assertEqual(watch[0]["status"], "просрочил визит")
         self.assertEqual([p["name"] for p in watch[0]["picks"]], ["A2/04.26 рубашка (ВЛ2026, 50)"])
+        self.assertEqual(active, [])
+        self.assertEqual(metrics["clients"]["active"]["clients"], 0)
         self.assertNotIn("Клиент a", str(metrics))
         self.assertTrue(any("«Спрос»" in s for s in metrics["suggestions"]))
 
@@ -191,3 +193,50 @@ class WeeklyInsightMcpTests(unittest.TestCase):
             tool.handler(MagicMock(), _actor(), detail="всё")
         with self.assertRaises(ToolArgumentError):
             tool.handler(MagicMock(), _actor(), report_id="нет")
+
+
+class ActiveClientsTests(unittest.TestCase):
+    def test_compare_cohort_and_pace(self):
+        from app.services.a_client_active import compare_active
+
+        previous = [
+            {"id": "stay", "name": "Была", "phone": "1", "rev_prev12": 100, "rev_cur12": 80, "avg_check": 1000, "median_gap": 30},
+            {"id": "gone", "name": "Ушла", "phone": "2", "rev_prev12": 50, "rev_cur12": 40},
+            {"id": "out", "name": "Вышла", "phone": "3", "rev_prev12": 10, "rev_cur12": 10},
+        ]
+        current = [
+            {"id": "stay", "name": "Была", "phone": "1", "status": "в ритме", "rev_prev12": 100, "rev_cur12": 110,
+             "avg_check": 1100, "median_gap": 28, "sizes": "платье: 44", "brands": ["A"], "categories": ["платье"]},
+            {"id": "flat", "name": "Ровная", "phone": "4", "status": "в ритме", "rev_prev12": 100, "rev_cur12": 104,
+             "avg_check": 500, "median_gap": 40},
+            {"id": "down", "name": "Падает", "phone": "5", "status": "одна покупка", "rev_prev12": 200, "rev_cur12": 100},
+            {"id": "fresh", "name": "Новая", "phone": "6", "status": "в ритме", "rev_prev12": 0, "rev_cur12": 70},
+        ]
+        board = compare_active(current, previous, [{"id": "gone", "status": "просрочил визит"}])
+        by_id = {row["id"]: row for row in board["items"]}
+        self.assertEqual(by_id["stay"]["cohort"], "был")
+        self.assertEqual(by_id["stay"]["pace"], "растёт")
+        self.assertEqual(by_id["stay"]["trend_pct"], 10.0)
+        self.assertEqual(by_id["stay"]["week_pct"], 37.5)
+        self.assertEqual(by_id["flat"]["cohort"], "новый")
+        self.assertEqual(by_id["flat"]["pace"], "ровно")
+        self.assertEqual(by_id["down"]["pace"], "падает")
+        self.assertEqual(by_id["fresh"]["pace"], "нет базы")
+        self.assertEqual(by_id["fresh"]["week_pct"], None)
+        self.assertEqual(board["summary"]["new"], 3)
+        self.assertEqual(board["summary"]["stayed"], 1)
+        self.assertEqual(board["summary"]["left"], 2)
+        left = {row["id"]: row["where"] for row in board["left"]}
+        self.assertEqual(left["gone"], "просрочил визит")
+        self.assertEqual(left["out"], "вышел из категории А")
+        self.assertTrue(board["summary"]["has_previous"])
+        self.assertIsNotNone(board["summary"]["avg_check"])
+
+    def test_first_week_has_no_cohort(self):
+        from app.services.a_client_active import compare_active
+
+        board = compare_active([{"id": "a", "rev_prev12": 10, "rev_cur12": 20}], None, [])
+        self.assertIsNone(board["items"][0]["cohort"])
+        self.assertEqual(board["left"], [])
+        self.assertFalse(board["summary"]["has_previous"])
+        self.assertEqual(board["summary"]["new"], 0)

@@ -13,6 +13,7 @@ from app.logging_config import setup_logging
 from app.database import SessionLocal
 from app.routers import (
     admin,
+    admin_a_clients,
     admin_ai_ingest,
     admin_hero_banners,
     admin_home_v2,
@@ -184,6 +185,7 @@ app.include_router(admin_procurement.router)
 app.include_router(admin_procurement_ai.router)
 app.include_router(admin_mcp_keys.router)
 app.include_router(admin_staff_feedback.router)
+app.include_router(admin_a_clients.router)
 app.include_router(admin_weekly_insight.router)
 app.add_api_route("/mcp", mcp_post, methods=["POST"], include_in_schema=False)
 app.add_api_route(

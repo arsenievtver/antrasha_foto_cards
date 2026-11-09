@@ -10,6 +10,7 @@ from sqlalchemy import Date, cast, func, select
 from sqlalchemy.orm import Session
 
 from app.deps import AdminPrincipal
+from app.models.a_client import AClient
 from app.models.staff_feedback import StaffFeedback
 
 TZ = ZoneInfo("Europe/Moscow")
@@ -55,7 +56,9 @@ def _period_filters(date_from: date | None, date_to: date | None) -> list:
     return out
 
 
-def feedback_dict(row: StaffFeedback) -> dict:
+def feedback_dict(row: StaffFeedback, client_name: str | None = None) -> dict:
+    thread_id = getattr(row, "thread_id", None)
+    client_id = getattr(row, "client_id", None)
     return {
         "id": str(row.id),
         "author_user_id": str(row.author_user_id) if row.author_user_id else None,
@@ -63,7 +66,20 @@ def feedback_dict(row: StaffFeedback) -> dict:
         "text": row.text,
         "created_at": row.created_at.isoformat() if row.created_at else None,
         "updated_at": row.updated_at.isoformat() if row.updated_at else None,
+        "thread_id": str(thread_id) if thread_id else None,
+        "thread_locked": bool(getattr(row, "thread_locked", False)),
+        "client_id": str(client_id) if client_id else None,
+        "client_binding": getattr(row, "client_binding", None),
+        "client_name": client_name,
     }
+
+
+def feedback_dicts(db: Session, rows: list[StaffFeedback]) -> list[dict]:
+    ids = {row.client_id for row in rows if getattr(row, "client_id", None)}
+    names: dict = {}
+    if ids:
+        names = dict(db.execute(select(AClient.id, AClient.name).where(AClient.id.in_(ids))).all())
+    return [feedback_dict(row, names.get(row.client_id) if row.client_id else None) for row in rows]
 
 
 def list_feedback(
@@ -72,12 +88,20 @@ def list_feedback(
     author_user_id: uuid.UUID | None = None,
     date_from: date | None = None,
     date_to: date | None = None,
+    client_id: uuid.UUID | None = None,
+    unlinked: bool = False,
     skip: int = 0,
     limit: int = 100,
 ) -> tuple[list[StaffFeedback], int]:
     filters = _period_filters(date_from, date_to)
     if author_user_id is not None:
         filters.append(StaffFeedback.author_user_id == author_user_id)
+    if client_id is not None:
+        filters.append(StaffFeedback.client_id == client_id)
+    if unlinked:
+        filters.append(
+            StaffFeedback.client_id.is_(None) | (StaffFeedback.client_binding == "none")
+        )
     total = db.scalar(select(func.count()).select_from(StaffFeedback).where(*filters)) or 0
     rows = db.scalars(
         select(StaffFeedback)

@@ -190,7 +190,7 @@ def execute_report(settings: Settings, report_id: uuid.UUID) -> None:
                 windows={"cur": (p.cur_from, p.week_end), "prev": (p.prev_from, p.cur_from - timedelta(days=1))},
                 stock_dates=[p.week_end - timedelta(days=28), p.week_end - timedelta(days=364)],
             )
-            metrics, watchlist = build_report(
+            metrics, watchlist, active = build_report(
                 ds,
                 today,
                 prev_watchlist_ids=_prev_watchlist_ids(db, p.week_start),
@@ -201,6 +201,7 @@ def execute_report(settings: Settings, report_id: uuid.UUID) -> None:
             metrics["summary_usage"] = usage
             row.metrics = metrics
             row.watchlist = watchlist
+            row.active_clients = active
             row.summary_md = summary
             row.summary_model = model
             row.ms_requests = requests_count
@@ -215,6 +216,17 @@ def execute_report(settings: Settings, report_id: uuid.UUID) -> None:
             row.status = "error"
             row.error = str(e)[:2000]
         row.finished_at = _now()
+        if row.status == "done":
+            db.flush()
+            nested = db.begin_nested()
+            try:
+                from app.services.a_clients import refresh_from_reports
+
+                refresh_from_reports(db)
+                nested.commit()
+            except Exception:
+                log.exception("a_clients: список после отчёта не обновлён")
+                nested.rollback()
         db.commit()
     finally:
         if client is not None:

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { fetchWeeklyReport, fetchWeeklyReports, runWeeklyReport } from "../api.js";
@@ -275,6 +276,7 @@ function WatchlistSection({ report }) {
     <>
       <div className="flex-gap" style={{ alignItems: "baseline", gap: "1rem" }}>
         <h3>Клиенты A на контроле ({list.length})</h3>
+        <Link to="/a-clients">Вести в «Клиенты А»</Link>
         <button type="button" className="secondary" onClick={() => downloadWatchlist(report)}>
           Скачать CSV
         </button>

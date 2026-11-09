@@ -32,6 +32,7 @@ import McpKey from "./pages/McpKey.jsx";
 import ProcurementAi from "./pages/ProcurementAi.jsx";
 import StaffFeedback from "./pages/StaffFeedback.jsx";
 import WeeklyInsight from "./pages/WeeklyInsight.jsx";
+import AClients from "./pages/AClients.jsx";
 import { getPermissions, getRole, hasPermission, hasValidSession } from "./api.js";
 
 function RequireAuth({ children }) {
@@ -298,6 +299,14 @@ export default function App() {
             element={
               <RoleRoute roles={["superuser"]}>
                 <WeeklyInsight />
+              </RoleRoute>
+            }
+          />
+          <Route
+            path="/a-clients"
+            element={
+              <RoleRoute roles={["superuser"]}>
+                <AClients />
               </RoleRoute>
             }
           />

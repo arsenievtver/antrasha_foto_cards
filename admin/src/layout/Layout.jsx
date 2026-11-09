@@ -115,8 +115,9 @@ export default function Layout() {
             {can("product") && <NavItem to="/shipments">Поставки</NavItem>}
             {can("product") && <NavItem to="/fx-rates">Курс EUR</NavItem>}
             {can("product") && <NavItem to="/procurement-ai">AI закупки</NavItem>}
-            {isSuperuser && <NavItem to="/staff-feedback">Спрос</NavItem>}
             {isSuperuser && <NavItem to="/weekly-insight">Неделя</NavItem>}
+            {isSuperuser && <NavItem to="/a-clients">Клиенты А</NavItem>}
+            {isSuperuser && <NavItem to="/staff-feedback">Спрос</NavItem>}
             {can("product") && <NavItem to="/mcp-key">Ключ MCP</NavItem>}
           </NavGroup>
 

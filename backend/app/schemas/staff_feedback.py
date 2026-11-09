@@ -27,6 +27,19 @@ class StaffFeedbackOut(BaseModel):
     text: str
     created_at: datetime
     updated_at: datetime | None
+    thread_id: uuid.UUID | None = None
+    thread_locked: bool = False
+    client_id: uuid.UUID | None = None
+    client_binding: str | None = None
+    client_name: str | None = None
+
+
+class StaffFeedbackMergeIn(BaseModel):
+    ids: list[uuid.UUID] = Field(..., min_length=2, max_length=20)
+
+
+class StaffFeedbackClientIn(BaseModel):
+    client_id: uuid.UUID | None = None
 
 
 class StaffFeedbackListOut(BaseModel):

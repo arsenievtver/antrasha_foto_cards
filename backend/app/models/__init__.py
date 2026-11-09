@@ -35,6 +35,7 @@ from app.models.season import Season
 from app.models.session import UserSession
 from app.models.shipment import Shipment
 from app.models.staff_feedback import StaffFeedback
+from app.models.a_client import AClient, AClientCaretaker, AClientWeek
 from app.models.gift_certificate import GiftCertificate, GiftCertificateTransaction
 from app.models.user import User, UserRole
 from app.models.welcome_gift_settings import WelcomeGiftSettings
@@ -54,6 +55,9 @@ __all__ = [
     "PAYMENT_KINDS",
     "Shipment",
     "StaffFeedback",
+    "AClient",
+    "AClientWeek",
+    "AClientCaretaker",
     "FxRate",
     "AiIngestJob",
     "OutletPhotoJob",

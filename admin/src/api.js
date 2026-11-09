@@ -1053,6 +1053,53 @@ export function runWeeklyReport() {
   return procurementRequest("/admin/weekly-insight/run", { method: "POST" });
 }
 
+export function fetchAClients(query) {
+  return procurementRequest("/admin/a-clients", { query });
+}
+
+export function fetchActiveAClients() {
+  return procurementRequest("/admin/a-clients/active");
+}
+
+export function fetchAClient(id) {
+  return procurementRequest(`/admin/a-clients/${encodeURIComponent(id)}`);
+}
+
+export function syncAClients() {
+  return procurementRequest("/admin/a-clients/sync", { method: "POST" });
+}
+
+export function addAClientCaretaker(id, body) {
+  return procurementRequest(`/admin/a-clients/${encodeURIComponent(id)}/caretakers`, {
+    method: "POST",
+    body,
+  });
+}
+
+export function dismissAClientCaretaker(id, caretakerId) {
+  return procurementRequest(
+    `/admin/a-clients/${encodeURIComponent(id)}/caretakers/${encodeURIComponent(caretakerId)}`,
+    { method: "DELETE" },
+  );
+}
+
+export function mergeStaffFeedback(ids) {
+  return procurementRequest("/admin/staff-feedback/threads", { method: "POST", body: { ids } });
+}
+
+export function splitStaffFeedback(threadId) {
+  return procurementRequest(`/admin/staff-feedback/threads/${encodeURIComponent(threadId)}/split`, {
+    method: "POST",
+  });
+}
+
+export function bindStaffFeedbackClient(id, clientId) {
+  return procurementRequest(`/admin/staff-feedback/${encodeURIComponent(id)}/client`, {
+    method: "PATCH",
+    body: { client_id: clientId },
+  });
+}
+
 export function fetchProcurementRefs() {
   return procurementRequest("/admin/procurement/refs");
 }

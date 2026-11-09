@@ -28,6 +28,8 @@ class WeeklyInsightReport(Base):
     metrics: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     # ФИО и телефоны — отдельно от метрик, чтобы MCP отдавал их только по запросу.
     watchlist: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+    # Клиенты А «в ритме»: тот же понедельничный прогон, без подборок.
+    active_clients: Mapped[list | None] = mapped_column(JSONB, nullable=True)
     summary_md: Mapped[str | None] = mapped_column(Text, nullable=True)
     summary_model: Mapped[str | None] = mapped_column(String(80), nullable=True)
     ms_requests: Mapped[int | None] = mapped_column(Integer, nullable=True)

@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, String, Text, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -29,6 +29,18 @@ class StaffFeedback(Base):
     # Подпись на момент отправки: остаётся, даже если сотрудника удалят.
     author_label: Mapped[str] = mapped_column(String(160), nullable=False)
     text: Mapped[str] = mapped_column(Text, nullable=False)
+    # Сообщения одной мысли. Пусто — отдельная заметка.
+    thread_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True, index=True)
+    # Ручное объединение или разъединение: автосклейка это сообщение больше не трогает.
+    thread_locked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    client_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("a_clients.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    # auto — разобрали по имени, manual — выбрали вручную, none — явно отвязали.
+    client_binding: Mapped[str | None] = mapped_column(String(16), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

@@ -11,16 +11,21 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.deps import AdminPrincipal, get_admin_principal, require_superuser
+from app.models.a_client import AClient
 from app.models.staff_feedback import StaffFeedback
 from app.schemas.staff_feedback import (
+    StaffFeedbackClientIn,
     StaffFeedbackListOut,
+    StaffFeedbackMergeIn,
     StaffFeedbackOut,
     StaffFeedbackStatsOut,
     StaffFeedbackTextIn,
 )
+from app.services.a_clients import merge_feedback, set_feedback_client, split_thread
 from app.services.staff_feedback import (
     author_identity,
     feedback_dict,
+    feedback_dicts,
     feedback_stats,
     is_own,
     list_feedback,
@@ -94,11 +99,56 @@ def list_all_feedback(
         limit=limit,
     )
     return {
-        "items": [feedback_dict(r) for r in rows],
+        "items": feedback_dicts(db, rows),
         "total": total,
         "skip": skip,
         "limit": limit,
     }
+
+
+@router.post("/threads")
+def merge_staff_feedback(
+    body: StaffFeedbackMergeIn,
+    db: Session = Depends(get_db),
+    _p: AdminPrincipal = Depends(require_superuser),
+) -> dict:
+    try:
+        thread_id = merge_feedback(db, body.ids)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    db.commit()
+    return {"thread_id": str(thread_id)}
+
+
+@router.post("/threads/{thread_id}/split")
+def split_staff_feedback(
+    thread_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    _p: AdminPrincipal = Depends(require_superuser),
+) -> dict:
+    try:
+        count = split_thread(db, thread_id)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    db.commit()
+    return {"split": count}
+
+
+@router.patch("/{feedback_id}/client", response_model=StaffFeedbackOut)
+def bind_staff_feedback_client(
+    feedback_id: uuid.UUID,
+    body: StaffFeedbackClientIn,
+    db: Session = Depends(get_db),
+    _p: AdminPrincipal = Depends(require_superuser),
+) -> dict:
+    try:
+        row = set_feedback_client(db, feedback_id, body.client_id)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    db.commit()
+    db.refresh(row)
+    name = db.get(AClient, row.client_id).name if row.client_id else None
+    return feedback_dict(row, name)
 
 
 @router.get("/stats", response_model=StaffFeedbackStatsOut)

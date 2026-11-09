@@ -1,5 +1,13 @@
-import { useCallback, useEffect, useState } from "react";
-import { fetchStaffFeedback, fetchStaffFeedbackStats } from "../api.js";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import {
+  bindStaffFeedbackClient,
+  fetchAClients,
+  fetchStaffFeedback,
+  fetchStaffFeedbackStats,
+  mergeStaffFeedback,
+  splitStaffFeedback,
+} from "../api.js";
 
 const LIMIT = 500;
 
@@ -20,7 +28,8 @@ function toMarkdown(items, { dateFrom, dateTo }) {
   const period = dateFrom || dateTo ? ` (${dateFrom || "…"} — ${dateTo || "…"})` : "";
   const lines = [`# Спрос от продавцов${period}`, ""];
   for (const row of [...items].reverse()) {
-    lines.push(`## ${fmtDate(row.created_at)} — ${row.author_label}`, "", row.text, "");
+    const who = row.client_name ? `${row.author_label} → ${row.client_name}` : row.author_label;
+    lines.push(`## ${fmtDate(row.created_at)} — ${who}`, "", row.text, "");
   }
   return lines.join("\n");
 }
@@ -35,13 +44,33 @@ function downloadText(filename, text) {
   URL.revokeObjectURL(url);
 }
 
+function groupItems(items) {
+  const groups = [];
+  const seen = new Map();
+  for (const row of items) {
+    const key = row.thread_id || row.id;
+    if (!seen.has(key)) {
+      const group = { key, thread_id: row.thread_id, rows: [] };
+      seen.set(key, group);
+      groups.push(group);
+    }
+    seen.get(key).rows.push(row);
+  }
+  for (const group of groups) {
+    group.rows.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+  }
+  return groups;
+}
+
 export default function StaffFeedback() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [author, setAuthor] = useState("");
   const [stats, setStats] = useState([]);
   const [items, setItems] = useState([]);
+  const [clients, setClients] = useState([]);
   const [total, setTotal] = useState(0);
+  const [picked, setPicked] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
@@ -50,13 +79,16 @@ export default function StaffFeedback() {
     setErr("");
     const period = { date_from: dateFrom, date_to: dateTo };
     try {
-      const [st, list] = await Promise.all([
+      const [st, list, people] = await Promise.all([
         fetchStaffFeedbackStats(period),
         fetchStaffFeedback({ ...period, author_user_id: author, limit: LIMIT }),
+        fetchAClients({}),
       ]);
       setStats(st.items || []);
       setItems(list.items || []);
       setTotal(list.total || 0);
+      setClients(people.items || []);
+      setPicked([]);
     } catch (e) {
       setErr(e.message);
     } finally {
@@ -69,13 +101,51 @@ export default function StaffFeedback() {
   }, [load]);
 
   const authors = stats.filter((s) => s.author_user_id);
+  const groups = useMemo(() => groupItems(items), [items]);
+  const pickedRows = items.filter((row) => picked.includes(row.id));
+  const sameAuthor = pickedRows.length >= 2 && new Set(pickedRows.map(authorKey)).size === 1;
+
+  function toggle(id) {
+    setPicked((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]));
+  }
+
+  async function onMerge() {
+    setErr("");
+    try {
+      await mergeStaffFeedback(picked);
+      await load();
+    } catch (e) {
+      setErr(e.message);
+    }
+  }
+
+  async function onSplit(threadId) {
+    setErr("");
+    try {
+      await splitStaffFeedback(threadId);
+      await load();
+    } catch (e) {
+      setErr(e.message);
+    }
+  }
+
+  async function onBind(row, clientId) {
+    setErr("");
+    try {
+      await bindStaffFeedbackClient(row.id, clientId || null);
+      await load();
+    } catch (e) {
+      setErr(e.message);
+    }
+  }
 
   return (
     <section>
       <h2 style={{ marginTop: 0, marginBottom: "0.35rem" }}>Спрос от продавцов</h2>
       <p style={{ color: "var(--muted)", marginTop: 0, marginBottom: "0.85rem", maxWidth: 720 }}>
-        Сообщения из раздела «Спрос» в рабочем PWA. Те же данные читает MCP закупок:
-        list_staff_feedback и get_staff_feedback_stats.
+        Сообщения из раздела «Спрос» в рабочем PWA. Если одну мысль разбили на несколько сообщений,
+        их можно склеить — тогда текст читается целиком. Привязка к клиенту А живёт в{" "}
+        <Link to="/a-clients">«Клиентах А»</Link>.
       </p>
 
       <div className="flex-gap" style={{ flexWrap: "wrap", gap: "0.5rem", marginBottom: "0.75rem" }}>
@@ -110,9 +180,15 @@ export default function StaffFeedback() {
         >
           Скачать .md
         </button>
+        <button type="button" disabled={!sameAuthor} onClick={onMerge}>
+          Объединить выбранные
+        </button>
       </div>
 
       {err ? <p className="error">{err}</p> : null}
+      {picked.length && !sameAuthor ? (
+        <p style={{ color: "var(--muted)" }}>Для склейки отметьте два или больше сообщений одного сотрудника.</p>
+      ) : null}
 
       <h3>Активность</h3>
       {!stats.length ? (
@@ -150,30 +226,58 @@ export default function StaffFeedback() {
       {!items.length ? (
         <p style={{ color: "var(--muted)" }}>{loading ? "Загрузка…" : "Список пуст."}</p>
       ) : (
-        <div style={{ overflowX: "auto" }}>
-          <table>
-            <thead>
-              <tr>
-                <th>Когда</th>
-                <th>Сотрудник</th>
-                <th>Текст</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((row) => (
-                <tr key={row.id}>
-                  <td style={{ whiteSpace: "nowrap", verticalAlign: "top" }}>
-                    {fmtDate(row.created_at)}
-                    {row.updated_at ? (
-                      <div style={{ fontSize: "0.8rem", color: "var(--muted)" }}>изменено</div>
-                    ) : null}
-                  </td>
-                  <td style={{ verticalAlign: "top" }}>{row.author_label}</td>
-                  <td style={{ whiteSpace: "pre-wrap", maxWidth: 640 }}>{row.text}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div style={{ display: "grid", gap: "0.75rem" }}>
+          {groups.map((group) => {
+            const head = group.rows[0];
+            const merged = group.rows.length > 1;
+            return (
+              <article
+                key={group.key}
+                style={{
+                  borderLeft: merged ? "3px solid var(--accent, #888)" : "3px solid transparent",
+                  paddingLeft: "0.75rem",
+                }}
+              >
+                <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "center" }}>
+                  <strong>{head.author_label}</strong>
+                  <span style={{ color: "var(--muted)" }}>{fmtDate(head.created_at)}</span>
+                  {merged ? <span>одна мысль, склеено {group.rows.length}</span> : null}
+                  {merged ? (
+                    <button type="button" className="secondary" onClick={() => onSplit(group.thread_id)}>
+                      Разделить
+                    </button>
+                  ) : null}
+                  <select
+                    value={head.client_id || ""}
+                    onChange={(e) => onBind(head, e.target.value)}
+                    style={{ marginLeft: "auto", maxWidth: 320 }}
+                  >
+                    <option value="">Клиент не выбран</option>
+                    {clients.map((client) => (
+                      <option key={client.id} value={client.id}>
+                        {client.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {group.rows.map((row) => (
+                  <label key={row.id} style={{ display: "flex", gap: "0.5rem", marginTop: "0.45rem" }}>
+                    <input
+                      type="checkbox"
+                      checked={picked.includes(row.id)}
+                      onChange={() => toggle(row.id)}
+                    />
+                    <span style={{ whiteSpace: "pre-wrap" }}>
+                      {row.text}
+                      {row.updated_at ? (
+                        <span style={{ color: "var(--muted)" }}> · изменено</span>
+                      ) : null}
+                    </span>
+                  </label>
+                ))}
+              </article>
+            );
+          })}
         </div>
       )}
     </section>

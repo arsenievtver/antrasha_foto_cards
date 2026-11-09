@@ -123,6 +123,7 @@ def client_profiles(lines: list[dict], catalog: dict[str, dict], p: Periods) -> 
                 "rev_cur": sum(l["sum"] for l in ls if l["_day"] >= p.cur_from),
                 "rev_prev": sum(l["sum"] for l in ls if l["_day"] < p.cur_from),
                 "visits": len(days),
+                "checks": len({l.get("check_id") or str(l["_day"]) for l in ls}),
                 "last": days[-1],
                 "days_since": (p.week_end - days[-1]).days,
                 "median_gap": statistics.median(gaps) if gaps else None,
@@ -536,6 +537,34 @@ def _top(lines: list[dict], key, n: int) -> list[dict]:
     return [{"key": k, "revenue": _r(v), "share_pct": _pct(v, total)} for k, v in sorted(acc.items(), key=lambda kv: -kv[1])[:n]]
 
 
+def client_card(pr: dict, *, picks: list | None = None) -> dict:
+    """Карточка клиента А: те же поля, что у списка на контроле, плюс средний чек."""
+    checks = pr.get("checks") or pr["visits"] or 0
+    card = {
+        "id": pr["id"],
+        "name": pr["name"],
+        "phone": pr["phone"],
+        "status": pr["status"],
+        "last": pr["last"].isoformat(),
+        "days_since": pr["days_since"],
+        "median_gap": _r(pr["median_gap"]),
+        "rev_prev12": _r(pr["rev_prev"]),
+        "rev_cur12": _r(pr["rev_cur"]),
+        "visits": pr["visits"],
+        "checks": checks,
+        "avg_check": _r(pr["rev24"] / checks) if checks else None,
+        "gender": G_LABEL.get(pr["gender"] or "", ""),
+        "brands": [b for b, _ in pr["brands"].most_common(3)],
+        "categories": [c for c, _ in pr["cats"].most_common(4)],
+        "sizes": "; ".join(f"{c}: {s}" for (_, c), s in pr["sizes"].items()),
+        "avg_discount_pct": _r(pr["avg_discount"]),
+        "markdown_share_pct": _r(pr["markdown_share"]),
+    }
+    if picks is not None:
+        card["picks"] = picks
+    return card
+
+
 def build_report(
     ds: Dataset,
     run_day: date,
@@ -543,8 +572,8 @@ def build_report(
     prev_watchlist_ids: set[str] | None = None,
     staff_feedback: dict | None = None,
     procurement: dict | None = None,
-) -> tuple[dict, list[dict]]:
-    """→ (metrics без ФИО, watchlist с ФИО и телефонами)."""
+) -> tuple[dict, list[dict], list[dict]]:
+    """→ (metrics без ФИО, список на контроле, действующие клиенты А). ФИО только во втором и третьем."""
     p = Periods.for_run(run_day)
     lines = _prepare_lines(ds)
     upto = [l for l in lines if l["_day"] <= p.week_end]
@@ -663,29 +692,10 @@ def build_report(
     watch = [pr for pr in profiles if pr["segment"] == "A" and pr["status"] in WATCH_STATUSES]
     order = {s: i for i, s in enumerate(WATCH_STATUSES)}
     watch.sort(key=lambda pr: (order[pr["status"]], -pr["rev24"]))
-    watchlist = []
-    for pr in watch:
-        watchlist.append(
-            {
-                "id": pr["id"],
-                "name": pr["name"],
-                "phone": pr["phone"],
-                "status": pr["status"],
-                "last": pr["last"].isoformat(),
-                "days_since": pr["days_since"],
-                "median_gap": _r(pr["median_gap"]),
-                "rev_prev12": _r(pr["rev_prev"]),
-                "rev_cur12": _r(pr["rev_cur"]),
-                "visits": pr["visits"],
-                "gender": G_LABEL.get(pr["gender"] or "", ""),
-                "brands": [b for b, _ in pr["brands"].most_common(3)],
-                "categories": [c for c, _ in pr["cats"].most_common(4)],
-                "sizes": "; ".join(f"{c}: {s}" for (_, c), s in pr["sizes"].items()),
-                "avg_discount_pct": _r(pr["avg_discount"]),
-                "markdown_share_pct": _r(pr["markdown_share"]),
-                "picks": picks_for(pr, idx, run_day),
-            }
-        )
+    watchlist = [client_card(pr, picks=picks_for(pr, idx, run_day)) for pr in watch]
+    active_profiles = [pr for pr in profiles if pr["segment"] == "A" and pr["status"] not in WATCH_STATUSES]
+    active_profiles.sort(key=lambda pr: -pr["rev_cur"])
+    active = [client_card(pr) for pr in active_profiles]
     clients = {
         "named_clients_24m": len(profiles),
         "segments": segments,
@@ -697,6 +707,12 @@ def build_report(
             "rev_cur12": _r(sum(w["rev_cur12"] for w in watchlist)),
             "picks": sum(len(w["picks"]) for w in watchlist),
             "picks_old": sum(1 for w in watchlist for x in w["picks"] if x["old"]),
+        },
+        "active": {
+            "clients": len(active),
+            "by_status": dict(Counter(w["status"] for w in active)),
+            "rev_prev12": _r(sum(w["rev_prev12"] for w in active)),
+            "rev_cur12": _r(sum(w["rev_cur12"] for w in active)),
         },
     }
 
@@ -712,7 +728,7 @@ def build_report(
         "staff_feedback": staff_feedback or {},
     }
     metrics["suggestions"] = rule_suggestions(metrics)
-    return metrics, watchlist
+    return metrics, watchlist, active
 
 
 def _fmt_mln(x: float | None) -> str:

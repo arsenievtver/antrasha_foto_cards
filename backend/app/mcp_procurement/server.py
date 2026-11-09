@@ -21,6 +21,7 @@ from app.mcp_procurement.registry import (
 )
 from app.services.mcp_keys import McpActor
 
+import app.mcp_procurement.a_client_tools  # noqa: F401,E402
 import app.mcp_procurement.gift_certificate_tools  # noqa: F401,E402
 import app.mcp_procurement.marketing_tools  # noqa: F401,E402
 import app.mcp_procurement.ranking_eval_tools  # noqa: F401,E402
@@ -67,14 +68,26 @@ SERVER_INSTRUCTIONS = (
     "на эталонном наборе. В деталях — оба ранга, url фото, снимок настроек ленты, "
     "разброс эмбеддингов набора и вектор вкуса (swipe_updates и like/dislike по полу). "
     "Сырые векторы не отдаются. "
-    "Спрос от продавцов — только чтение и только по ключу суперпользователя: "
-    "list_staff_feedback (тексты: что спрашивали и чего нет, размеры, бренды) и "
-    "get_staff_feedback_stats (активность по сотрудникам). Текст свободный; сверяйте "
-    "его со справочниками и закупками, а остатки и продажи смотрите в MCP МойСклад. "
+    "Спрос от продавцов — только ключ суперпользователя: "
+    "list_staff_feedback (тексты, thread_id одной мысли, client_name клиента А; "
+    "unlinked=true — без клиента) и get_staff_feedback_stats (активность). "
+    "Склейка и привязка к клиенту — инструменты записи, они перечислены ниже. "
+    "Текст свободный; сверяйте его со справочниками и закупками, а остатки и продажи "
+    "смотрите в MCP МойСклад. "
     "Недельные отчёты по МойСклад — только чтение и только по ключу суперпользователя: "
     "list_weekly_reports и get_weekly_report (разделы «В общем», «За неделю», «Динамика», "
     "«Предложения» и метрики; клиенты на контроле с телефонами — только include_watchlist). "
     "Отчёт строится в понедельник утром или кнопкой в админке «Неделя». "
+    "Клиенты А на контроле — только ключ суперпользователя. "
+    "Чтение: list_a_clients и get_a_client (снимок из недель, сотрудники, история недель, комментарии), "
+    "list_active_a_clients (действующие А: новые и старые к прошлой неделе, динамика в процентах, "
+    "размеры, марки, средний чек; срез пишется в понедельник). "
+    "Запись, если у ключа есть право менять данные: sync_a_clients (собрать из недель и разобрать комментарии), "
+    "add_a_client_caretaker и dismiss_a_client_caretaker (несколько сотрудников у одного клиента). "
+    "Спрос: list_staff_feedback (unlinked=true — без клиента, client_id — сообщения одного клиента, "
+    "общий thread_id — одна мысль) и get_staff_feedback_stats. "
+    "Запись по спросу: merge_staff_feedback, split_staff_feedback, set_staff_feedback_client "
+    "(client_id=null отвязывает). Ручная привязка и снятый сотрудник следующим разбором не затираются. "
     "Подарочные сертификаты — list_gift_certificates, get_gift_certificate (чтение); "
     "create_gift_certificate, create_gift_certificates_batch, update_gift_certificate, "
     "send_gift_certificate_share_sms, send_marketing_sms_batch (запись; маркетинговые SMS — "

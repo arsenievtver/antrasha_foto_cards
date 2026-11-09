@@ -53,7 +53,7 @@ ds.stock = [
 ds.profit = {"cur": {"cogs": 16_700_000, "revenue": 40_000_000}, "prev": {"cogs": 19_100_000, "revenue": 44_600_000}}
 
 t = time.time()
-metrics, watch = build_report(ds, date(2026, 10, 27), prev_watchlist_ids={w for w in []}, staff_feedback={"messages_week": 1})
+metrics, watch, _active = build_report(ds, date(2026, 10, 27), prev_watchlist_ids={w for w in []}, staff_feedback={"messages_week": 1})
 print("sec", round(time.time() - t, 2))
 out = Path(__file__).parent / "iter4_weekly_result.json"
 out.write_text(json.dumps({"metrics": metrics, "watch_n": len(watch), "watch0": watch[:1]}, ensure_ascii=False, indent=1, default=str))
