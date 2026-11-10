@@ -31,6 +31,8 @@ class MoySkladProductRef:
     variant_id: str | None = None
     path_name: str | None = None
     gender: str | None = None  # male | female | None
+    supplier_id: str | None = None
+    supplier_name: str | None = None
 
 
 _LEAF_FEMALE_RE = re.compile(r"(^|[\s/(])жен(\.|$|[\s)])", re.IGNORECASE)
@@ -68,6 +70,18 @@ def infer_gender(
     if _FEMALE_TYPE_RE.search(name):
         return "female"
     return None
+
+
+def _supplier_of(supplier: object) -> tuple[str | None, str | None]:
+    if not isinstance(supplier, dict):
+        return None, None
+    meta = supplier.get("meta") if isinstance(supplier.get("meta"), dict) else {}
+    sid = _id_from_href(meta.get("href"))
+    if not sid and supplier.get("id"):
+        sid = str(supplier.get("id")).strip().lower() or None
+    raw_name = supplier.get("name")
+    name = str(raw_name).strip() if raw_name is not None and str(raw_name).strip() else None
+    return sid, name
 
 
 def _id_from_href(href: str | None) -> str | None:
@@ -123,22 +137,41 @@ class MoySkladClient(BaseApiClient):
             "Content-Type": "application/json",
         }
 
-    async def _product_article(self, product_id: str) -> str | None:
-        """Артикул часто живёт на родительском товаре, а не на модификации."""
+    async def _product_party(self, product_id: str) -> tuple[str | None, str | None, str | None]:
+        """Артикул и поставщик с карточки товара. Ошибка сети не роняет поиск по штрихкоду."""
         try:
-            resp = await self.get(f"/entity/product/{product_id}")
+            resp = await self.get(
+                f"/entity/product/{product_id}",
+                params={"expand": "supplier"},
+            )
         except ApiClientAbortableException as e:
             log.warning(
-                "moysklad product article product=%s HTTP %s",
+                "moysklad product party product=%s HTTP %s",
                 product_id,
+                e.response.status,
+            )
+            return None, None, None
+        data = resp.parsed_response if isinstance(resp.parsed_response, dict) else {}
+        raw = data.get("article")
+        article = str(raw).strip() if raw is not None and str(raw).strip() else None
+        supplier_id, supplier_name = _supplier_of(data.get("supplier"))
+        if supplier_id and not supplier_name:
+            supplier_name = await self._counterparty_name(supplier_id)
+        return article, supplier_id, supplier_name
+
+    async def _counterparty_name(self, counterparty_id: str) -> str | None:
+        try:
+            resp = await self.get(f"/entity/counterparty/{counterparty_id}")
+        except ApiClientAbortableException as e:
+            log.warning(
+                "moysklad counterparty %s HTTP %s",
+                counterparty_id,
                 e.response.status,
             )
             return None
         data = resp.parsed_response if isinstance(resp.parsed_response, dict) else {}
-        raw = data.get("article")
-        if raw is None:
-            return None
-        text = str(raw).strip()
+        raw = data.get("name")
+        text = str(raw).strip() if raw is not None else ""
         return text or None
 
     async def find_by_barcode(self, barcode: str) -> MoySkladProductRef:
@@ -198,9 +231,12 @@ class MoySkladClient(BaseApiClient):
             if article_raw is not None and str(article_raw).strip()
             else None
         )
-        # У модификаций артикул часто только у родителя — дотягиваем отдельно.
-        if not article and product_id and entity_type == "variant":
-            article = await self._product_article(product_id)
+        supplier_id: str | None = None
+        supplier_name: str | None = None
+        if product_id:
+            extra_article, supplier_id, supplier_name = await self._product_party(product_id)
+            if not article:
+                article = extra_article
 
         code_raw = row.get("code")
         found_barcode = _first_barcode_value(row, preferred=code) or code
@@ -224,6 +260,8 @@ class MoySkladClient(BaseApiClient):
             variant_id=variant_id,
             path_name=path_name,
             gender=gender,
+            supplier_id=supplier_id,
+            supplier_name=supplier_name,
         )
 
     async def upload_product_image(

@@ -222,6 +222,17 @@ export default function Brands() {
     }
   }
 
+  async function onUnlinkMoySklad(b) {
+    if (!window.confirm(`Сбросить id МойСклад у «${b.name}»?`)) return;
+    setErr("");
+    try {
+      await updateBrand(b.id, { name: b.name, moysklad_id: null });
+      await reload();
+    } catch (e) {
+      setErr(e.message);
+    }
+  }
+
   async function onDelete(b) {
     if (!window.confirm(`Удалить бренд «${b.name}»?`)) return;
     setErr("");
@@ -243,7 +254,8 @@ export default function Brands() {
       <h2 style={{ marginTop: 0 }}>Бренды</h2>
       <p style={{ color: "var(--muted)", maxWidth: 760 }}>
         Сводка по закупкам: сколько заказано, оплачено и поставлено. Откройте бренд,
-        чтобы увидеть разбивку по сезонам и категориям.
+        чтобы увидеть разбивку по сезонам и категориям. Id поставщика из МойСклад
+        записывается, когда кадр новой коллекции уходит в Fashn.
       </p>
 
       {err ? <p className="error">{err}</p> : null}
@@ -327,7 +339,21 @@ export default function Brands() {
                           autoFocus
                         />
                       ) : (
-                        b.name
+                        <>
+                          {b.name}
+                          {b.moysklad_id ? (
+                            <div style={{ color: "var(--muted)", fontSize: "0.8rem" }}>
+                              МойСклад привязан{" "}
+                              <button
+                                type="button"
+                                className="secondary"
+                                onClick={() => onUnlinkMoySklad(b)}
+                              >
+                                сбросить
+                              </button>
+                            </div>
+                          ) : null}
+                        </>
                       )}
                     </td>
                     <td>{s?.orders_count ?? 0}</td>

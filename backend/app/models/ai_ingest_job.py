@@ -35,6 +35,7 @@ class AiIngestJob(Base):
     show_badge: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     original_filename: Mapped[str] = mapped_column(Text, nullable=False)
     temp_path: Mapped[str] = mapped_column(Text, nullable=False)
+    # inbox — кадр с телефона ждёт в админке. pending | processing | completed | failed — очередь Fashn.
     status: Mapped[str] = mapped_column(
         String(20),
         nullable=False,
@@ -68,6 +69,17 @@ class AiIngestJob(Base):
         nullable=True,
         index=True,
     )
+    # Снимок товара с ценника. Пусто у загрузки с компьютера — в МойСклад она не ходит.
+    moysklad_product_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    moysklad_supplier_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    supplier_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    product_name: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    article: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    barcode: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    path_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # uploaded | failed. Пусто — в МойСклад ещё не отправляли или это не съёмка коллекции.
+    moysklad_upload_status: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    moysklad_upload_error: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     brand = relationship("Brand", lazy="joined", back_populates="ingest_jobs")
     release_batch = relationship("FeedReleaseBatch", back_populates="ingest_jobs")

@@ -199,7 +199,7 @@ def update_season(db: Session, _actor: McpActor, season_id: str, **fields):
 
 @tool(
     "list_brands",
-    "Все бренды закупок: id и название. Список полный, по имени.",
+    "Все бренды закупок: id, название и moysklad_id поставщика, если привязан. Список полный, по имени.",
     {"type": "object", "properties": {}, "required": []},
 )
 def list_brands(db: Session, _actor: McpActor):

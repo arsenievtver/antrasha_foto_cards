@@ -11,6 +11,7 @@ ADMIN_PERMISSIONS: dict[str, str] = {
     "product": "Товар",
     "outlet": "Аутлет: съёмка (PWA)",
     "outlet_transfer": "Аутлет: очередь переноса (PWA)",
+    "collection": "Новая коллекция: съёмка (PWA)",
     "ai_assistant": "AI помощник",
     "giftcards": "Сертификаты",
 }

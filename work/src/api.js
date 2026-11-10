@@ -85,7 +85,7 @@ export function getRole() {
 
 export function getPermissions() {
   if (getRole() === "superuser") {
-    return ["product", "outlet", "outlet_transfer", "ai_assistant"];
+    return ["product", "outlet", "outlet_transfer", "collection", "ai_assistant"];
   }
   try {
     const raw = localStorage.getItem(PERMS_KEY);
@@ -110,6 +110,10 @@ export function hasOutletAccess() {
   return hasPermission("outlet");
 }
 
+export function hasCollectionAccess() {
+  return hasPermission("collection");
+}
+
 export function hasOutletTransferAccess() {
   return hasPermission("outlet_transfer");
 }
@@ -126,7 +130,12 @@ export function hasWorkAccess() {
 
 export function workHomePath() {
   if (hasProductAccess()) return "/dashboard";
-  if (hasOutletAccess() || hasOutletTransferAccess() || hasAiAssistantAccess()) {
+  if (
+    hasOutletAccess() ||
+    hasOutletTransferAccess() ||
+    hasCollectionAccess() ||
+    hasAiAssistantAccess()
+  ) {
     return "/menu";
   }
   if (hasWorkAccess()) return "/demand";
@@ -289,6 +298,39 @@ export function updateShipment(shipmentId, body) {
 
 export async function fetchOutletPhotoStatus() {
   const res = await fetch(apiUrl("/admin/outlet-photo/status"), { headers: headersJson() });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
+export async function fetchCollectionPhotoStatus() {
+  const res = await fetch(apiUrl("/admin/collection-photo/status"), { headers: headersJson() });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
+export async function lookupCollectionBarcode(barcode) {
+  const res = await fetch(apiUrl("/admin/collection-photo/lookup"), {
+    method: "POST",
+    headers: headersJson(),
+    body: JSON.stringify({ barcode }),
+  });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
+export async function createCollectionPhotoJob({ gender, file, barcode }) {
+  const fd = new FormData();
+  fd.append("gender", gender);
+  fd.append("barcode", barcode);
+  fd.append("image", file);
+  const res = await fetch(apiUrl("/admin/collection-photo/jobs"), {
+    method: "POST",
+    headers: headersAuthOnly(),
+    body: fd,
+  });
   const data = await parseResponseJson(res);
   if (!res.ok) throw new Error(detail(data, res.statusText));
   return data;

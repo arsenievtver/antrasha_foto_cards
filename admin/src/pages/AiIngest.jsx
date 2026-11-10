@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   createBrand,
   deleteAiIngestJob,
+  enqueueAiIngestInbox,
+  fetchAiIngestJobSource,
   fetchAiIngestJobs,
   fetchAiIngestLimits,
   fetchAiIngestReleaseDraft,
@@ -10,6 +12,7 @@ import {
   fetchFeedSettings,
   publishAiIngestRelease,
   retryAiIngestJob,
+  retryAiIngestMoySklad,
   uploadAiIngestBatch,
 } from "../api.js";
 
@@ -66,11 +69,19 @@ export default function AiIngest() {
   const [uploading, setUploading] = useState(false);
   const [releaseDraft, setReleaseDraft] = useState(null);
   const [publishBusy, setPublishBusy] = useState(false);
+  const [inbox, setInbox] = useState([]);
+  const [inboxMode, setInboxMode] = useState("single");
+  const [inboxBadge, setInboxBadge] = useState(false);
+  const [picked, setPicked] = useState({});
+  const [selected, setSelected] = useState(() => new Set());
+  const [enqueueBusy, setEnqueueBusy] = useState(false);
+  const [thumbs, setThumbs] = useState({});
+  const thumbsRef = useRef({});
   const fileInputRef = useRef(null);
 
   const loadJobs = useCallback(async () => {
     setErr("");
-    const data = await fetchAiIngestJobs({ skip, limit });
+    const data = await fetchAiIngestJobs({ skip, limit, queue: "fashn" });
     setItems(data.items || []);
     setTotal(data.total ?? 0);
   }, [skip, limit]);
@@ -87,17 +98,19 @@ export default function AiIngest() {
 
   const pollQueue = useCallback(async () => {
     try {
-      const [st, data, lim, draft] = await Promise.all([
+      const [st, data, lim, draft, phone] = await Promise.all([
         fetchAiIngestStats(),
-        fetchAiIngestJobs({ skip, limit }),
+        fetchAiIngestJobs({ skip, limit, queue: "fashn" }),
         fetchAiIngestLimits(),
         fetchAiIngestReleaseDraft(gender),
+        fetchAiIngestJobs({ skip: 0, limit: 200, queue: "inbox" }),
       ]);
       setStats(st);
       setItems(data.items || []);
       setTotal(data.total ?? 0);
       setLimits(lim);
       setReleaseDraft(draft);
+      setInbox(phone.items || []);
     } catch {
       /* сеть / сессия — не показываем при каждом тике */
     }
@@ -126,7 +139,12 @@ export default function AiIngest() {
         if (skip === 0) {
           await Promise.all([refreshMeta(), loadBrands()]);
         }
-        await loadJobs();
+        await Promise.all([
+          loadJobs(),
+          fetchAiIngestJobs({ skip: 0, limit: 200, queue: "inbox" }).then((phone) => {
+            if (!c) setInbox(phone.items || []);
+          }),
+        ]);
       } catch (e) {
         if (!c) setErr(e.message);
       } finally {
@@ -165,6 +183,85 @@ export default function AiIngest() {
     }, 3000);
     return () => clearInterval(t);
   }, [pollQueue]);
+
+  useEffect(() => {
+    let stop = false;
+    const missing = inbox.filter((j) => !thumbsRef.current[j.id]);
+    if (!missing.length) return undefined;
+    (async () => {
+      for (const j of missing) {
+        try {
+          const blob = await fetchAiIngestJobSource(j.id);
+          if (stop) return;
+          thumbsRef.current[j.id] = URL.createObjectURL(blob);
+        } catch {
+          thumbsRef.current[j.id] = "";
+        }
+      }
+      if (!stop) setThumbs({ ...thumbsRef.current });
+    })();
+    return () => {
+      stop = true;
+    };
+  }, [inbox]);
+
+  function brandValue(j) {
+    if (Object.prototype.hasOwnProperty.call(picked, j.id)) return picked[j.id];
+    if (j.brand_match === "linked" && j.suggested_brand_id) return j.suggested_brand_id;
+    return j.brand_id || j.suggested_brand_id || "";
+  }
+
+  function toggleInbox(id) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function selectInboxGender(g) {
+    setSelected(new Set(inbox.filter((j) => j.gender === g).map((j) => j.id)));
+  }
+
+  async function onEnqueue() {
+    const rows = inbox.filter((j) => selected.has(j.id));
+    if (!rows.length) {
+      setErr("Отметьте кадры");
+      return;
+    }
+    const missing = rows.filter((j) => !brandValue(j));
+    if (missing.length) {
+      setErr("У отмеченных кадров выберите бренд");
+      return;
+    }
+    setEnqueueBusy(true);
+    setErr("");
+    try {
+      await enqueueAiIngestInbox({
+        sourceMode: inboxMode,
+        showBadge: inboxBadge,
+        items: rows.map((j) => ({ job_id: j.id, brand_id: brandValue(j) })),
+      });
+      setSelected(new Set());
+      setPicked({});
+      await pollQueue();
+    } catch (ex) {
+      setErr(ex.message || String(ex));
+    } finally {
+      setEnqueueBusy(false);
+    }
+  }
+
+  async function onMoySklad(id) {
+    setErr("");
+    try {
+      await retryAiIngestMoySklad(id);
+      await pollQueue();
+    } catch (ex) {
+      setErr(ex.message);
+    }
+  }
 
   function onPick(e) {
     const list = e.target.files ? Array.from(e.target.files) : [];
@@ -264,6 +361,14 @@ export default function AiIngest() {
     setErr("");
     try {
       await deleteAiIngestJob(id);
+      setSelected((prev) => {
+        if (!prev.has(id)) return prev;
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+      const phone = await fetchAiIngestJobs({ skip: 0, limit: 200, queue: "inbox" });
+      setInbox(phone.items || []);
       await Promise.all([refreshMeta(), loadJobs()]);
     } catch (ex) {
       setErr(ex.message);
@@ -334,6 +439,131 @@ export default function AiIngest() {
 
       {err ? <p className="error">{err}</p> : null}
 
+      <div
+        style={{
+          marginBottom: "1.5rem",
+          padding: "0.85rem 1rem",
+          borderRadius: 8,
+          border: "1px solid var(--border)",
+          background: "var(--surface)",
+        }}
+      >
+        <div style={{ fontWeight: 600, marginBottom: "0.35rem" }}>
+          С телефона ({inbox.length})
+        </div>
+        <p style={{ margin: "0 0 0.75rem", color: "var(--muted)", fontSize: "0.9rem" }}>
+          Пол и бренд уже с ценника. Отметьте кадры, выберите способ и поставьте в Fashn.
+          Совпадение бренда по имени — только подсказка: id поставщика запишется в справочник,
+          когда отправите.
+        </p>
+        {inbox.length ? (
+          <>
+            <div style={{ display: "flex", gap: "0.6rem", flexWrap: "wrap", alignItems: "center" }}>
+              <button type="button" className="secondary" onClick={() => selectInboxGender("male")}>
+                Все мужские
+              </button>
+              <button type="button" className="secondary" onClick={() => selectInboxGender("female")}>
+                Все женские
+              </button>
+              <button type="button" className="secondary" onClick={() => setSelected(new Set())}>
+                Снять выбор
+              </button>
+              <label style={{ display: "flex", gap: "0.45rem", alignItems: "center" }}>
+                <span>Что на фото</span>
+                <select value={inboxMode} onChange={(e) => setInboxMode(e.target.value)}>
+                  <option value="single">Одна вещь</option>
+                  <option value="look">Образ в сборе</option>
+                </select>
+              </label>
+              <label style={{ display: "flex", gap: "0.45rem", alignItems: "center" }}>
+                <input
+                  type="checkbox"
+                  checked={inboxBadge}
+                  onChange={(e) => setInboxBadge(e.target.checked)}
+                />
+                Бейдж
+              </label>
+              <button type="button" disabled={enqueueBusy || selected.size === 0} onClick={onEnqueue}>
+                {enqueueBusy ? "Отправка…" : `В Fashn (${selected.size})`}
+              </button>
+            </div>
+            <div style={{ overflowX: "auto", marginTop: "0.75rem" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.9rem" }}>
+                <thead>
+                  <tr style={{ textAlign: "left", borderBottom: "1px solid var(--border)" }}>
+                    <th style={{ padding: "0.45rem 0.35rem" }} />
+                    <th style={{ padding: "0.45rem 0.35rem" }}>Кадр</th>
+                    <th style={{ padding: "0.45rem 0.35rem" }}>Товар</th>
+                    <th style={{ padding: "0.45rem 0.35rem" }}>Пол</th>
+                    <th style={{ padding: "0.45rem 0.35rem" }}>Бренд</th>
+                    <th style={{ padding: "0.45rem 0.35rem" }} />
+                  </tr>
+                </thead>
+                <tbody>
+                  {inbox.map((j) => (
+                    <tr key={j.id} style={{ borderBottom: "1px solid var(--border)", verticalAlign: "top" }}>
+                      <td style={{ padding: "0.45rem 0.35rem" }}>
+                        <input
+                          type="checkbox"
+                          checked={selected.has(j.id)}
+                          onChange={() => toggleInbox(j.id)}
+                        />
+                      </td>
+                      <td style={{ padding: "0.45rem 0.35rem" }}>
+                        {thumbs[j.id] ? (
+                          <img
+                            src={thumbs[j.id]}
+                            alt=""
+                            style={{ width: 72, height: 90, objectFit: "cover", borderRadius: 6 }}
+                          />
+                        ) : (
+                          <span style={{ color: "var(--muted)" }}>—</span>
+                        )}
+                      </td>
+                      <td style={{ padding: "0.45rem 0.35rem" }}>
+                        <div>{j.product_name || j.original_filename}</div>
+                        <div style={{ color: "var(--muted)", fontSize: "0.82rem" }}>
+                          {j.article ? `Арт. ${j.article}` : "без артикула"}
+                          {j.supplier_name ? ` · ${j.supplier_name}` : ""}
+                        </div>
+                      </td>
+                      <td style={{ padding: "0.45rem 0.35rem" }}>
+                        {j.gender === "female" ? "женский" : "мужской"}
+                      </td>
+                      <td style={{ padding: "0.45rem 0.35rem", minWidth: 220 }}>
+                        <select
+                          value={brandValue(j)}
+                          onChange={(e) => setPicked((prev) => ({ ...prev, [j.id]: e.target.value }))}
+                        >
+                          <option value="">— выберите —</option>
+                          {brands.map((b) => (
+                            <option key={b.id} value={b.id}>
+                              {b.name}
+                            </option>
+                          ))}
+                        </select>
+                        {j.brand_warning ? (
+                          <div style={{ color: "var(--danger)", fontSize: "0.82rem", marginTop: 4 }}>
+                            {j.brand_warning}
+                          </div>
+                        ) : null}
+                      </td>
+                      <td style={{ padding: "0.45rem 0.35rem" }}>
+                        <button type="button" className="danger" onClick={() => onDelete(j.id)}>
+                          Удалить
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        ) : (
+          <p style={{ margin: 0, color: "var(--muted)" }}>Пока пусто. Кадры появятся из приложения сотрудника.</p>
+        )}
+      </div>
+
       {releaseDraft ? (
         <div
           style={{
@@ -365,6 +595,11 @@ export default function AiIngest() {
             {releaseDraft.fashn_pending > 0 ? (
               <span style={{ color: "var(--muted)" }}>
                 Fashn в работе: <strong>{releaseDraft.fashn_pending}</strong>
+              </span>
+            ) : null}
+            {releaseDraft.moysklad_pending > 0 ? (
+              <span style={{ color: "var(--danger)" }}>
+                МойСклад: <strong>{releaseDraft.moysklad_pending}</strong> — выпуск ждёт повтор
               </span>
             ) : null}
             {releaseDraft.fashn_failed > 0 ? (
@@ -559,11 +794,24 @@ export default function AiIngest() {
                 <td style={{ padding: "0.45rem 0.35rem", wordBreak: "break-word" }}>
                   {j.result_url ? (
                     <a href={j.result_url} target="_blank" rel="noreferrer">
-                      PNG в бакете
+                      открыть
                     </a>
                   ) : (
                     j.error_message || "—"
                   )}
+                  {j.moysklad_product_id && j.moysklad_upload_status === "uploaded" ? (
+                    <div style={{ color: "var(--muted)", fontSize: "0.82rem" }}>в МойСклад</div>
+                  ) : null}
+                  {j.moysklad_product_id && j.status === "completed" && j.moysklad_upload_status !== "uploaded" ? (
+                    <div style={{ marginTop: 4 }}>
+                      <div style={{ color: "var(--danger)", fontSize: "0.82rem" }}>
+                        {j.moysklad_upload_error || "Не ушло в МойСклад"}
+                      </div>
+                      <button type="button" className="secondary" onClick={() => onMoySklad(j.id)}>
+                        Повторить МойСклад
+                      </button>
+                    </div>
+                  ) : null}
                 </td>
                 <td style={{ padding: "0.45rem 0.35rem", whiteSpace: "nowrap" }}>
                   {j.status === "failed" ? (

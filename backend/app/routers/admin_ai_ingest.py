@@ -8,15 +8,18 @@ import uuid
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
+from fastapi.responses import FileResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.config import DOTENV_CANDIDATE_PATHS, DOTENV_LOADED_PATHS, settings
 from app.database import SessionLocal, get_db
 from app.deps import AdminPrincipal, get_admin_principal
-from app.models import AiIngestJob, Brand
+from app.models import AiIngestJob, Brand, Photo
 from app.schemas.ai_ingest import (
     AiIngestDiagnosticsOut,
+    AiIngestEnqueueIn,
+    AiIngestEnqueueOut,
     AiIngestJobListResponse,
     AiIngestJobOut,
     AiIngestLimitsOut,
@@ -27,14 +30,18 @@ from app.schemas.ai_ingest import (
 )
 from app.externals.http.fashn import VALID_CONTENT_MODES, normalize_content_mode
 from app.services.ai_ingest_worker import count_pending_jobs, is_processing_stale
+from app.services.brand_match import apply_supplier_link, match_supplier
+from app.services.image_prepare import image_bytes_to_png
+from app.services.moysklad_image import upload_catalog_png
+from app.services.yc_storage import public_object_url, read_object_bytes
 from app.services.feed_release_batch import (
     count_failed_fashn_for_draft,
+    count_moysklad_pending_for_draft,
     count_pending_fashn_for_draft,
     draft_batch_summary,
     get_or_create_draft_batch,
     publish_draft_batch,
 )
-from app.services.yc_storage import public_object_url
 
 log = logging.getLogger("app.api.admin_ai_ingest")
 
@@ -78,13 +85,16 @@ def _safe_filename(name: str) -> str:
     return base[:240]
 
 
-def _job_out(j: AiIngestJob) -> AiIngestJobOut:
+def _job_out(j: AiIngestJob, brands: list | None = None) -> AiIngestJobOut:
     url = None
     if j.result_bucket and j.result_key:
         url = public_object_url(j.result_bucket, j.result_key)
     brand_name = None
     if j.brand_id and j.brand is not None:
         brand_name = j.brand.name
+    match = None
+    if brands is not None and (j.status == "inbox" or j.moysklad_supplier_id or j.supplier_name):
+        match = match_supplier(brands, j.moysklad_supplier_id, j.supplier_name)
     return AiIngestJobOut(
         id=j.id,
         gender=j.gender,
@@ -103,6 +113,17 @@ def _job_out(j: AiIngestJob) -> AiIngestJobOut:
         created_at=j.created_at,
         started_at=j.started_at,
         finished_at=j.finished_at,
+        product_name=j.product_name,
+        article=j.article,
+        barcode=j.barcode,
+        supplier_name=j.supplier_name,
+        moysklad_product_id=j.moysklad_product_id,
+        moysklad_upload_status=j.moysklad_upload_status,
+        moysklad_upload_error=j.moysklad_upload_error,
+        brand_match=match.confidence if match else None,
+        brand_warning=match.warning if match else None,
+        suggested_brand_id=match.brand_id if match else None,
+        suggested_brand_name=match.brand_name if match else None,
     )
 
 
@@ -151,6 +172,7 @@ def queue_stats(
         pending=_count_status(db, "pending"),
         processing=_count_status(db, "processing"),
         failed=_count_status(db, "failed"),
+        inbox=_count_status(db, "inbox"),
     )
 
 
@@ -168,14 +190,20 @@ def get_release_draft(
     batch_id = summary.get("batch_id")
     fashn_pending = 0
     fashn_failed = 0
+    moysklad_pending = 0
     if batch_id:
         fashn_pending = count_pending_fashn_for_draft(db, batch_id)
         fashn_failed = count_failed_fashn_for_draft(db, batch_id)
+        moysklad_pending = count_moysklad_pending_for_draft(db, batch_id)
     photo_count = int(summary["photo_count"])
     embedded_count = int(summary["embedded_count"])
     embed_pending = max(0, photo_count - embedded_count)
     can_publish = (
-        photo_count > 0 and fashn_pending == 0 and fashn_failed == 0 and embed_pending == 0
+        photo_count > 0
+        and fashn_pending == 0
+        and fashn_failed == 0
+        and embed_pending == 0
+        and moysklad_pending == 0
     )
     return AiIngestReleaseDraftOut(
         gender=g,
@@ -187,6 +215,7 @@ def get_release_draft(
         last_embed_error=summary.get("last_embed_error"),
         fashn_pending=fashn_pending,
         fashn_failed=fashn_failed,
+        moysklad_pending=moysklad_pending,
         can_publish=can_publish,
     )
 
@@ -213,6 +242,11 @@ def publish_release_draft(
             status_code=409,
             detail="В пакете есть ошибки Fashn — повторите или удалите их в таблице ниже",
         )
+    if batch_id and count_moysklad_pending_for_draft(db, batch_id) > 0:
+        raise HTTPException(
+            status_code=409,
+            detail="В пакете есть фото, которые не ушли в МойСклад — повторите загрузку в таблице",
+        )
     try:
         result = publish_draft_batch(db, gender=g)
     except ValueError as e:
@@ -235,17 +269,27 @@ def list_jobs(
     _p: AdminPrincipal = Depends(get_admin_principal),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
+    queue: str | None = Query(None, description="inbox | fashn"),
 ) -> AiIngestJobListResponse:
     _ = _p
-    total = db.scalar(select(func.count()).select_from(AiIngestJob)) or 0
-    rows = db.scalars(
-        select(AiIngestJob)
-        .order_by(AiIngestJob.created_at.desc())
-        .offset(skip)
-        .limit(limit),
-    ).all()
+    cond = None
+    if queue == "inbox":
+        cond = AiIngestJob.status == "inbox"
+    elif queue == "fashn":
+        cond = AiIngestJob.status != "inbox"
+    elif queue:
+        raise HTTPException(status_code=400, detail="queue: inbox или fashn")
+    total_stmt = select(func.count()).select_from(AiIngestJob)
+    rows_stmt = select(AiIngestJob)
+    if cond is not None:
+        total_stmt = total_stmt.where(cond)
+        rows_stmt = rows_stmt.where(cond)
+    order = AiIngestJob.created_at.asc() if queue == "inbox" else AiIngestJob.created_at.desc()
+    total = db.scalar(total_stmt) or 0
+    rows = db.scalars(rows_stmt.order_by(order).offset(skip).limit(limit)).all()
+    brands = list(db.scalars(select(Brand).order_by(Brand.name.asc())).all())
     return AiIngestJobListResponse(
-        items=[_job_out(j) for j in rows],
+        items=[_job_out(j, brands) for j in rows],
         total=int(total),
         skip=skip,
         limit=limit,
@@ -481,3 +525,135 @@ def delete_job(
         pass
     db.delete(j)
     db.commit()
+
+
+def _source_file(job: AiIngestJob) -> Path:
+    root = settings.ai_ingest_temp_path.resolve()
+    path = Path(job.temp_path).resolve()
+    if not path.is_file() or path.parent != root:
+        raise HTTPException(status_code=404, detail="Исходник не найден")
+    return path
+
+
+_SOURCE_MEDIA = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".webp": "image/webp",
+    ".heic": "image/heic",
+    ".heif": "image/heif",
+}
+
+
+@router.get("/jobs/{job_id}/source")
+def job_source(
+    job_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    _p: AdminPrincipal = Depends(get_admin_principal),
+) -> FileResponse:
+    _ = _p
+    job = db.get(AiIngestJob, job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Задача не найдена")
+    path = _source_file(job)
+    media = _SOURCE_MEDIA.get(path.suffix.lower(), "application/octet-stream")
+    return FileResponse(path, media_type=media, filename=job.original_filename or path.name)
+
+
+@router.post("/inbox/enqueue", response_model=AiIngestEnqueueOut)
+def enqueue_inbox(
+    body: AiIngestEnqueueIn,
+    db: Session = Depends(get_db),
+    _p: AdminPrincipal = Depends(get_admin_principal),
+) -> AiIngestEnqueueOut:
+    """Кадры с телефона → обычная очередь Fashn. Id поставщика пишется на выбранный бренд."""
+    _ = _p
+    if not body.items or len(body.items) > 100:
+        raise HTTPException(status_code=400, detail="Выберите от 1 до 100 кадров")
+    if len({item.job_id for item in body.items}) != len(body.items):
+        raise HTTPException(status_code=400, detail="В списке повторяется один и тот же кадр")
+    try:
+        mode = normalize_content_mode(body.source_mode)
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail=f"source_mode: укажите {' или '.join(sorted(VALID_CONTENT_MODES))}",
+        ) from None
+    if not settings.fashn_configured or not settings.yc_s3_configured:
+        raise HTTPException(status_code=503, detail="Fashn или хранилище не настроены")
+
+    lim = _limits()
+    pending = count_pending_jobs(db)
+    if pending + len(body.items) > lim.max_pending_jobs:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Очередь Fashn переполнена: pending={pending}, лимит {lim.max_pending_jobs}",
+        )
+
+    brands = list(db.scalars(select(Brand).order_by(Brand.name.asc())).all())
+    by_id = {b.id: b for b in brands}
+    drafts: dict[str, uuid.UUID] = {}
+    updated: list[AiIngestJob] = []
+    for item in body.items:
+        job = db.get(AiIngestJob, item.job_id)
+        if job is None or job.status != "inbox":
+            raise HTTPException(status_code=400, detail="В выборке есть кадр не из очереди телефона")
+        _source_file(job)
+        brand_id = item.brand_id or job.brand_id
+        brand = by_id.get(brand_id) if brand_id else None
+        if brand is None:
+            label = job.article or job.product_name or "кадр"
+            raise HTTPException(status_code=400, detail=f"Выберите бренд: {label}")
+        link_error = apply_supplier_link(brand, job.moysklad_supplier_id, brands)
+        if link_error:
+            raise HTTPException(status_code=409, detail=link_error)
+        if job.gender not in drafts:
+            drafts[job.gender] = get_or_create_draft_batch(db, gender=job.gender).id
+        job.brand_id = brand.id
+        job.source_mode = mode
+        job.show_badge = bool(body.show_badge)
+        job.status = "pending"
+        job.release_batch_id = drafts[job.gender]
+        job.error_message = None
+        updated.append(job)
+    db.commit()
+    for job in updated:
+        db.refresh(job)
+    return AiIngestEnqueueOut(items=[_job_out(job, brands) for job in updated])
+
+
+@router.post("/jobs/{job_id}/moysklad", response_model=AiIngestJobOut)
+async def retry_moysklad_image(
+    job_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    _p: AdminPrincipal = Depends(get_admin_principal),
+) -> AiIngestJobOut:
+    _ = _p
+    job = db.get(AiIngestJob, job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Задача не найдена")
+    if not job.moysklad_product_id:
+        raise HTTPException(status_code=400, detail="У кадра нет товара МойСклад")
+    if job.moysklad_upload_status == "uploaded":
+        brands = list(db.scalars(select(Brand)).all())
+        return _job_out(job, brands)
+    if job.status != "completed" or not job.result_bucket or not job.result_key or not job.photo_id:
+        raise HTTPException(status_code=409, detail="Сначала дождитесь кадра Fashn")
+    filename = f"collection-{job.id.hex[:12]}.png"
+    try:
+        png = image_bytes_to_png(read_object_bytes(job.result_bucket, job.result_key))
+        await upload_catalog_png(job.moysklad_product_id, png, filename=filename)
+    except Exception as e:
+        job.moysklad_upload_status = "failed"
+        job.moysklad_upload_error = f"{type(e).__name__}: {e}"[:2000]
+        db.commit()
+        raise HTTPException(status_code=502, detail=f"МойСклад: {job.moysklad_upload_error}") from e
+    photo = db.get(Photo, job.photo_id)
+    if photo is not None:
+        photo.moy_sklad_id = job.moysklad_product_id[:128]
+    job.moysklad_upload_status = "uploaded"
+    job.moysklad_upload_error = None
+    db.commit()
+    db.refresh(job)
+    brands = list(db.scalars(select(Brand)).all())
+    return _job_out(job, brands)

@@ -15,6 +15,7 @@ from app.routers import (
     admin,
     admin_a_clients,
     admin_ai_ingest,
+    admin_collection_photo,
     admin_hero_banners,
     admin_home_v2,
     admin_mcp_keys,
@@ -151,6 +152,7 @@ app.include_router(admin_hero_banners.router)
 app.include_router(admin_modal_videos.router)
 app.include_router(admin_home_v2.router)
 app.include_router(admin_ai_ingest.router)
+app.include_router(admin_collection_photo.router)
 app.include_router(admin_outlet_photo.router)
 app.include_router(admin_procurement.router)
 app.include_router(admin_procurement_ai.router)

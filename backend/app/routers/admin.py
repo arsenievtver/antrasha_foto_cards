@@ -1570,6 +1570,15 @@ def delete_user(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
+def _brand_out(b: Brand) -> AdminBrandOut:
+    return AdminBrandOut(
+        id=b.id,
+        name=b.name,
+        created_at=b.created_at,
+        moysklad_id=b.moysklad_id,
+    )
+
+
 @router.get("/brands", response_model=AdminBrandListResponse)
 def list_brands(
     db: Session = Depends(get_db),
@@ -1577,11 +1586,7 @@ def list_brands(
 ) -> AdminBrandListResponse:
     _ = _principal
     rows = db.scalars(select(Brand).order_by(Brand.name.asc())).all()
-    return AdminBrandListResponse(
-        items=[
-            AdminBrandOut(id=b.id, name=b.name, created_at=b.created_at) for b in rows
-        ],
-    )
+    return AdminBrandListResponse(items=[_brand_out(b) for b in rows])
 
 
 @router.post("/brands", response_model=AdminBrandOut)
@@ -1608,7 +1613,7 @@ def create_brand(
             detail="Бренд с таким названием уже есть",
         ) from None
     db.refresh(b)
-    return AdminBrandOut(id=b.id, name=b.name, created_at=b.created_at)
+    return _brand_out(b)
 
 
 @router.patch("/brands/{brand_id}", response_model=AdminBrandOut)
@@ -1628,19 +1633,36 @@ def update_brand(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Укажите название бренда",
         )
+    changed = False
     if name != b.name:
         b.name = name
         db.execute(update(Photo).where(Photo.brand_id == brand_id).values(brand=name))
+        changed = True
+    if "moysklad_id" in body.model_fields_set:
+        raw = (body.moysklad_id or "").strip().lower() or None
+        if raw:
+            other = db.scalar(
+                select(Brand).where(Brand.moysklad_id == raw, Brand.id != b.id)
+            )
+            if other is not None:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"Этот поставщик уже привязан к бренду «{other.name}»",
+                )
+        if b.moysklad_id != raw:
+            b.moysklad_id = raw
+            changed = True
+    if changed:
         try:
             db.commit()
         except IntegrityError:
             db.rollback()
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="Бренд с таким названием уже есть",
+                detail="Бренд с таким названием или id МойСклад уже есть",
             ) from None
         db.refresh(b)
-    return AdminBrandOut(id=b.id, name=b.name, created_at=b.created_at)
+    return _brand_out(b)
 
 
 @router.delete("/brands/{brand_id}", status_code=status.HTTP_204_NO_CONTENT)

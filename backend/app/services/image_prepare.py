@@ -152,6 +152,17 @@ def build_fashn_product_image_data_url(path: Path) -> str:
     return f"data:image/jpeg;base64,{b64}"
 
 
+def image_bytes_to_png(raw: bytes) -> bytes:
+    """Кадр из бакета (WebP) → PNG, который принимает МойСклад."""
+    img = Image.open(io.BytesIO(raw))
+    img.load()
+    img = _apply_exif_orientation(img)
+    img = _image_to_rgb(img)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG", optimize=True)
+    return buf.getvalue()
+
+
 def png_bytes_to_webp(png_bytes: bytes, *, quality: int = 100) -> bytes:
     """PNG от Fashn → WebP для загрузки в Object Storage (качество 0–100, по умолчанию 100)."""
     img = Image.open(io.BytesIO(png_bytes))

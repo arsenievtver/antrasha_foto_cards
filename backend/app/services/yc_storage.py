@@ -180,6 +180,15 @@ def delete_fashn_source(bucket: str, key: str) -> None:
     delete_object_from_managed_bucket(bucket, key)
 
 
+def read_object_bytes(bucket: str, key: str) -> bytes:
+    client = get_s3_client()
+    obj = client.get_object(Bucket=bucket, Key=key)
+    body = obj["Body"].read()
+    if not isinstance(body, (bytes, bytearray)):
+        raise RuntimeError("пустой объект в хранилище")
+    return bytes(body)
+
+
 def put_image_object(
     bucket: str,
     key: str,

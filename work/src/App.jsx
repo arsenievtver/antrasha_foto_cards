@@ -4,6 +4,7 @@ import Login from "./pages/Login.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import Menu from "./pages/Menu.jsx";
 import OutletPhoto from "./pages/OutletPhoto.jsx";
+import CollectionPhoto from "./pages/CollectionPhoto.jsx";
 import OutletTransfer from "./pages/OutletTransfer.jsx";
 import AiAssistant from "./pages/AiAssistant.jsx";
 import ProcurementAi from "./pages/ProcurementAi.jsx";
@@ -25,6 +26,7 @@ import ShipmentEdit from "./pages/ShipmentEdit.jsx";
 import {
   clearSession,
   hasAiAssistantAccess,
+  hasCollectionAccess,
   hasOutletAccess,
   hasOutletTransferAccess,
   hasProductAccess,
@@ -44,6 +46,13 @@ function RequireWork({ children }) {
 
 function RequireProduct({ children }) {
   if (!hasProductAccess()) {
+    return <Navigate to={workHomePath()} replace />;
+  }
+  return children;
+}
+
+function RequireCollection({ children }) {
+  if (!hasCollectionAccess()) {
     return <Navigate to={workHomePath()} replace />;
   }
   return children;
@@ -97,6 +106,14 @@ export default function App() {
           />
           <Route path="/menu" element={<Menu />} />
           <Route path="/demand" element={<Feedback />} />
+          <Route
+            path="/collection"
+            element={
+              <RequireCollection>
+                <CollectionPhoto />
+              </RequireCollection>
+            }
+          />
           <Route
             path="/outlet"
             element={

@@ -66,6 +66,7 @@ class AdminBrandOut(BaseModel):
     id: uuid.UUID
     name: str
     created_at: datetime
+    moysklad_id: str | None = None
 
 
 class AdminBrandListResponse(BaseModel):
@@ -78,6 +79,8 @@ class AdminBrandCreateRequest(BaseModel):
 
 class AdminBrandUpdateRequest(BaseModel):
     name: str = Field(min_length=1, max_length=200)
+    # Поле в запросе — записать id поставщика или сбросить (null). Нет поля — не трогать.
+    moysklad_id: str | None = Field(default=None, max_length=64)
 
 
 class AdminFittingRequestOut(BaseModel):

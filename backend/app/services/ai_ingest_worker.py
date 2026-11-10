@@ -27,6 +27,7 @@ from app.services.feed_release_batch import (
     pick_draft_photo_needing_embedding,
 )
 from app.services.image_prepare import jpeg_bytes_for_fashn_file, png_bytes_to_webp
+from app.services.moysklad_image import record_moysklad_upload
 from app.services.photo_embedding import (
     embed_image_bytes,
     embed_photo_url,
@@ -335,6 +336,7 @@ def run_single_ingest_job(cfg: Settings, job_id: uuid.UUID) -> None:
                 release_batch_id=batch_id,
             )
             log.info("ai_ingest job_id=%s OK → photo_id=%s batch=%s", job_id, photo.id, batch_id)
+            record_moysklad_upload(db, job, photo_id=photo.id, png=png_bytes)
         except Exception as e:
             log.exception("save job_id=%s", job_id)
             db.rollback()

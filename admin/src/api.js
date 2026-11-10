@@ -11,6 +11,7 @@ export const ADMIN_PERMISSIONS = [
   { key: "product", label: "Товар" },
   { key: "outlet", label: "Аутлет: съёмка (PWA)" },
   { key: "outlet_transfer", label: "Аутлет: очередь переноса (PWA)" },
+  { key: "collection", label: "Новая коллекция: съёмка (PWA)" },
   { key: "ai_assistant", label: "AI помощник" },
   { key: "giftcards", label: "Сертификаты" },
 ];
@@ -696,11 +697,12 @@ export async function createBrand(name) {
   return data;
 }
 
-export async function updateBrand(brandId, name) {
+export async function updateBrand(brandId, nameOrBody) {
+  const body = typeof nameOrBody === "string" ? { name: nameOrBody } : nameOrBody;
   const res = await fetch(apiUrl(`/admin/brands/${brandId}`), {
     method: "PATCH",
     headers: headersJson(),
-    body: JSON.stringify({ name }),
+    body: JSON.stringify(body),
   });
   const data = await parseResponseJson(res);
   if (!res.ok) throw new Error(detail(data, res.statusText));
@@ -763,8 +765,9 @@ export async function publishAiIngestRelease(gender) {
   return data;
 }
 
-export async function fetchAiIngestJobs({ skip = 0, limit = 50 } = {}) {
+export async function fetchAiIngestJobs({ skip = 0, limit = 50, queue } = {}) {
   const q = new URLSearchParams({ skip: String(skip), limit: String(limit) });
+  if (queue) q.set("queue", queue);
   const res = await fetch(`${apiUrl("/admin/ai-ingest/jobs")}?${q}`, { headers: headersJson() });
   const data = await parseResponseJson(res);
   if (!res.ok) throw new Error(detail(data, res.statusText));
@@ -792,6 +795,48 @@ export async function uploadAiIngestBatch(
     method: "POST",
     headers: headersAuthOnly(),
     body: fd,
+  });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
+export async function fetchAiIngestJobSource(jobId) {
+  const res = await fetch(apiUrl(`/admin/ai-ingest/jobs/${jobId}/source`), {
+    headers: headersAuthOnly(),
+  });
+  if (!res.ok) {
+    let message = res.statusText;
+    try {
+      const data = await res.json();
+      message = detail(data, res.statusText);
+    } catch {
+      /* не JSON */
+    }
+    throw new Error(message);
+  }
+  return res.blob();
+}
+
+export async function enqueueAiIngestInbox({ sourceMode, showBadge = false, items }) {
+  const res = await fetch(apiUrl("/admin/ai-ingest/inbox/enqueue"), {
+    method: "POST",
+    headers: headersJson(),
+    body: JSON.stringify({
+      source_mode: sourceMode,
+      show_badge: !!showBadge,
+      items,
+    }),
+  });
+  const data = await parseResponseJson(res);
+  if (!res.ok) throw new Error(detail(data, res.statusText));
+  return data;
+}
+
+export async function retryAiIngestMoySklad(jobId) {
+  const res = await fetch(apiUrl(`/admin/ai-ingest/jobs/${jobId}/moysklad`), {
+    method: "POST",
+    headers: headersJson(),
   });
   const data = await parseResponseJson(res);
   if (!res.ok) throw new Error(detail(data, res.statusText));

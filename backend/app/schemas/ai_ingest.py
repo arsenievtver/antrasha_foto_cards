@@ -45,6 +45,19 @@ class AiIngestJobOut(BaseModel):
     created_at: datetime
     started_at: datetime | None
     finished_at: datetime | None
+    product_name: str | None = None
+    article: str | None = None
+    barcode: str | None = None
+    supplier_name: str | None = None
+    moysklad_product_id: str | None = None
+    # linked | name | none — только для кадра с телефона.
+    brand_match: str | None = None
+    brand_warning: str | None = None
+    suggested_brand_id: uuid.UUID | None = None
+    suggested_brand_name: str | None = None
+    # uploaded | failed | пусто
+    moysklad_upload_status: str | None = None
+    moysklad_upload_error: str | None = None
 
 
 class AiIngestUploadResponse(BaseModel):
@@ -63,6 +76,7 @@ class AiIngestQueueStatsOut(BaseModel):
     pending: int
     processing: int
     failed: int
+    inbox: int = 0
 
 
 class AiIngestReleaseDraftOut(BaseModel):
@@ -75,6 +89,7 @@ class AiIngestReleaseDraftOut(BaseModel):
     last_embed_error: str | None = None
     fashn_pending: int = 0
     fashn_failed: int = 0
+    moysklad_pending: int = 0
     can_publish: bool = False
 
 
@@ -85,6 +100,21 @@ class AiIngestPublishOut(BaseModel):
     photo_count: int = 0
     message: str
     failed: list[dict] = []
+
+
+class AiIngestEnqueueItem(BaseModel):
+    job_id: uuid.UUID
+    brand_id: uuid.UUID | None = None
+
+
+class AiIngestEnqueueIn(BaseModel):
+    source_mode: str
+    show_badge: bool = False
+    items: list[AiIngestEnqueueItem]
+
+
+class AiIngestEnqueueOut(BaseModel):
+    items: list[AiIngestJobOut]
 
 
 class AiIngestDiagnosticsOut(BaseModel):

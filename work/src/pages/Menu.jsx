@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import {
   hasAiAssistantAccess,
+  hasCollectionAccess,
   hasOutletAccess,
   hasOutletTransferAccess,
   hasProductAccess,
@@ -29,6 +30,12 @@ export default function Menu() {
               <span className="menu-list__hint">Поставки, оплаты, предоплата и курс</span>
             </Link>
           </>
+        ) : null}
+        {hasCollectionAccess() ? (
+          <Link to="/collection" className="menu-list__item">
+            <span className="menu-list__title">Новая коллекция</span>
+            <span className="menu-list__hint">Штрихкод → фото в админку</span>
+          </Link>
         ) : null}
         {hasOutletAccess() ? (
           <Link to="/outlet" className="menu-list__item">

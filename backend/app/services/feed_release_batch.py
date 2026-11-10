@@ -168,6 +168,23 @@ def count_pending_fashn_for_draft(db: Session, batch_id: uuid.UUID) -> int:
     )
 
 
+def count_moysklad_pending_for_draft(db: Session, batch_id: uuid.UUID) -> int:
+    """Кадры коллекции, которые уже в черновике, но картинка ещё не в МойСклад."""
+    return int(
+        db.scalar(
+            select(func.count())
+            .select_from(AiIngestJob)
+            .where(
+                AiIngestJob.release_batch_id == batch_id,
+                AiIngestJob.status == "completed",
+                AiIngestJob.moysklad_product_id.is_not(None),
+                AiIngestJob.moysklad_upload_status.is_distinct_from("uploaded"),
+            )
+        )
+        or 0
+    )
+
+
 def count_failed_fashn_for_draft(db: Session, batch_id: uuid.UUID) -> int:
     return int(
         db.scalar(
