@@ -44,6 +44,9 @@ class OutletPhotoJobOut(BaseModel):
     path_name: str | None = None
     product_gender: str | None = None
     created_at: datetime
+    started_at: datetime | None = None
+    # Заказ уже в Fashn: идёт генерация, а не очередь или отправка.
+    fashn_ordered: bool = False
 
 
 class OutletPhotoJobCurrentOut(BaseModel):

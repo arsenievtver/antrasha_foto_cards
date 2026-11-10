@@ -18,6 +18,7 @@ from app.deps import AdminPrincipal
 from app.externals.http.fashn import (
     CONTENT_MODE_SINGLE,
     FRAME_OUTLET,
+    STAGE_SUBMIT,
     FashnClient,
     FashnJobFailed,
     FashnJobGone,
@@ -29,6 +30,29 @@ from app.services.yc_storage import delete_fashn_source, public_object_url, put_
 log = logging.getLogger("app.outlet_photo")
 
 JOB_DEADLINE_SEC = 15 * 60
+
+
+class OutletJobCancelled(Exception):
+    """Сотрудник отменил кадр до заказа в Fashn — платить не за что."""
+
+
+def _job_status(job_id: uuid.UUID) -> str | None:
+    db = SessionLocal()
+    try:
+        return db.scalar(select(OutletPhotoJob.status).where(OutletPhotoJob.id == job_id))
+    finally:
+        db.close()
+
+
+def describe_fashn_error(e: BaseException) -> str:
+    """Текст для экрана сотрудника, а не имя исключения."""
+    if isinstance(e, FashnJobFailed):
+        return "Fashn не смог сделать кадр. Попробуйте другой ракурс или фон."
+    if isinstance(e, FashnJobGone):
+        return "Fashn потерял заказ. Отправьте кадр ещё раз."
+    if isinstance(e, (TimeoutError, asyncio.TimeoutError)):
+        return "Fashn не ответил вовремя. Отправьте кадр ещё раз."
+    return f"Ошибка связи с Fashn ({type(e).__name__}). Отправьте кадр ещё раз."
 
 
 def _root() -> Path:
@@ -213,6 +237,10 @@ def _render_png(job_id: uuid.UUID, raw: bytes, gender: str, remote_id: str | Non
     bucket = settings.yc_bucket_men if g == "male" else settings.yc_bucket_women
     uploaded: list[str] = []
 
+    def on_stage(stage: str) -> None:
+        if stage == STAGE_SUBMIT and _job_status(job_id) != "running":
+            raise OutletJobCancelled()
+
     def source_url() -> str:
         jpeg, _size = jpeg_bytes_for_fashn_bytes(raw)
         key = put_fashn_source_jpeg(bucket, jpeg)
@@ -237,6 +265,7 @@ def _render_png(job_id: uuid.UUID, raw: bytes, gender: str, remote_id: str | Non
                     frame=FRAME_OUTLET,
                     remote_id=remote_id,
                     on_submitted=lambda rid: _save_fashn_job_id(job_id, rid),
+                    on_stage=on_stage,
                 ),
                 timeout=JOB_DEADLINE_SEC,
             ),
@@ -302,6 +331,16 @@ def _run(job_id: uuid.UUID) -> None:
     t0 = time.monotonic()
     try:
         png = _render_png(job_id, raw, gender, remote_id)
+    except OutletJobCancelled:
+        log.info("outlet job %s отменён до заказа в Fashn", job_id)
+        db = SessionLocal()
+        try:
+            job = db.get(OutletPhotoJob, job_id)
+            if job:
+                delete_job_files(job)
+        finally:
+            db.close()
+        return
     except Exception as e:
         dt = time.monotonic() - t0
         log.warning(
@@ -318,7 +357,7 @@ def _run(job_id: uuid.UUID) -> None:
             if job and isinstance(e, (FashnJobFailed, FashnJobGone)):
                 job.fashn_job_id = None
             if job and job.status == "running":
-                _fail(db, job, f"Fashn: {type(e).__name__}: {e}")
+                _fail(db, job, describe_fashn_error(e))
             elif job:
                 delete_job_files(job)
         finally:

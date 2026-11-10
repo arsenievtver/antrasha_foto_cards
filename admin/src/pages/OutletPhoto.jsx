@@ -455,7 +455,7 @@ export default function OutletPhoto() {
                 </span>
               </div>
             ) : null}
-            {step !== STEPS.SUCCESS && (
+            {step !== STEPS.SUCCESS && step !== STEPS.WAITING && (
               <button
                 type="button"
                 className="secondary"

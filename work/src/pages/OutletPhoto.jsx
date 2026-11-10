@@ -46,6 +46,19 @@ function productFromJob(job) {
   };
 }
 
+function waitingLabel(job) {
+  if (!job || job.status === "pending") return "Кадр в очереди";
+  if (!job.fashn_ordered) return "Отправляем кадр в Fashn";
+  return "Fashn рисует кадр";
+}
+
+function fmtElapsed(fromIso, now) {
+  if (!fromIso) return "";
+  const sec = Math.max(0, Math.floor((now - new Date(fromIso).getTime()) / 1000));
+  const m = Math.floor(sec / 60);
+  return `${m}:${String(sec % 60).padStart(2, "0")}`;
+}
+
 const CROP_ASPECT = 4 / 5;
 
 function revokeUrl(url) {
@@ -74,6 +87,8 @@ export default function OutletPhoto() {
   const [busy, setBusy] = useState(false);
   const [loadingStatus, setLoadingStatus] = useState(true);
   const [scanOpen, setScanOpen] = useState(false);
+  const [waitJob, setWaitJob] = useState(null);
+  const [now, setNow] = useState(() => Date.now());
   const cameraRef = useRef(null);
   const fileRef = useRef(null);
   const jobIdRef = useRef("");
@@ -102,6 +117,7 @@ export default function OutletPhoto() {
         setBarcode(job.barcode || "");
         if (job.gender === "male" || job.gender === "female") setGender(job.gender);
         if (job.status === "pending" || job.status === "running") {
+          setWaitJob(job);
           setStep(STEPS.WAITING);
         } else if (job.status === "ready") {
           try {
@@ -151,6 +167,7 @@ export default function OutletPhoto() {
       try {
         const job = await fetchOutletPhotoJob(jobId);
         if (stop) return;
+        setWaitJob(job);
         if (job.status === "pending" || job.status === "running") {
           setErr("");
           return;
@@ -174,6 +191,10 @@ export default function OutletPhoto() {
           setStep(croppedFileRef.current ? STEPS.PREVIEW_CROP : STEPS.PRODUCT);
           return;
         }
+        if (job.status === "cancelled") {
+          setStep(croppedFileRef.current ? STEPS.PREVIEW_CROP : STEPS.PRODUCT);
+          return;
+        }
       } catch (ex) {
         loadingImage = false;
         if (!stop) setErr(netMessage(ex));
@@ -193,6 +214,24 @@ export default function OutletPhoto() {
       document.removeEventListener("visibilitychange", onVis);
     };
   }, [step, jobId]);
+
+  useEffect(() => {
+    if (step !== STEPS.WAITING) return undefined;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [step]);
+
+  function onCancelWaiting() {
+    if (!confirm("Отменить генерацию? Если Fashn уже начал рисовать, кадр всё равно спишется.")) {
+      return;
+    }
+    const id = jobIdRef.current;
+    setJobId("");
+    setWaitJob(null);
+    setErr("");
+    setStep(croppedFileRef.current ? STEPS.PREVIEW_CROP : STEPS.PRODUCT);
+    if (id) void dismissOutletPhotoJob(id).catch(() => {});
+  }
 
   function resetAll() {
     const id = jobIdRef.current;
@@ -288,6 +327,7 @@ export default function OutletPhoto() {
     setErr("");
     try {
       const job = await createOutletPhotoJob({ gender, file: croppedFile, product });
+      setWaitJob(job);
       setJobId(job.id);
       setStep(STEPS.WAITING);
     } catch (ex) {
@@ -425,7 +465,7 @@ export default function OutletPhoto() {
                 </span>
               </div>
             ) : null}
-            {step !== STEPS.SUCCESS ? (
+            {step !== STEPS.SUCCESS && step !== STEPS.WAITING ? (
               <button
                 type="button"
                 className="secondary"
@@ -489,7 +529,9 @@ export default function OutletPhoto() {
 
       {step === STEPS.PREVIEW_CROP && (
         <div className="outlet-card">
-          <p style={{ marginTop: 0 }}>Кадр 4:5 — отправить на сервер?</p>
+          <p style={{ marginTop: 0 }}>
+            {err ? "Кадр сохранён — можно отправить ещё раз." : "Кадр 4:5 — отправить на сервер?"}
+          </p>
           {croppedPreview ? (
             <img src={croppedPreview} alt="Кадр" className="outlet-preview" />
           ) : null}
@@ -516,11 +558,28 @@ export default function OutletPhoto() {
 
       {step === STEPS.WAITING && (
         <div className="outlet-card">
-          <p style={{ marginTop: 0, fontWeight: 600 }}>Fashn рисует кадр на сервере</p>
-          <p className="muted" style={{ marginTop: 0 }}>
-            Телефон больше не ждёт ответ. Можно закрыть страницу и открыть её снова — здесь
-            появится готовый кадр.
+          <div className="outlet-waiting">
+            <span className="outlet-spinner" aria-hidden="true" />
+            <div>
+              <div style={{ fontWeight: 600 }}>{waitingLabel(waitJob)}</div>
+              <div className="muted small">
+                {fmtElapsed(waitJob?.created_at, now)}
+                {waitJob?.fashn_ordered ? " · обычно около минуты" : ""}
+              </div>
+            </div>
+          </div>
+          <p className="muted small" style={{ marginBottom: 0 }}>
+            Можно уйти на другую страницу или закрыть приложение — кадр доделается на сервере и
+            будет ждать здесь.
           </p>
+          <button
+            type="button"
+            className="secondary"
+            style={{ marginTop: "0.75rem" }}
+            onClick={onCancelWaiting}
+          >
+            Отменить
+          </button>
         </div>
       )}
 

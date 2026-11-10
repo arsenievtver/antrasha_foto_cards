@@ -1694,6 +1694,29 @@
   margin: 0.5rem 0 0.85rem;
 }
 
+.outlet-waiting {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.65rem;
+}
+
+.outlet-spinner {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  border-top-color: currentColor;
+  animation: outlet-spin 0.9s linear infinite;
+}
+
+@keyframes outlet-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .outlet-uploads {
   margin-top: 0.25rem;
 }

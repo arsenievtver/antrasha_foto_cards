@@ -138,6 +138,8 @@ async def lifespan(_app: FastAPI):
         db_boot.close()
 
     tasks: list[asyncio.Task] = [
+        # Два потока: долгий заказ Fashn не держит очередь остальных сотрудников.
+        asyncio.create_task(_outlet_photo_loop()),
         asyncio.create_task(_outlet_photo_loop()),
     ]
     log.info("Очередь фото аутлета включена")

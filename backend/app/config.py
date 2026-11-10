@@ -243,9 +243,10 @@ class Settings(BaseSettings):
     fashn_https_proxy: str | None = None
     # Таймауты requests к api.fashn.ai: (connect, read). Submit с большим base64 часто >120 с.
     fashn_http_connect_timeout: float = 30.0
-    # POST /run: после отправки сырого JPEG тело меньше — 300 с обычно достаточно; при ноде Fashn приподними.
-    fashn_http_read_timeout_submit: float = 300.0
-    fashn_http_read_timeout_poll: float = 60.0
+    # POST /run: в теле только ссылка на исходник, Fashn отвечает за секунды.
+    # Дольше — ответ потерялся; ждать минутами нет смысла, сотрудник смотрит на экран.
+    fashn_http_read_timeout_submit: float = 45.0
+    fashn_http_read_timeout_poll: float = 30.0
     fashn_http_read_timeout_download: float = 180.0
     # Очередь телефон → ИИ → Object Storage: лимиты и каталог временных файлов
     ai_ingest_max_files_per_upload: int = 40

@@ -107,6 +107,8 @@ def _job_out(row: OutletPhotoJob) -> OutletPhotoJobOut:
         path_name=row.path_name,
         product_gender=row.product_gender,
         created_at=row.created_at,
+        started_at=row.started_at,
+        fashn_ordered=bool(row.fashn_job_id),
     )
 
 
