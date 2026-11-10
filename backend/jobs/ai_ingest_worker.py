@@ -24,6 +24,7 @@ from app.services.ai_ingest_worker import (
     reset_stale_processing_jobs,
     try_process_one_ingest_job,
 )
+from app.services.outlet_photo_jobs import reset_running_jobs, try_process_one_outlet_photo_job
 from app.services.photo_embedding import warm_image_model
 
 log = logging.getLogger("app.jobs.ai_ingest_worker")
@@ -51,6 +52,21 @@ async def _slot() -> None:
             await asyncio.to_thread(try_process_one_ingest_job, settings)
         except Exception:
             log.exception("ai_ingest slot error")
+
+
+async def _outlet_slot() -> None:
+    """Кадры аутлета: телефон создаёт задачу через API, Fashn вызывается здесь."""
+    while True:
+        try:
+            did = await asyncio.to_thread(try_process_one_outlet_photo_job)
+        except ProgrammingError:
+            log.warning("outlet photo: нет таблицы очереди — alembic upgrade head")
+            await asyncio.sleep(60)
+            continue
+        except Exception:
+            log.exception("outlet photo: ошибка очереди")
+            did = False
+        await asyncio.sleep(0.4 if did else 1.2)
 
 
 async def _stale_watch() -> None:
@@ -97,6 +113,7 @@ async def main() -> None:
     try:
         # Воркер один: всё, что числится в работе, осталось от прошлого запуска.
         reset_stale_processing_jobs(db, older_than_minutes=0)
+        reset_running_jobs(db)
     except ProgrammingError:
         db.rollback()
         log.warning("reset_stale_processing_jobs skipped — run alembic upgrade head first")
@@ -104,7 +121,13 @@ async def main() -> None:
         db.close()
 
     n = max(1, settings.ai_ingest_worker_concurrency)
-    await asyncio.gather(*[_slot() for _ in range(n)], _stale_watch(), _embed_loop())
+    await asyncio.gather(
+        *[_slot() for _ in range(n)],
+        _outlet_slot(),
+        _outlet_slot(),
+        _stale_watch(),
+        _embed_loop(),
+    )
 
 
 if __name__ == "__main__":

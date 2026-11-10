@@ -49,10 +49,6 @@ from app.routers import (
 )
 from app.mcp_procurement.http import mcp_method_not_allowed, mcp_post
 from app.services.ai_ingest_worker import reset_stale_processing_jobs
-from app.services.outlet_photo_jobs import (
-    reset_running_jobs,
-    try_process_one_outlet_photo_job,
-)
 from app.services.weekly_insight.runner import run_scheduled_if_due
 from app.services.yc_photo_sync import run_sync_job_commit
 
@@ -76,22 +72,6 @@ async def _yc_auto_sync_loop() -> None:
         except Exception:
             log.exception("yc_auto_sync: ошибка синхронизации с Object Storage")
         await asyncio.sleep(interval_sec)
-
-
-async def _outlet_photo_loop() -> None:
-    """Телефон не ждёт Fashn: очередь крутится рядом с API."""
-    await asyncio.sleep(2)
-    while True:
-        try:
-            did = await asyncio.to_thread(try_process_one_outlet_photo_job)
-        except ProgrammingError:
-            log.warning("outlet photo: нет таблицы очереди — alembic upgrade head")
-            await asyncio.sleep(60)
-            continue
-        except Exception:
-            log.exception("outlet photo: ошибка очереди")
-            did = False
-        await asyncio.sleep(0.4 if did else 1.2)
 
 
 async def _weekly_insight_loop() -> None:
@@ -127,22 +107,11 @@ async def lifespan(_app: FastAPI):
             log.warning(
                 "lifespan: reset_stale_processing_jobs пропущен — БД без миграций или нет таблицы ai_ingest_jobs; выполните alembic upgrade head",
             )
-        try:
-            reset_running_jobs(db_boot)
-        except ProgrammingError:
-            db_boot.rollback()
-            log.warning(
-                "lifespan: очередь аутлета пропущена — нет таблицы outlet_photo_jobs; выполните alembic upgrade head",
-            )
     finally:
         db_boot.close()
 
-    tasks: list[asyncio.Task] = [
-        # Два потока: долгий заказ Fashn не держит очередь остальных сотрудников.
-        asyncio.create_task(_outlet_photo_loop()),
-        asyncio.create_task(_outlet_photo_loop()),
-    ]
-    log.info("Очередь фото аутлета включена")
+    # Очередь аутлета ведёт ai-ingest-worker: из процесса API заказы в Fashn зависали.
+    tasks: list[asyncio.Task] = []
     if settings.yc_auto_sync_interval_minutes > 0:
         tasks.append(asyncio.create_task(_yc_auto_sync_loop()))
         log.info("Фоновая синхронизация Object Storage включена")

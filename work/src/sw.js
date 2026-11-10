@@ -1,4 +1,4 @@
-import { setCacheNameDetails } from "workbox-core";
+import { clientsClaim, setCacheNameDetails } from "workbox-core";
 import { cleanupOutdatedCaches, precacheAndRoute } from "workbox-precaching";
 
 setCacheNameDetails({
@@ -7,6 +7,11 @@ setCacheNameDetails({
   precache: "precache",
   runtime: "runtime",
 });
+
+// Установленное на iPhone приложение почти не закрывается полностью — без этого
+// новая версия ждала бы «закрытия всех вкладок» неделями.
+self.skipWaiting();
+clientsClaim();
 
 cleanupOutdatedCaches();
 precacheAndRoute(self.__WB_MANIFEST);

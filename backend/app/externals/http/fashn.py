@@ -210,7 +210,7 @@ class FashnClient(BaseApiClient):
         return {"proxy": self._proxy} if self._proxy and not self._socks else {}
 
     async def _submit_payload(self, payload: dict, *, label: str) -> str:
-        """POST /run один раз. Повтор — только если соединение так и не открылось."""
+        """POST /run. Повтор — если соединение не открылось или ответ не пришёл вовремя."""
         last: BaseException | None = None
         for attempt in range(1, SUBMIT_CONNECT_TRIES + 1):
             try:
@@ -230,6 +230,17 @@ class FashnClient(BaseApiClient):
                     attempt,
                     SUBMIT_CONNECT_TRIES,
                     type(e).__name__,
+                )
+            except asyncio.TimeoutError as e:
+                # Fashn отвечает на /run за 1–3 с. Зависшие запросы в истории Fashn
+                # не появлялись — до него они не доходят, повтор не платит дважды.
+                last = e
+                log.warning(
+                    "fashn %s: ответ не пришёл за %.0f с (%s/%s), повтор",
+                    label,
+                    self._submit_timeout,
+                    attempt,
+                    SUBMIT_CONNECT_TRIES,
                 )
             except ApiClientAbortableException as e:
                 log.warning(

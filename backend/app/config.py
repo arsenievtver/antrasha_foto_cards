@@ -245,7 +245,7 @@ class Settings(BaseSettings):
     fashn_http_connect_timeout: float = 30.0
     # POST /run: в теле только ссылка на исходник, Fashn отвечает за секунды.
     # Дольше — ответ потерялся; ждать минутами нет смысла, сотрудник смотрит на экран.
-    fashn_http_read_timeout_submit: float = 45.0
+    fashn_http_read_timeout_submit: float = 25.0
     fashn_http_read_timeout_poll: float = 30.0
     fashn_http_read_timeout_download: float = 180.0
     # Очередь телефон → ИИ → Object Storage: лимиты и каталог временных файлов
