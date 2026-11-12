@@ -28,6 +28,27 @@ function listText(value) {
   return Array.isArray(value) ? value.join(", ") : value || "";
 }
 
+function groupSizes(text) {
+  const groups = [];
+  const index = new Map();
+  for (const part of String(text || "").split(";")) {
+    const piece = part.trim();
+    if (!piece) continue;
+    const colon = piece.indexOf(":");
+    const cat = (colon === -1 ? piece : piece.slice(0, colon)).trim();
+    const size = colon === -1 ? "" : piece.slice(colon + 1).trim();
+    if (!cat) continue;
+    let at = index.get(cat);
+    if (at === undefined) {
+      at = groups.length;
+      index.set(cat, at);
+      groups.push({ cat, sizes: [] });
+    }
+    if (size && !groups[at].sizes.includes(size)) groups[at].sizes.push(size);
+  }
+  return groups;
+}
+
 function sumOf(rows, key) {
   return rows.reduce((acc, row) => acc + (Number(row[key]) || 0), 0);
 }
@@ -195,19 +216,45 @@ export default function AClientsActive() {
   }, [left, q]);
 
   const slices = useMemo(() => {
-    const base = [
-      { id: "all", label: "Всего", rows: searched },
-      { id: "growing", label: "Растут", rows: searched.filter((row) => row.pace === "растёт") },
-      { id: "falling", label: "Падают", rows: searched.filter((row) => row.pace === "падает") },
-      { id: "flat", label: "Ровно", rows: searched.filter((row) => row.pace === "ровно") },
+    const pace = [
+      {
+        id: "growing",
+        label: "Растут",
+        note: "выросли больше чем на 5%",
+        rows: searched.filter((row) => row.pace === "растёт"),
+      },
+      {
+        id: "falling",
+        label: "Падают",
+        note: "упали больше чем на 5%",
+        rows: searched.filter((row) => row.pace === "падает"),
+      },
+      {
+        id: "flat",
+        label: "Ровно",
+        note: "изменение в пределах ±5%",
+        rows: searched.filter((row) => row.pace === "ровно"),
+      },
+      {
+        id: "none",
+        label: "Нет базы",
+        note: "в прошлых 12 месяцах покупок не было",
+        rows: searched.filter((row) => row.pace === "нет базы"),
+      },
     ];
-    if (!hasPrevious) return base;
+    const all = {
+      id: "all",
+      label: "Всего",
+      note: "растут + падают + ровно + нет базы",
+      rows: searched,
+    };
+    if (!hasPrevious) return [all, ...pace];
     return [
-      base[0],
-      { id: "new", label: "Новые", rows: searched.filter((row) => row.cohort === "новый") },
-      { id: "stayed", label: "Были", rows: searched.filter((row) => row.cohort === "был") },
-      ...base.slice(1),
-      { id: "left", label: "Выбыли", rows: searchedLeft },
+      all,
+      { id: "new", label: "Новые", note: "в прошлом срезе их не было", rows: searched.filter((row) => row.cohort === "новый") },
+      { id: "stayed", label: "Были", note: "были и на прошлой неделе", rows: searched.filter((row) => row.cohort === "был") },
+      ...pace,
+      { id: "left", label: "Выбыли", note: "ушли из действующих, считаются отдельно", rows: searchedLeft },
     ];
   }, [searched, searchedLeft, hasPrevious]);
 
@@ -246,9 +293,9 @@ export default function AClientsActive() {
   return (
     <>
       <p style={{ color: "var(--muted)", marginTop: 0, maxWidth: 760 }}>
-        Категория А, которая держит ритм: не в списке на контроле. Срез от {board.week_start}
-        {board.prev_week_start ? `, сравнение с ${board.prev_week_start}` : ""}. Динамика — последние 12 месяцев к
-        предыдущим 12. «К срезу» — как изменилась эта выручка с прошлого понедельника. Полоса ±5% считается ровной.
+        Категория А, которая держит ритм и не стоит на контроле. Срез от {board.week_start}
+        {board.prev_week_start ? `, сравнение с ${board.prev_week_start}` : ""}. Динамика внизу — последние 12 месяцев
+        к предыдущим 12 у самого клиента. «К срезу» — как изменилась эта выручка с прошлого понедельника.
       </p>
       {!hasPrevious ? (
         <p style={{ color: "var(--muted)" }}>
@@ -264,14 +311,14 @@ export default function AClientsActive() {
       </div>
 
       <div style={{ overflowX: "auto", marginBottom: "1rem" }}>
-        <table>
+        <table className="a-active-table">
           <thead>
             <tr>
-              <th>Срез</th>
+              <th>Кого считаем</th>
               <th>Клиентов</th>
               <th>Прошлые 12 мес</th>
               <th>Последние 12 мес</th>
-              <th>Динамика</th>
+              <th>Динамика выручки</th>
               <th>Средний чек</th>
               <th>Интервал, дн</th>
             </tr>
@@ -285,22 +332,27 @@ export default function AClientsActive() {
                 <tr
                   key={item.id}
                   onClick={() => setSlice(active && item.id !== "all" ? "all" : item.id)}
-                  style={{ cursor: "pointer", background: active ? "var(--row-active, rgba(0,0,0,0.04))" : undefined }}
+                  style={{ cursor: "pointer", background: active ? "rgba(108, 158, 255, 0.14)" : undefined }}
                 >
-                  <td>{item.label}</td>
-                  <td>{item.rows.length}</td>
-                  <td>{rub(itemPrev)}</td>
-                  <td>{rub(itemCur)}</td>
-                  <td>{pct(trendOf(itemCur, itemPrev))}</td>
-                  <td>{item.id === "left" ? "—" : rub(avgOf(item.rows, "avg_check"))}</td>
-                  <td>{item.id === "left" ? "—" : num(avgOf(item.rows, "median_gap"), 1)}</td>
+                  <td>
+                    <div style={{ color: paceColor(item.id === "growing" ? "растёт" : item.id === "falling" ? "падает" : "") }}>
+                      {item.label}
+                    </div>
+                    {item.note ? <div className="a-active-slice-note">{item.note}</div> : null}
+                  </td>
+                  <td className="a-active-num">{item.rows.length}</td>
+                  <td className="a-active-num">{rub(itemPrev)}</td>
+                  <td className="a-active-num">{rub(itemCur)}</td>
+                  <td className="a-active-num">{pct(trendOf(itemCur, itemPrev))}</td>
+                  <td className="a-active-num">{item.id === "left" ? "—" : rub(avgOf(item.rows, "avg_check"))}</td>
+                  <td className="a-active-num">{item.id === "left" ? "—" : num(avgOf(item.rows, "median_gap"), 1)}</td>
                 </tr>
               );
             })}
           </tbody>
         </table>
         <p style={{ color: "var(--muted)", marginBottom: 0 }}>
-          В выборке {sorted.length}: последние 12 мес {rub(cur)}, прошлые {rub(prev)}, динамика {pct(trendOf(cur, prev))}.
+          В выборке {sorted.length}: последние 12 мес {rub(cur)}, прошлые {rub(prev)}, динамика выручки {pct(trendOf(cur, prev))}.
         </p>
       </div>
 
@@ -313,7 +365,7 @@ export default function AClientsActive() {
       )}
 
       <div style={{ overflowX: "auto" }}>
-        <table>
+        <table className="a-active-table">
           <thead>
             <tr>
               {columns.map((col) => (
@@ -328,20 +380,26 @@ export default function AClientsActive() {
             {sorted.map((row) => (
               <tr key={row.id}>
                 {columns.map((col) => (
-                  <td key={col.key} style={{ color: col.key === "pace" ? paceColor(row.pace) : undefined, whiteSpace: col.money || col.percent ? "nowrap" : undefined }}>
+                  <td
+                    key={col.key}
+                    className={col.money || col.percent || col.key === "median_gap" || col.key === "visits" || col.key === "days_since" ? "a-active-num" : undefined}
+                    style={{ color: col.key === "pace" ? paceColor(row.pace) : undefined }}
+                  >
                     {col.key === "name" ? (
-                      <>
+                      <div className="a-active-name">
                         {row.name}
                         <div style={{ color: "var(--muted)", fontSize: "0.85rem" }}>{row.phone}</div>
-                      </>
+                      </div>
+                    ) : col.key === "sizes" ? (
+                      <SizeChips text={row.sizes} />
+                    ) : col.key === "brands" || col.key === "categories" ? (
+                      <TagChips values={row[col.key]} />
                     ) : col.money ? (
                       rub(row[col.key])
                     ) : col.percent ? (
                       pct(row[col.key])
                     ) : col.key === "cohort" ? (
                       row.cohort || "—"
-                    ) : col.key === "brands" || col.key === "categories" ? (
-                      listText(row[col.key]) || "—"
                     ) : (
                       row[col.key] ?? "—"
                     )}
@@ -358,6 +416,35 @@ export default function AClientsActive() {
         </table>
       </div>
     </>
+  );
+}
+
+function SizeChips({ text }) {
+  const groups = groupSizes(text);
+  if (!groups.length) return "—";
+  return (
+    <div className="a-chips">
+      {groups.map((group) => (
+        <span key={group.cat} className="a-chip">
+          <span className="a-chip__cat">{group.cat}</span>
+          {group.sizes.length ? <span>{group.sizes.join(", ")}</span> : null}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function TagChips({ values }) {
+  const items = Array.isArray(values) ? values.filter(Boolean) : [];
+  if (!items.length) return "—";
+  return (
+    <div className="a-chips a-chips--short">
+      {items.map((item) => (
+        <span key={item} className="a-chip">
+          {item}
+        </span>
+      ))}
+    </div>
   );
 }
 
