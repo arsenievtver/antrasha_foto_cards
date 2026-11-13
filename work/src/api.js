@@ -321,10 +321,13 @@ export async function lookupCollectionBarcode(barcode) {
   return data;
 }
 
-export async function createCollectionPhotoJob({ gender, file, barcode }) {
+export async function createCollectionPhotoJob({ gender, file, barcode, extraBarcodes = [] }) {
   const fd = new FormData();
   fd.append("gender", gender);
   fd.append("barcode", barcode);
+  if (extraBarcodes?.length) {
+    fd.append("extra_barcodes", JSON.stringify(extraBarcodes));
+  }
   fd.append("image", file);
   const res = await fetch(apiUrl("/admin/collection-photo/jobs"), {
     method: "POST",

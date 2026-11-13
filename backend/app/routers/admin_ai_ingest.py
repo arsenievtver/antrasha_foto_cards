@@ -32,7 +32,10 @@ from app.externals.http.fashn import VALID_CONTENT_MODES, normalize_content_mode
 from app.services.ai_ingest_worker import count_pending_jobs, is_processing_stale
 from app.services.brand_match import apply_supplier_link, match_supplier
 from app.services.image_prepare import image_bytes_to_png
-from app.services.moysklad_image import upload_catalog_png
+from app.services.moysklad_image import (
+    collection_product_ids,
+    upload_catalog_png_to_products,
+)
 from app.services.yc_storage import public_object_url, read_object_bytes
 from app.services.feed_release_batch import (
     count_failed_fashn_for_draft,
@@ -118,6 +121,7 @@ def _job_out(j: AiIngestJob, brands: list | None = None) -> AiIngestJobOut:
         barcode=j.barcode,
         supplier_name=j.supplier_name,
         moysklad_product_id=j.moysklad_product_id,
+        linked_products=list(j.linked_products or []) or None,
         moysklad_upload_status=j.moysklad_upload_status,
         moysklad_upload_error=j.moysklad_upload_error,
         brand_match=match.confidence if match else None,
@@ -632,7 +636,8 @@ async def retry_moysklad_image(
     job = db.get(AiIngestJob, job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Задача не найдена")
-    if not job.moysklad_product_id:
+    product_ids = collection_product_ids(job)
+    if not product_ids:
         raise HTTPException(status_code=400, detail="У кадра нет товара МойСклад")
     if job.moysklad_upload_status == "uploaded":
         brands = list(db.scalars(select(Brand)).all())
@@ -642,7 +647,7 @@ async def retry_moysklad_image(
     filename = f"collection-{job.id.hex[:12]}.png"
     try:
         png = image_bytes_to_png(read_object_bytes(job.result_bucket, job.result_key))
-        await upload_catalog_png(job.moysklad_product_id, png, filename=filename)
+        await upload_catalog_png_to_products(product_ids, png, filename=filename)
     except Exception as e:
         job.moysklad_upload_status = "failed"
         job.moysklad_upload_error = f"{type(e).__name__}: {e}"[:2000]
@@ -650,7 +655,7 @@ async def retry_moysklad_image(
         raise HTTPException(status_code=502, detail=f"МойСклад: {job.moysklad_upload_error}") from e
     photo = db.get(Photo, job.photo_id)
     if photo is not None:
-        photo.moy_sklad_id = job.moysklad_product_id[:128]
+        photo.moy_sklad_id = product_ids[0][:128]
     job.moysklad_upload_status = "uploaded"
     job.moysklad_upload_error = None
     db.commit()

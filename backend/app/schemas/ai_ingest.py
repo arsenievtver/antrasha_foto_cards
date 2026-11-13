@@ -50,6 +50,8 @@ class AiIngestJobOut(BaseModel):
     barcode: str | None = None
     supplier_name: str | None = None
     moysklad_product_id: str | None = None
+    # Доп. товары комплекта с телефона: [{product_id, barcode, article, name}, …]
+    linked_products: list[dict] | None = None
     # linked | name | none — только для кадра с телефона.
     brand_match: str | None = None
     brand_warning: str | None = None

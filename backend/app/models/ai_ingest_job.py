@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, func
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -77,6 +77,8 @@ class AiIngestJob(Base):
     article: Mapped[str | None] = mapped_column(String(120), nullable=True)
     barcode: Mapped[str | None] = mapped_column(String(64), nullable=True)
     path_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Доп. товары комплекта (куртка+брюки и т.п.): [{product_id, barcode, article, name}, …], без первого.
+    linked_products: Mapped[list | None] = mapped_column(JSONB, nullable=True)
     # uploaded | failed. Пусто — в МойСклад ещё не отправляли или это не съёмка коллекции.
     moysklad_upload_status: Mapped[str | None] = mapped_column(String(20), nullable=True)
     moysklad_upload_error: Mapped[str | None] = mapped_column(Text, nullable=True)

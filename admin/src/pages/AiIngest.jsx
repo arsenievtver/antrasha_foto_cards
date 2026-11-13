@@ -47,6 +47,20 @@ const sourceModeLabel = (m) => {
   return m || "—";
 };
 
+function productLinesLabel(j) {
+  const lines = [];
+  const main = j.article || j.product_name;
+  if (main || j.barcode) {
+    lines.push([main, j.barcode].filter(Boolean).join(" · "));
+  }
+  for (const lp of j.linked_products || []) {
+    const bit = [lp.article, lp.name, lp.barcode].filter(Boolean).join(" · ");
+    if (bit) lines.push(bit);
+  }
+  if (lines.length > 1) return `Комплект (${lines.length}): ${lines.join("; ")}`;
+  return lines[0] || j.product_name || j.original_filename || "—";
+}
+
 export default function AiIngest() {
   const [limits, setLimits] = useState(null);
   const [stats, setStats] = useState(null);
@@ -521,9 +535,13 @@ export default function AiIngest() {
                         )}
                       </td>
                       <td style={{ padding: "0.45rem 0.35rem" }}>
-                        <div>{j.product_name || j.original_filename}</div>
+                        <div>{productLinesLabel(j)}</div>
                         <div style={{ color: "var(--muted)", fontSize: "0.82rem" }}>
-                          {j.article ? `Арт. ${j.article}` : "без артикула"}
+                          {j.linked_products?.length
+                            ? `После Fashn — фото на ${1 + j.linked_products.length} карточки`
+                            : j.article
+                              ? `Арт. ${j.article}`
+                              : "без артикула"}
                           {j.supplier_name ? ` · ${j.supplier_name}` : ""}
                         </div>
                       </td>

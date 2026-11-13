@@ -1665,6 +1665,32 @@
   margin-bottom: 0.25rem;
 }
 
+.collection-product-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.collection-product-list__item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 0.55rem;
+  border-radius: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
+.collection-product-list__remove {
+  flex-shrink: 0;
+  padding: 0.35rem 0.55rem;
+  font-size: 0.82rem;
+}
+
 .outlet-product__existing {
   display: flex;
   align-items: center;
